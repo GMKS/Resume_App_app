@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
 import '../services/share_export_service.dart';
@@ -176,8 +177,8 @@ class _SavedResumesScreenState extends State<SavedResumesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: const Text('Saved Resumes'),
-        automaticallyImplyLeading: true, // shows Back if canPop
         actions: [
           IconButton(
             tooltip: 'Templates',
@@ -368,6 +369,12 @@ class ResumeDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('yMMMd – HH:mm');
+    final String? photoB64 =
+        (resume.data['profilePhotoBase64'] is String &&
+            (resume.data['profilePhotoBase64'] as String).isNotEmpty)
+        ? resume.data['profilePhotoBase64'] as String
+        : null;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(resume.title),
@@ -376,6 +383,15 @@ class ResumeDetailsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (photoB64 != null) ...[
+            Center(
+              child: CircleAvatar(
+                radius: 50,
+                backgroundImage: MemoryImage(base64Decode(photoB64)),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),

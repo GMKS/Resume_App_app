@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
+import '../widgets/profile_photo_picker.dart';
+import '../widgets/requirements_banner.dart';
 
 class CreativeResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -12,8 +15,6 @@ class CreativeResumeFormScreen extends StatefulWidget {
 }
 
 class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
-  String? profilePhotoPath;
-
   @override
   Widget build(BuildContext context) {
     return BaseResumeForm(
@@ -30,6 +31,7 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
         'languages',
         'hobbies',
         'references',
+        'profilePhotoBase64', // ADDED
       ],
       child: Builder(
         builder: (ctx) {
@@ -41,41 +43,31 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _section('Profile Photo'),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 36,
-                        backgroundColor: Colors.grey.shade300,
-                        backgroundImage: profilePhotoPath != null
-                            ? AssetImage(profilePhotoPath!)
-                            : null,
-                        child: profilePhotoPath == null
-                            ? const Icon(
-                                Icons.person,
-                                size: 40,
-                                color: Colors.white70,
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.upload),
-                        onPressed: () {
-                          // Placeholder - no picker integration
-                          setState(() {
-                            profilePhotoPath = 'assets/profile_placeholder.png';
-                          });
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(
-                              content: Text('Mock photo assigned (demo only)'),
-                            ),
-                          );
-                        },
-                        label: const Text('Upload'),
-                      ),
-                    ],
+                  RequirementsBanner(
+                    requiredFieldLabels: const {
+                      'name': 'Full Name',
+                      'phone': 'Mobile Number',
+                      'email': 'Email',
+                      'portfolio': 'Portfolio / Website',
+                      'creativeSummary': 'Creative Summary',
+                      'skills': 'Skills',
+                      'tools': 'Tools & Software',
+                      'experience': 'Experience',
+                      'education': 'Education',
+                    },
                   ),
+                  _section('Profile Photo'),
+                  ProfilePhotoPicker(
+                    initialBase64:
+                        state.controllerFor('profilePhotoBase64').text.isEmpty
+                        ? null
+                        : state.controllerFor('profilePhotoBase64').text,
+                    onChanged: (b64) {
+                      state.controllerFor('profilePhotoBase64').text =
+                          b64 ?? '';
+                    },
+                  ),
+                  const SizedBox(height: 12),
 
                   _section('Personal Information'),
                   state.buildTextField('name', 'Full Name', required: true),
@@ -155,11 +147,6 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.save),
                       onPressed: () {
-                        // Optionally attach profile photo path to data
-                        if (profilePhotoPath != null) {
-                          state.controllerFor('profilePhoto').text =
-                              profilePhotoPath!;
-                        }
                         state.saveResume();
                       },
                       label: const Text('Save Creative Resume'),

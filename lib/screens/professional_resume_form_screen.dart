@@ -3,6 +3,7 @@ import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
 import '../services/share_export_service.dart';
 import '../services/resume_storage_service.dart';
+import '../widgets/requirements_banner.dart';
 
 class ProfessionalResumeFormScreen extends StatelessWidget {
   final SavedResume? existing;

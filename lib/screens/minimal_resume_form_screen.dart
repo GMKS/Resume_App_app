@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
+import '../widgets/requirements_banner.dart';
 
 class MinimalResumeFormScreen extends StatelessWidget {
   final SavedResume? existing;
@@ -28,6 +29,17 @@ class _MinimalFormBody extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            RequirementsBanner(
+              requiredFieldLabels: const {
+                'name': 'Full Name',
+                'phone': 'Mobile Number',
+                'email': 'Email Address',
+                'summary': 'Summary',
+                'education': 'Education',
+                'experience': 'Experience',
+                'skills': 'Skills',
+              },
+            ),
             _section('Personal Information'),
             state.buildTextField('name', 'Full Name', required: true),
             state.buildTextField(

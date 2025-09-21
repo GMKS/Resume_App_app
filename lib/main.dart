@@ -16,8 +16,9 @@ class MyApp extends StatelessWidget {
 
   Future<void> _init() async {
     await ReminderService.instance.init();
-    await AuthService.instance.init();
-    loggedInNotifier.value = AuthService.instance.isLoggedIn;
+    // Force logout EVERY cold start:
+    await AuthService.instance.init(alwaysFresh: true);
+    loggedInNotifier.value = false; // always show login first
   }
 
   @override
