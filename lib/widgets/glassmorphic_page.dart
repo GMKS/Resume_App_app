@@ -31,7 +31,6 @@ class GlassmorphicPage extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 32),
-              // App Icon or Logo
               Center(
                 child: Icon(
                   Icons.home,
@@ -40,7 +39,6 @@ class GlassmorphicPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              // Title
               Text(
                 title,
                 style: const TextStyle(
@@ -51,7 +49,6 @@ class GlassmorphicPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              // Glassmorphic Card
               Expanded(
                 child: Center(
                   child: Container(
@@ -76,7 +73,7 @@ class GlassmorphicPage extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showButton)
+              if (showButton && onButtonPressed != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -105,32 +102,6 @@ class GlassmorphicPage extends StatelessWidget {
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: _GlassNavBar(),
-    );
-  }
-}
-
-// Example bottom navigation bar
-class _GlassNavBar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          Icon(Icons.home, color: Colors.white, size: 28),
-          Icon(Icons.settings, color: Colors.white54, size: 28),
-          Icon(Icons.person, color: Colors.white54, size: 28),
-          Icon(Icons.notifications, color: Colors.white54, size: 28),
-        ],
       ),
     );
   }

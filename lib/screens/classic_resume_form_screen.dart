@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
+import '../services/cloud_resume_service.dart';
+import '../services/share_export_service.dart';
 
 class ClassicResumeFormScreen extends StatefulWidget {
   final SavedResume? existingResume;
@@ -94,30 +96,35 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
     }
   }
 
-  Future<void> _saveResume() async {
-    if (!_formKey.currentState!.validate()) return;
-    final data = _controllers.map((k, c) => MapEntry(k, c.text));
+  Future<SavedResume?> _saveResume({bool returnResume = false}) async {
+    if (!(_formKey.currentState?.validate() ?? false)) return null;
+    final Map<String, dynamic> data = {
+      for (final e in _controllers.entries) e.key: e.value.text,
+    };
     if (_workStart != null) data['workStart'] = _workStart!.toIso8601String();
     if (_workEnd != null) data['workEnd'] = _workEnd!.toIso8601String();
     final title = _controllers['name']!.text.isEmpty
         ? 'My Resume'
         : '${_controllers['name']!.text} Resume';
     final resume = SavedResume(
-      id: widget.existingResume?.id ?? ResumeStorageService.generateId(),
+      id:
+          widget.existingResume?.id ??
+          ResumeStorageService.instance.generateId(),
       title: widget.existingResume?.title ?? title,
       template: 'Classic',
-      data: data,
-      applications: widget.existingResume?.applications ?? [],
       createdAt: widget.existingResume?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
+      data: data,
     );
-    await ResumeStorageService.saveResume(resume);
-    if (mounted) {
+    await ResumeStorageService.instance.saveOrUpdate(resume);
+    if (!mounted) return resume;
+    if (!returnResume) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Resume saved!')));
       Navigator.pop(context);
     }
+    return resume;
   }
 
   Widget _sectionTitle(String text) => Padding(
@@ -252,23 +259,76 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
             _buildField('certifications', 'Certifications', maxLines: 2),
 
             const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saveResume,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  textStyle: const TextStyle(
-                    fontFamily: 'Arial',
-                    fontWeight: FontWeight.bold,
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.cloud_upload_outlined),
+                    label: const Text('Cloud Save'),
+                    onPressed: () async {
+                      // Validate first
+                      if (!(_formKey.currentState?.validate() ?? false)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Fix validation errors.'),
+                          ),
+                        );
+                        return;
+                      }
+                      await _saveResume(returnResume: true).then((
+                        resume,
+                      ) async {
+                        if (resume == null) return;
+                        if (!CloudResumeService.instance.canUploadClassic()) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Cloud limit (2 Classic) reached'),
+                            ),
+                          );
+                          return;
+                        }
+                        final ok = await CloudResumeService.instance
+                            .uploadClassic(resume);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              ok ? 'Uploaded to cloud' : 'Upload failed',
+                            ),
+                          ),
+                        );
+                      });
+                    },
                   ),
                 ),
-                child: const Text('Save Resume'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.save),
+                    label: const Text('Save Local'),
+                    onPressed: _saveResume,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.email_outlined),
+                label: const Text('Share via Email'),
+                onPressed: () async {
+                  if (!(_formKey.currentState?.validate() ?? false)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Save first or fix errors')),
+                    );
+                    return;
+                  }
+                  // Ensure latest saved version
+                  final resume = await _saveResume(returnResume: true);
+                  if (resume != null) {
+                    await ShareExportService.instance.shareEmailClassic(resume);
+                  }
+                },
               ),
             ),
           ],

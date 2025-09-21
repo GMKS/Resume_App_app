@@ -1,40 +1,50 @@
 class SavedResume {
   final String id;
-  String title, template;
-  Map<String, String> data;
-  List<CompanyApplication> applications;
-  DateTime createdAt, updatedAt;
+  final String title;
+  final String template;
+  final DateTime createdAt;
+  DateTime updatedAt;
+  Map<String, dynamic> data;
 
   SavedResume({
     required this.id,
     required this.title,
     required this.template,
-    required this.data,
-    required this.applications,
     required this.createdAt,
     required this.updatedAt,
+    required this.data,
   });
+
+  factory SavedResume.fromJson(Map<String, dynamic> json) => SavedResume(
+    id: json['id'] as String,
+    title: json['title'] as String,
+    template: json['template'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    updatedAt: DateTime.parse(json['updatedAt'] as String),
+    data: (json['data'] as Map?)?.cast<String, dynamic>() ?? {},
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
     'template': template,
-    'data': data,
-    'applications': applications.map((app) => app.toJson()).toList(),
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
+    'data': data,
   };
 
-  factory SavedResume.fromJson(Map<String, dynamic> json) => SavedResume(
-    id: json['id'],
-    title: json['title'],
-    template: json['template'],
-    data: Map<String, String>.from(json['data']),
-    applications: (json['applications'] as List)
-        .map((app) => CompanyApplication.fromJson(app))
-        .toList(),
-    createdAt: DateTime.parse(json['createdAt']),
-    updatedAt: DateTime.parse(json['updatedAt']),
+  SavedResume copyWith({
+    String? title,
+    String? template,
+    DateTime? updatedAt,
+    Map<String, dynamic>? data,
+  }) => SavedResume(
+    id: id,
+    title: title ?? this.title,
+    template: template ?? this.template,
+    createdAt: createdAt,
+    updatedAt: updatedAt ?? DateTime.now(),
+    data: data ?? this.data,
   );
 }
 

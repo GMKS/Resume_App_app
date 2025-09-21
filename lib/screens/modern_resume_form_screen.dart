@@ -164,15 +164,16 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
         ? 'My Resume'
         : '${_controllers['name']!.text} Resume';
     final resume = SavedResume(
-      id: widget.existingResume?.id ?? ResumeStorageService.generateId(),
+      id:
+          widget.existingResume?.id ??
+          ResumeStorageService.instance.generateId(),
       title: widget.existingResume?.title ?? title,
       template: 'Modern',
-      data: data,
-      applications: widget.existingResume?.applications ?? [],
       createdAt: widget.existingResume?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
+      data: data,
     );
-    await ResumeStorageService.saveResume(resume);
+    await ResumeStorageService.instance.saveOrUpdate(resume);
     if (mounted) {
       ScaffoldMessenger.of(
         context,
