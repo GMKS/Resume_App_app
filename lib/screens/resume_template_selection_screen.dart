@@ -27,6 +27,7 @@ class _ResumeTemplateSelectionScreenState
       style: 'Balanced traditional layout',
       requiredFields: const ['Name', 'Email', 'Phone'],
       screen: const ClassicResumeFormScreen(),
+      prefix: 'classic',
     ),
     _TemplateMeta(
       title: 'Modern',
@@ -35,6 +36,7 @@ class _ResumeTemplateSelectionScreenState
       style: 'Modern accent headers',
       requiredFields: const ['Name', 'Summary'],
       screen: const ModernResumeFormScreen(),
+      prefix: 'modern',
     ),
     _TemplateMeta(
       title: 'Minimal',
@@ -43,6 +45,7 @@ class _ResumeTemplateSelectionScreenState
       style: 'Clean single-column',
       requiredFields: const ['Name', 'Experience'],
       screen: const MinimalResumeFormScreen(),
+      prefix: 'minimal',
     ),
     _TemplateMeta(
       title: 'Professional',
@@ -51,6 +54,7 @@ class _ResumeTemplateSelectionScreenState
       style: 'Executive summary',
       requiredFields: const ['Name', 'Executive Summary'],
       screen: const ProfessionalResumeFormScreen(),
+      prefix: 'professional',
     ),
     _TemplateMeta(
       title: 'Creative',
@@ -59,6 +63,7 @@ class _ResumeTemplateSelectionScreenState
       style: 'Color blocks & photo',
       requiredFields: const ['Name', 'Portfolio'],
       screen: const CreativeResumeFormScreen(),
+      prefix: 'creative',
     ),
     _TemplateMeta(
       title: 'One Page',
@@ -67,6 +72,7 @@ class _ResumeTemplateSelectionScreenState
       style: 'Compact single page',
       requiredFields: const ['Name', 'Summary', 'Experience'],
       screen: const OnePageResumeFormScreen(),
+      prefix: 'onepage',
     ),
   ];
 
@@ -114,7 +120,7 @@ class _ResumeTemplateSelectionScreenState
                         ],
                       ),
                       title: Text(
-                        '${t.prefix}${t.title}',
+                        t.title,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: _selectedIndex == index
@@ -334,7 +340,7 @@ class _TemplateMeta {
     required this.style,
     required this.requiredFields,
     required this.screen,
-    this.prefix = '',
+    required this.prefix,
   });
 }
 

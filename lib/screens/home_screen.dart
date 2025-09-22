@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'signup_screen.dart';
 import '../screens/resume_template_selection_screen.dart';
 import './saved_resumes_screen.dart';
+import '../services/auth_service.dart';
+import '../main.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -20,16 +21,12 @@ class HomeScreen extends StatelessWidget {
         IconButton(
           icon: const Icon(Icons.logout, color: Colors.purple),
           tooltip: 'Logout',
-          onPressed: () {
+          onPressed: () async {
+            await AuthService.instance.logout();
+            loggedInNotifier.value = false;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Logged out successfully')),
             );
-            Future.delayed(const Duration(milliseconds: 500), () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const SignupScreen()),
-                (route) => false,
-              );
-            });
           },
         ),
       ],

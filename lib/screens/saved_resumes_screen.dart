@@ -8,7 +8,7 @@ import '../services/reminder_service.dart';
 import '../services/auth_service.dart';
 import 'resume_template_selection_screen.dart';
 import 'login_screen.dart';
-import '../../main.dart'; // for loggedInNotifier
+import '../main.dart'; // for loggedInNotifier
 
 // Form screens for editing:
 import 'classic_resume_form_screen.dart';

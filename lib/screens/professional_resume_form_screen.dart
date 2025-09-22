@@ -4,6 +4,8 @@ import '../widgets/base_resume_form.dart';
 import '../services/share_export_service.dart';
 import '../services/resume_storage_service.dart';
 import '../widgets/requirements_banner.dart';
+import '../services/ai_resume_service.dart';
+import '../widgets/ai_widgets.dart';
 
 class ProfessionalResumeFormScreen extends StatelessWidget {
   final SavedResume? existing;
@@ -35,6 +37,52 @@ class ProfessionalResumeFormScreen extends StatelessWidget {
 }
 
 class _ProfessionalFormBody extends StatelessWidget {
+  String _getResumeContent(Map<String, TextEditingController> controllers) {
+    final buffer = StringBuffer();
+
+    // Add basic info
+    if (controllers['name']?.text.isNotEmpty == true) {
+      buffer.writeln('Name: ${controllers['name']!.text}');
+    }
+    if (controllers['email']?.text.isNotEmpty == true) {
+      buffer.writeln('Email: ${controllers['email']!.text}');
+    }
+    if (controllers['phone']?.text.isNotEmpty == true) {
+      buffer.writeln('Phone: ${controllers['phone']!.text}');
+    }
+
+    // Add executive summary
+    if (controllers['executiveSummary']?.text.isNotEmpty == true) {
+      buffer.writeln(
+        '\nExecutive Summary: ${controllers['executiveSummary']!.text}',
+      );
+    }
+
+    // Add skills
+    if (controllers['keySkills']?.text.isNotEmpty == true) {
+      buffer.writeln('\nKey Skills: ${controllers['keySkills']!.text}');
+    }
+
+    // Add work experience
+    if (controllers['jobTitle']?.text.isNotEmpty == true ||
+        controllers['company']?.text.isNotEmpty == true) {
+      buffer.writeln('\nWork Experience:');
+      buffer.writeln(
+        '${controllers['jobTitle']?.text ?? ''} at ${controllers['company']?.text ?? ''}',
+      );
+      if (controllers['achievements']?.text.isNotEmpty == true) {
+        buffer.writeln('Achievements: ${controllers['achievements']!.text}');
+      }
+    }
+
+    // Add education
+    if (controllers['education']?.text.isNotEmpty == true) {
+      buffer.writeln('\nEducation: ${controllers['education']!.text}');
+    }
+
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = BaseResumeForm.of(context)!;
@@ -100,6 +148,21 @@ class _ProfessionalFormBody extends StatelessWidget {
             state.buildTextField('address', 'Address', maxLines: 2),
 
             _section('Executive Summary'),
+            AISummaryGenerator(
+              name: state.controllers['name']?.text ?? '',
+              targetRole: state.controllers['jobTitle']?.text ?? '',
+              skills: (state.controllers['keySkills']?.text ?? '')
+                  .split(',')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList(),
+              experience: [
+                (state.controllers['achievements']?.text ?? '').trim(),
+              ].where((s) => s.isNotEmpty).toList(),
+              onGenerated: (summary) {
+                state.controllers['executiveSummary']?.text = summary;
+              },
+            ),
             state.buildTextField(
               'executiveSummary',
               'Executive Summary',
@@ -117,6 +180,16 @@ class _ProfessionalFormBody extends StatelessWidget {
             state.buildTextField('jobTitle', 'Job Title'),
             state.buildTextField('company', 'Company'),
             state.buildTextField('duration', 'Duration (e.g. 2019 - 2023)'),
+            AIBulletPointGenerator(
+              jobTitle: state.controllers['jobTitle']?.text ?? '',
+              company: state.controllers['company']?.text ?? '',
+              description: '',
+              onGenerated: (bulletPoints) {
+                state.controllers['achievements']?.text = bulletPoints.join(
+                  '\n• ',
+                );
+              },
+            ),
             state.buildTextField('achievements', 'Achievements', maxLines: 4),
 
             _section('Education'),
@@ -144,6 +217,14 @@ class _ProfessionalFormBody extends StatelessWidget {
 
             _section('References'),
             state.buildTextField('references', 'References', maxLines: 3),
+
+            const SizedBox(height: 24),
+            // ATS Optimization Panel
+            ATSOptimizationPanel(
+              content: _getResumeContent(state.controllers),
+              jobDescription:
+                  '', // Can be enhanced to accept job description input
+            ),
 
             const SizedBox(height: 28),
             SizedBox(

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../main.dart';
+import '../main.dart';
 import '../services/auth_service.dart';
 import 'resume_template_selection_screen.dart';
 import 'saved_resumes_screen.dart';

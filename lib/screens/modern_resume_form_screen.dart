@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
+import '../services/ai_resume_service.dart';
+import '../widgets/ai_widgets.dart';
 
 class ModernResumeFormScreen extends StatefulWidget {
   final SavedResume? existingResume;
@@ -182,6 +184,49 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     }
   }
 
+  String _getResumeContent() {
+    final buffer = StringBuffer();
+
+    // Add basic info
+    if (_controllers['name']?.text.isNotEmpty == true) {
+      buffer.writeln('Name: ${_controllers['name']!.text}');
+    }
+    if (_controllers['email']?.text.isNotEmpty == true) {
+      buffer.writeln('Email: ${_controllers['email']!.text}');
+    }
+    if (_controllers['phone']?.text.isNotEmpty == true) {
+      buffer.writeln('Phone: ${_controllers['phone']!.text}');
+    }
+
+    // Add summary
+    if (_controllers['summary']?.text.isNotEmpty == true) {
+      buffer.writeln('\nSummary: ${_controllers['summary']!.text}');
+    }
+
+    // Add skills
+    if (_skillRatings.isNotEmpty) {
+      buffer.writeln('\nSkills: ${_skillRatings.keys.join(', ')}');
+    }
+
+    // Add work experience
+    if (_workTimeline.isNotEmpty) {
+      buffer.writeln('\nWork Experience:');
+      for (final work in _workTimeline) {
+        buffer.writeln('${work['role']} at ${work['company']}');
+      }
+    }
+
+    // Add education
+    if (_eduTimeline.isNotEmpty) {
+      buffer.writeln('\nEducation:');
+      for (final edu in _eduTimeline) {
+        buffer.writeln('${edu['degree']} from ${edu['school']}');
+      }
+    }
+
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final accent = Colors.purple;
@@ -283,7 +328,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              // Stylish Summary
+              // AI-Enhanced Summary Section
               Card(
                 color: accent.withOpacity(0.08),
                 shape: RoundedRectangleBorder(
@@ -291,24 +336,59 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(18),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info, color: Colors.purple, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _controllers['summary'],
-                          maxLines: 3,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.info,
+                            color: Colors.purple,
+                            size: 28,
                           ),
-                          decoration: const InputDecoration(
-                            labelText: 'Summary',
-                            border: InputBorder.none,
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Professional Summary',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.purple,
+                            ),
                           ),
-                        ),
+                          const Spacer(),
+                          Icon(
+                            Icons.auto_awesome,
+                            color: Colors.purple.shade300,
+                            size: 20,
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 16),
+                      AIEnhancedTextField(
+                        controller: _controllers['summary']!,
+                        label: 'Summary',
+                        hintText: 'Write a compelling professional summary...',
+                        section: 'summary',
+                        maxLines: 4,
+                        enableAI: true,
+                      ),
+                      const SizedBox(height: 12),
+                      // AI Summary Generator
+                      if (_controllers['name']!.text.isNotEmpty)
+                        AISummaryGenerator(
+                          name: _controllers['name']!.text,
+                          targetRole: 'Professional', // Can be made dynamic
+                          skills: _skillRatings.keys.toList(),
+                          experience: _workTimeline
+                              .map((w) => w['position'] ?? '')
+                              .cast<String>()
+                              .toList(),
+                          onGenerated: (summary) {
+                            setState(() {
+                              _controllers['summary']!.text = summary;
+                            });
+                          },
+                        ),
                     ],
                   ),
                 ),
@@ -483,6 +563,29 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      // AI Bullet Point Generator for Work Experience
+                      if (_workCompany.text.isNotEmpty &&
+                          _workRole.text.isNotEmpty)
+                        AIBulletPointGenerator(
+                          jobTitle: _workRole.text,
+                          company: _workCompany.text,
+                          description:
+                              'Professional experience in ${_workRole.text} at ${_workCompany.text}',
+                          onGenerated: (bulletPoints) {
+                            setState(() {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Generated ${bulletPoints.length} bullet points!',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            });
+                          },
+                        ),
+                      const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
                         child: ElevatedButton.icon(
@@ -731,6 +834,13 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 24),
+              // ATS Optimization Panel
+              ATSOptimizationPanel(
+                content: _getResumeContent(),
+                jobDescription:
+                    'Paste job description here for better ATS optimization',
               ),
               const SizedBox(height: 32),
               SizedBox(

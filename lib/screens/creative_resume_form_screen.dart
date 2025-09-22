@@ -4,6 +4,8 @@ import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
 import '../widgets/profile_photo_picker.dart';
 import '../widgets/requirements_banner.dart';
+import '../services/ai_resume_service.dart';
+import '../widgets/ai_widgets.dart';
 
 class CreativeResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -15,6 +17,50 @@ class CreativeResumeFormScreen extends StatefulWidget {
 }
 
 class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
+  String _getResumeContent(Map<String, TextEditingController> controllers) {
+    final buffer = StringBuffer();
+
+    // Add basic info
+    if (controllers['name']?.text.isNotEmpty == true) {
+      buffer.writeln('Name: ${controllers['name']!.text}');
+    }
+    if (controllers['email']?.text.isNotEmpty == true) {
+      buffer.writeln('Email: ${controllers['email']!.text}');
+    }
+    if (controllers['phone']?.text.isNotEmpty == true) {
+      buffer.writeln('Phone: ${controllers['phone']!.text}');
+    }
+
+    // Add creative summary
+    if (controllers['creativeSummary']?.text.isNotEmpty == true) {
+      buffer.writeln(
+        '\nCreative Summary: ${controllers['creativeSummary']!.text}',
+      );
+    }
+
+    // Add skills
+    if (controllers['skills']?.text.isNotEmpty == true) {
+      buffer.writeln('\nSkills: ${controllers['skills']!.text}');
+    }
+
+    // Add tools
+    if (controllers['tools']?.text.isNotEmpty == true) {
+      buffer.writeln('\nTools & Software: ${controllers['tools']!.text}');
+    }
+
+    // Add experience
+    if (controllers['experience']?.text.isNotEmpty == true) {
+      buffer.writeln('\nExperience: ${controllers['experience']!.text}');
+    }
+
+    // Add education
+    if (controllers['education']?.text.isNotEmpty == true) {
+      buffer.writeln('\nEducation: ${controllers['education']!.text}');
+    }
+
+    return buffer.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     return BaseResumeForm(
@@ -91,6 +137,21 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                   ),
 
                   _section('Creative Summary'),
+                  AISummaryGenerator(
+                    name: state.controllers['name']?.text ?? '',
+                    targetRole: 'Creative Professional',
+                    skills: (state.controllers['skills']?.text ?? '')
+                        .split(',')
+                        .map((s) => s.trim())
+                        .where((s) => s.isNotEmpty)
+                        .toList(),
+                    experience: [
+                      (state.controllers['experience']?.text ?? '').trim(),
+                    ].where((s) => s.isNotEmpty).toList(),
+                    onGenerated: (summary) {
+                      state.controllers['creativeSummary']?.text = summary;
+                    },
+                  ),
                   state.buildTextField(
                     'creativeSummary',
                     'Creative Summary',
@@ -117,6 +178,16 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                   ),
 
                   _section('Experience'),
+                  AIBulletPointGenerator(
+                    jobTitle: 'Creative Professional',
+                    company: '',
+                    description: '',
+                    onGenerated: (bulletPoints) {
+                      state.controllers['experience']?.text = bulletPoints.join(
+                        '\n• ',
+                      );
+                    },
+                  ),
                   state.buildTextField('experience', 'Experience', maxLines: 4),
 
                   _section('Education'),
@@ -140,6 +211,14 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
 
                   _section('References'),
                   state.buildTextField('references', 'References', maxLines: 3),
+
+                  const SizedBox(height: 24),
+                  // ATS Optimization Panel
+                  ATSOptimizationPanel(
+                    content: _getResumeContent(state.controllers),
+                    jobDescription:
+                        '', // Can be enhanced to accept job description input
+                  ),
 
                   const SizedBox(height: 28),
                   SizedBox(

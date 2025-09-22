@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:linkedin_login/linkedin_login.dart';
 import '../services/auth_service.dart';
-import '../../main.dart';
+import '../widgets/mobile_login_widgets.dart';
+import '../main.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _pass = TextEditingController();
   bool _loading = false;
   bool _rememberMe = false;
+  int _selectedTab = 0; // 0 for email, 1 for mobile
 
   @override
   void initState() {
@@ -291,112 +291,187 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 22),
-                      _gradientField(
-                        controller: _email,
-                        label: 'Username / Email',
-                        keyboard: TextInputType.emailAddress,
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      _gradientField(
-                        controller: _pass,
-                        label: 'Password',
-                        obscure: true,
-                        validator: (v) =>
-                            (v == null || v.length < 3) ? 'Min 3 chars' : null,
-                      ),
-                      const SizedBox(height: 26),
-                      // UPDATED LOGIN BUTTON (new color / subtle gradient)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF5F11E8), Color(0xFF8E3DFF)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(.30),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              elevation: 0,
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: _loading ? null : _submit,
-                            child: _loading
-                                ? const SizedBox(
-                                    height: 22,
-                                    width: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Log In',
+
+                      // Tab selector for Email/Mobile login
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => _selectedTab = 0),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: _selectedTab == 0
+                                        ? Colors.white.withOpacity(0.2)
+                                        : Colors.transparent,
+                                  ),
+                                  child: const Text(
+                                    'Email Login',
+                                    textAlign: TextAlign.center,
                                     style: TextStyle(
+                                      color: Colors.white,
                                       fontWeight: FontWeight.w600,
-                                      letterSpacing: .8,
-                                      fontSize: 16,
                                     ),
                                   ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              onChanged: (v) =>
-                                  setState(() => _rememberMe = v ?? false),
-                              visualDensity: VisualDensity.compact,
-                              activeColor: const Color(0xFF8E3DFF),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Remember me',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                          const Spacer(),
-                          InkWell(
-                            onTap: _forgotPassword,
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: Text(
-                                'Forgot password?',
-                                style: TextStyle(
-                                  color: Color(0xFFFFE4FF),
-                                  fontSize: 12.5,
-                                  decoration: TextDecoration.underline,
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => _selectedTab = 1),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: _selectedTab == 1
+                                        ? Colors.white.withOpacity(0.2)
+                                        : Colors.transparent,
+                                  ),
+                                  child: const Text(
+                                    'Mobile Login',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(height: 22),
+
+                      // Login form content based on selected tab
+                      if (_selectedTab == 0) ...[
+                        // Email login form
+                        _gradientField(
+                          controller: _email,
+                          label: 'Username / Email',
+                          keyboard: TextInputType.emailAddress,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Required'
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+                        _gradientField(
+                          controller: _pass,
+                          label: 'Password',
+                          obscure: true,
+                          validator: (v) => (v == null || v.length < 3)
+                              ? 'Min 3 chars'
+                              : null,
+                        ),
+                        const SizedBox(height: 26),
+                        // UPDATED LOGIN BUTTON (new color / subtle gradient)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF5F11E8), Color(0xFF8E3DFF)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(.30),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                elevation: 0,
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: _loading ? null : _submit,
+                              child: _loading
+                                  ? const SizedBox(
+                                      height: 22,
+                                      width: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Log In',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: .8,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: Checkbox(
+                                value: _rememberMe,
+                                onChanged: (v) =>
+                                    setState(() => _rememberMe = v ?? false),
+                                visualDensity: VisualDensity.compact,
+                                activeColor: const Color(0xFF8E3DFF),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Remember me',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                            const Spacer(),
+                            InkWell(
+                              onTap: _forgotPassword,
+                              child: const Padding(
+                                padding: EdgeInsets.all(4.0),
+                                child: Text(
+                                  'Forgot password?',
+                                  style: TextStyle(
+                                    color: Color(0xFFFFE4FF),
+                                    fontSize: 12.5,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        // Mobile login form
+                        MobileLoginForm(
+                          onLoginSuccess: () {
+                            loggedInNotifier.value = true;
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       Opacity(
                         opacity: .55,
@@ -523,11 +598,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
-  }
-
-  void _showSocialUnavailable(String provider) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$provider login not implemented')));
   }
 }

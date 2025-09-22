@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'services/reminder_service.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
@@ -6,8 +7,12 @@ import 'screens/home_shell.dart';
 
 final ValueNotifier<bool> loggedInNotifier = ValueNotifier(false);
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp();
+
   runApp(const MyApp());
 }
 
