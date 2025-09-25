@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
 import '../widgets/requirements_banner.dart';
 import '../widgets/profile_photo_picker.dart'; // ADD for photo picker
-import '../services/ai_resume_service.dart';
 import '../widgets/ai_widgets.dart';
+import '../widgets/dynamic_sections.dart';
 
 class OnePageResumeFormScreen extends StatelessWidget {
   final SavedResume? existing;
@@ -17,10 +18,6 @@ class OnePageResumeFormScreen extends StatelessWidget {
     'email': 'Email Address',
     'summary': 'Professional Summary',
     'coreSkills': 'Key Skills',
-    'jobTitle': 'Job Title',
-    'company': 'Company Name',
-    'employmentDates': 'Employment Dates',
-    'education': 'Education',
   };
 
   @override
@@ -33,15 +30,9 @@ class OnePageResumeFormScreen extends StatelessWidget {
         'title', // Professional Title (optional)
         'portfolio',
         'linkedIn',
-        // Experience structured fields
-        'jobTitle',
-        'company',
-        'experienceLocation',
-        'employmentDates',
         // Content blocks
         'coreSkills',
         'experience', // bullet list / achievements
-        'education',
         'certifications',
         'projects',
         // Optional sections
@@ -52,14 +43,73 @@ class OnePageResumeFormScreen extends StatelessWidget {
         'hobbies',
         // Photo
         'profilePhotoBase64',
+        // Dynamic data as JSON
+        'workExperiencesJson',
+        'educationsJson',
       ],
       child: const _OnePageBody(),
     );
   }
 }
 
-class _OnePageBody extends StatelessWidget {
+class _OnePageBody extends StatefulWidget {
   const _OnePageBody();
+
+  @override
+  State<_OnePageBody> createState() => _OnePageBodyState();
+}
+
+class _OnePageBodyState extends State<_OnePageBody> {
+  List<WorkExperience> _workExperiences = [];
+  List<Education> _educations = [];
+
+  // Color theme for One Page template
+  static const Color _accentColor = Color(0xFF1976D2);
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with one empty entry
+    _workExperiences.add(WorkExperience(id: '1'));
+    _educations.add(Education(id: '1'));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadExistingData();
+  }
+
+  void _loadExistingData() {
+    final state = BaseResumeForm.of(context);
+    if (state?.widget.existingResume != null) {
+      final resume = state!.widget.existingResume!;
+
+      // Load work experiences from JSON
+      final workJson = resume.data['workExperiencesJson'] as String?;
+      if (workJson != null && workJson.isNotEmpty) {
+        try {
+          final List<dynamic> workList = json.decode(workJson);
+          _workExperiences = workList
+              .map((e) => WorkExperience.fromJson(e))
+              .toList();
+        } catch (e) {
+          // If parsing fails, keep default
+        }
+      }
+
+      // Load educations from JSON
+      final eduJson = resume.data['educationsJson'] as String?;
+      if (eduJson != null && eduJson.isNotEmpty) {
+        try {
+          final List<dynamic> eduList = json.decode(eduJson);
+          _educations = eduList.map((e) => Education.fromJson(e)).toList();
+        } catch (e) {
+          // If parsing fails, keep default
+        }
+      }
+    }
+  }
 
   String _getResumeContent(Map<String, TextEditingController> controllers) {
     final buffer = StringBuffer();
@@ -88,21 +138,27 @@ class _OnePageBody extends StatelessWidget {
       buffer.writeln('\nCore Skills: ${controllers['coreSkills']!.text}');
     }
 
-    // Add work experience
-    if (controllers['jobTitle']?.text.isNotEmpty == true ||
-        controllers['company']?.text.isNotEmpty == true) {
+    // Add work experiences
+    if (_workExperiences.isNotEmpty) {
       buffer.writeln('\nWork Experience:');
-      buffer.writeln(
-        '${controllers['jobTitle']?.text ?? ''} at ${controllers['company']?.text ?? ''}',
-      );
-      if (controllers['experience']?.text.isNotEmpty == true) {
-        buffer.writeln('${controllers['experience']!.text}');
+      for (final exp in _workExperiences) {
+        if (exp.jobTitle.isNotEmpty || exp.company.isNotEmpty) {
+          buffer.writeln('${exp.jobTitle} at ${exp.company}');
+          if (exp.description.isNotEmpty) {
+            buffer.writeln(exp.description);
+          }
+        }
       }
     }
 
     // Add education
-    if (controllers['education']?.text.isNotEmpty == true) {
-      buffer.writeln('\nEducation: ${controllers['education']!.text}');
+    if (_educations.isNotEmpty) {
+      buffer.writeln('\nEducation:');
+      for (final edu in _educations) {
+        if (edu.degree.isNotEmpty || edu.institution.isNotEmpty) {
+          buffer.writeln('${edu.degree} at ${edu.institution}');
+        }
+      }
     }
 
     return buffer.toString();
@@ -176,15 +232,18 @@ class _OnePageBody extends StatelessWidget {
             _section('Professional Summary / Objective'),
             AISummaryGenerator(
               name: state.controllers['name']?.text ?? '',
-              targetRole: state.controllers['jobTitle']?.text ?? '',
+              targetRole: _workExperiences.isNotEmpty
+                  ? _workExperiences.first.jobTitle
+                  : '',
               skills: (state.controllers['coreSkills']?.text ?? '')
                   .split(',')
                   .map((s) => s.trim())
                   .where((s) => s.isNotEmpty)
                   .toList(),
-              experience: [
-                (state.controllers['experience']?.text ?? '').trim(),
-              ].where((s) => s.isNotEmpty).toList(),
+              experience: _workExperiences
+                  .map((exp) => exp.description)
+                  .where((desc) => desc.isNotEmpty)
+                  .toList(),
               onGenerated: (summary) {
                 state.controllers['summary']?.text = summary;
               },
@@ -206,68 +265,33 @@ class _OnePageBody extends StatelessWidget {
             ),
 
             _divider(),
-            _section('Professional Experience'),
-            Row(
-              children: [
-                Expanded(
-                  child: state.buildTextField(
-                    'jobTitle',
-                    'Job Title',
-                    required: true,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: state.buildTextField(
-                    'company',
-                    'Company Name',
-                    required: true,
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: state.buildTextField(
-                    'experienceLocation',
-                    'Location (City, State)',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: state.buildTextField(
-                    'employmentDates',
-                    'Dates (e.g. Jan 2022 – Aug 2024)',
-                    required: true,
-                  ),
-                ),
-              ],
-            ),
-            AIBulletPointGenerator(
-              jobTitle: state.controllers['jobTitle']?.text ?? '',
-              company: state.controllers['company']?.text ?? '',
-              description: '',
-              onGenerated: (bulletPoints) {
-                state.controllers['experience']?.text = bulletPoints.join(
-                  '\n• ',
-                );
+            DynamicWorkExperienceSection(
+              workExperiences: _workExperiences,
+              onWorkExperiencesChanged: (experiences) {
+                setState(() {
+                  _workExperiences = experiences;
+                  // Store as JSON in a hidden controller for saving
+                  state.controllerFor('workExperiencesJson').text = json.encode(
+                    experiences.map((e) => e.toJson()).toList(),
+                  );
+                });
               },
-            ),
-            state.buildTextField(
-              'experience',
-              '2–5 Bullet Points (achievements, metrics)',
-              required: true,
-              maxLines: 8,
+              accentColor: _accentColor,
             ),
 
             _divider(),
-            _section('Education'),
-            state.buildTextField(
-              'education',
-              'Degree / Institution / Graduation Year / Honors',
-              required: true,
-              maxLines: 4,
+            DynamicEducationSection(
+              educations: _educations,
+              onEducationsChanged: (educations) {
+                setState(() {
+                  _educations = educations;
+                  // Store as JSON in a hidden controller for saving
+                  state.controllerFor('educationsJson').text = json.encode(
+                    educations.map((e) => e.toJson()).toList(),
+                  );
+                });
+              },
+              accentColor: _accentColor,
             ),
 
             _divider(),

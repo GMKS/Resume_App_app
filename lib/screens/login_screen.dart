@@ -3,6 +3,7 @@ import 'package:linkedin_login/linkedin_login.dart';
 import '../services/auth_service.dart';
 import '../widgets/mobile_login_widgets.dart';
 import '../main.dart';
+import 'auth_screen.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -90,6 +91,16 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openFirebaseAuth() async {
+    final result = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (context) => const AuthScreen()));
+
+    if (result == true) {
+      loggedInNotifier.value = true;
+    }
   }
 
   Widget _gradientField({
@@ -549,8 +560,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                           AuthService.instance
                                               .completeLinkedInLogin(email)
                                               .then((_) {
-                                                if (Navigator.canPop(context))
+                                                if (Navigator.canPop(context)) {
                                                   Navigator.pop(context);
+                                                }
                                                 loggedInNotifier.value = true;
                                               });
                                         },
@@ -563,6 +575,36 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 24),
+                      // Firebase Authentication Option
+                      Container(
+                        width: double.infinity,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white54),
+                        ),
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            elevation: 0,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: _openFirebaseAuth,
+                          icon: const Icon(Icons.security, size: 20),
+                          label: const Text(
+                            'Sign in with Firebase',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 32),
                       Row(

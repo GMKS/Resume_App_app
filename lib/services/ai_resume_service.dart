@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'premium_service.dart';
 
 /// AI-powered resume writing service using GPT for content generation
 class AIResumeService {
@@ -15,6 +16,10 @@ class AIResumeService {
     String? industry,
     int count = 3,
   }) async {
+    if (!PremiumService.hasAIFeatures) {
+      throw Exception('AI features require Premium subscription');
+    }
+
     try {
       final prompt =
           '''

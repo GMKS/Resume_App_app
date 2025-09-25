@@ -6,6 +6,7 @@ import 'professional_resume_form_screen.dart';
 import 'creative_resume_form_screen.dart';
 import 'one_page_resume_form_screen.dart';
 import '../services/resume_storage_service.dart';
+import '../services/premium_service.dart';
 
 class ResumeTemplateSelectionScreen extends StatefulWidget {
   const ResumeTemplateSelectionScreen({super.key});
@@ -91,11 +92,19 @@ class _ResumeTemplateSelectionScreenState
                 initialOpenPanelValue: _selectedIndex, // auto-open selected
                 children: List.generate(templates.length, (index) {
                   final t = templates[index];
+                  final isLocked = !PremiumService.canUseTemplate(t.title);
                   return ExpansionPanelRadio(
                     canTapOnHeader: true,
                     value: index,
                     headerBuilder: (_, isOpen) => ListTile(
                       onTap: () {
+                        if (isLocked) {
+                          PremiumService.showUpgradeDialog(
+                            context,
+                            '${t.title} Template',
+                          );
+                          return;
+                        }
                         setState(() {
                           _selectedIndex = index;
                         });
@@ -109,24 +118,55 @@ class _ResumeTemplateSelectionScreenState
                                 ? Theme.of(
                                     context,
                                   ).colorScheme.primary.withOpacity(.15)
+                                : isLocked
+                                ? Colors.grey.shade300
                                 : Colors.grey.shade200,
                           ),
                           Icon(
-                            t.icon,
+                            isLocked ? Icons.lock : t.icon,
                             color: _selectedIndex == index
                                 ? Theme.of(context).colorScheme.primary
+                                : isLocked
+                                ? Colors.grey
                                 : Colors.grey[700],
                           ),
                         ],
                       ),
-                      title: Text(
-                        t.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: _selectedIndex == index
-                              ? Theme.of(context).colorScheme.primary
-                              : Colors.black87,
-                        ),
+                      title: Row(
+                        children: [
+                          Text(
+                            t.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: _selectedIndex == index
+                                  ? Theme.of(context).colorScheme.primary
+                                  : isLocked
+                                  ? Colors.grey
+                                  : Colors.black87,
+                            ),
+                          ),
+                          if (isLocked) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'PRO',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       subtitle: Text(
                         'Best For: ${t.bestFor}',
@@ -172,6 +212,13 @@ class _ResumeTemplateSelectionScreenState
                       label: Text('Continue', overflow: TextOverflow.ellipsis),
                       onPressed: () {
                         final meta = templates[_selectedIndex];
+                        if (!PremiumService.canUseTemplate(meta.title)) {
+                          PremiumService.showUpgradeDialog(
+                            context,
+                            '${meta.title} Template',
+                          );
+                          return;
+                        }
                         _showRequiredFieldsSheet(context, meta);
                       },
                     ),

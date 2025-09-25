@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
-import '../services/ai_resume_service.dart';
 import '../widgets/ai_widgets.dart';
 
 class ModernResumeFormScreen extends StatefulWidget {
@@ -358,7 +357,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                           const Spacer(),
                           Icon(
                             Icons.auto_awesome,
-                            color: Colors.purple.shade300,
+                            color: const Color.fromARGB(255, 157, 152, 202),
                             size: 20,
                           ),
                         ],
