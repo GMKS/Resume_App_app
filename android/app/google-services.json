@@ -1,45 +1,36 @@
 {
   "project_info": {
-    "project_number": "42581559002",
-    "project_id": "resume-app-sms",
-    "storage_bucket": "resume-app-sms.firebasestorage.app"
+    "project_number": "198483032831",
+    "project_id": "resume-app-8ff9c",
+    "storage_bucket": "resume-app-8ff9c.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:42581559002:android:9944d24d64f15a380947e3",
-        "android_client_info": {
-          "package_name": "com.example.resume_app_app"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyANuDvsv_pwMheTF7eMnNEJscYWga3vxss"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:42581559002:android:479c9737d18c2b080947e3",
+        "mobilesdk_app_id": "1:198483032831:android:0ef8a69160a08a5a8d6aca",
         "android_client_info": {
           "package_name": "com.example.resume_builder_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "198483032831-2qqoltatuovmukh0m3hg89emt61mhg4g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyANuDvsv_pwMheTF7eMnNEJscYWga3vxss"
+          "current_key": "AIzaSyCc2az430lE_cox_a7LxQQ0NRWEPmj1Kds"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "198483032831-2qqoltatuovmukh0m3hg89emt61mhg4g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

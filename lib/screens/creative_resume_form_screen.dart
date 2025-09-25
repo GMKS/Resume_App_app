@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:io';
 import '../models/saved_resume.dart';
+import '../models/branding.dart';
+import '../screens/customization_screen.dart';
 import '../widgets/base_resume_form.dart';
 import '../widgets/profile_photo_picker.dart';
 import '../widgets/requirements_banner.dart';
-import '../services/ai_resume_service.dart';
+import '../widgets/dynamic_sections.dart';
 import '../widgets/ai_widgets.dart';
+import '../services/share_export_service.dart';
 
 class CreativeResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -17,6 +21,157 @@ class CreativeResumeFormScreen extends StatefulWidget {
 }
 
 class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
+  List<WorkExperience> _workExperiences = [];
+  List<Education> _educations = [];
+  BrandingTheme _currentBranding = BrandingTheme.creative;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingData();
+  }
+
+  void _loadExistingData() {
+    if (widget.existing != null) {
+      // Load work experiences from JSON
+      if (widget.existing!.data['workExperiences'] != null) {
+        try {
+          final List<dynamic> workExpData = jsonDecode(
+            widget.existing!.data['workExperiences'],
+          );
+          _workExperiences = workExpData
+              .map((item) => WorkExperience.fromJson(item))
+              .toList();
+        } catch (e) {
+          _workExperiences = [];
+        }
+      }
+
+      // Load education from JSON
+      if (widget.existing!.data['educations'] != null) {
+        try {
+          final List<dynamic> educationData = jsonDecode(
+            widget.existing!.data['educations'],
+          );
+          _educations = educationData
+              .map((item) => Education.fromJson(item))
+              .toList();
+        } catch (e) {
+          _educations = [];
+        }
+      }
+
+      // Load branding from JSON
+      if (widget.existing!.data['branding'] != null) {
+        try {
+          final Map<String, dynamic> brandingData = jsonDecode(
+            widget.existing!.data['branding'],
+          );
+          _currentBranding = BrandingTheme.fromJson(brandingData);
+        } catch (e) {
+          _currentBranding = BrandingTheme.creative;
+        }
+      }
+    }
+  }
+
+  void _loadBrandingFromResume() {
+    final state = BaseResumeForm.of(context);
+    if (state != null && state.controllerFor('branding').text.isNotEmpty) {
+      try {
+        final Map<String, dynamic> brandingData = jsonDecode(
+          state.controllerFor('branding').text,
+        );
+        setState(() {
+          _currentBranding = BrandingTheme.fromJson(brandingData);
+        });
+      } catch (e) {
+        // Keep current branding if parsing fails
+      }
+    }
+  }
+
+  void _openCustomization() async {
+    final result = await Navigator.push<BrandingTheme>(
+      context,
+      MaterialPageRoute(builder: (context) => const CustomizationScreen()),
+    );
+
+    if (result != null) {
+      setState(() {
+        _currentBranding = result;
+      });
+
+      // Update the form controller
+      final state = BaseResumeForm.of(context);
+      if (state != null) {
+        state.controllerFor('branding').text = jsonEncode(result.toJson());
+      }
+    }
+  }
+
+  Future<void> _exportResume(String format) async {
+    final state = BaseResumeForm.of(context);
+    if (state == null) return;
+
+    // Check if required fields are filled
+    if (state.controllers['name']?.text.isEmpty == true ||
+        state.controllers['email']?.text.isEmpty == true ||
+        state.controllers['phone']?.text.isEmpty == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all required fields first'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Create the resume object manually
+      final Map<String, dynamic> data = {
+        for (final e in state.controllers.entries) e.key: e.value.text,
+      };
+
+      final resume = SavedResume(
+        id:
+            widget.existing?.id ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
+        title: state.controllers['name']?.text ?? 'Creative Resume',
+        template: 'Creative',
+        data: data,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      final shareService = ShareExportService.instance;
+      File? file;
+
+      switch (format) {
+        case 'pdf':
+          file = await shareService.exportPdf(resume);
+          break;
+        case 'docx':
+          file = await shareService.exportDoc(resume);
+          break;
+        case 'txt':
+          file = await shareService.exportTxt(resume);
+          break;
+      }
+
+      if (file != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Resume exported as ${format.toUpperCase()}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      }
+    }
+  }
+
   String _getResumeContent(Map<String, TextEditingController> controllers) {
     final buffer = StringBuffer();
 
@@ -48,14 +203,26 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
       buffer.writeln('\nTools & Software: ${controllers['tools']!.text}');
     }
 
-    // Add experience
-    if (controllers['experience']?.text.isNotEmpty == true) {
-      buffer.writeln('\nExperience: ${controllers['experience']!.text}');
+    // Add dynamic work experiences
+    if (_workExperiences.isNotEmpty) {
+      buffer.writeln('\nWork Experience:');
+      for (final exp in _workExperiences) {
+        buffer.writeln('• ${exp.jobTitle} at ${exp.company}');
+        if (exp.description.isNotEmpty) {
+          buffer.writeln('  ${exp.description}');
+        }
+      }
     }
 
-    // Add education
-    if (controllers['education']?.text.isNotEmpty == true) {
-      buffer.writeln('\nEducation: ${controllers['education']!.text}');
+    // Add dynamic education
+    if (_educations.isNotEmpty) {
+      buffer.writeln('\nEducation:');
+      for (final edu in _educations) {
+        buffer.writeln('• ${edu.degree} from ${edu.institution}');
+        if (edu.description.isNotEmpty) {
+          buffer.writeln('  ${edu.description}');
+        }
+      }
     }
 
     return buffer.toString();
@@ -77,13 +244,76 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
         'languages',
         'hobbies',
         'references',
-        'profilePhotoBase64', // ADDED
+        'profilePhotoBase64',
+        'workExperiences',
+        'educations',
+        'branding',
       ],
       child: Builder(
         builder: (ctx) {
           final state = BaseResumeForm.of(ctx)!;
+
+          // Initialize JSON data in controllers if not already set
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (state.controllerFor('workExperiences').text.isEmpty) {
+              state.controllerFor('workExperiences').text = jsonEncode(
+                _workExperiences.map((e) => e.toJson()).toList(),
+              );
+            }
+            if (state.controllerFor('educations').text.isEmpty) {
+              state.controllerFor('educations').text = jsonEncode(
+                _educations.map((e) => e.toJson()).toList(),
+              );
+            }
+          });
+
           return Scaffold(
-            appBar: AppBar(title: const Text('Creative Resume')),
+            appBar: AppBar(
+              title: const Text('Creative Resume'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.palette),
+                  tooltip: 'Customize Branding',
+                  onPressed: _openCustomization,
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.download),
+                  onSelected: _exportResume,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'pdf',
+                      child: Row(
+                        children: [
+                          Icon(Icons.picture_as_pdf),
+                          SizedBox(width: 8),
+                          Text('Export as PDF'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'docx',
+                      child: Row(
+                        children: [
+                          Icon(Icons.description),
+                          SizedBox(width: 8),
+                          Text('Export as DOCX'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'txt',
+                      child: Row(
+                        children: [
+                          Icon(Icons.text_snippet),
+                          SizedBox(width: 8),
+                          Text('Export as TXT'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
             body: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Column(
@@ -98,8 +328,6 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                       'creativeSummary': 'Creative Summary',
                       'skills': 'Skills',
                       'tools': 'Tools & Software',
-                      'experience': 'Experience',
-                      'education': 'Education',
                     },
                   ),
                   _section('Profile Photo'),
@@ -145,9 +373,12 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                         .map((s) => s.trim())
                         .where((s) => s.isNotEmpty)
                         .toList(),
-                    experience: [
-                      (state.controllers['experience']?.text ?? '').trim(),
-                    ].where((s) => s.isNotEmpty).toList(),
+                    experience: _workExperiences
+                        .map(
+                          (exp) =>
+                              '${exp.jobTitle} at ${exp.company}: ${exp.description}',
+                        )
+                        .toList(),
                     onGenerated: (summary) {
                       state.controllers['creativeSummary']?.text = summary;
                     },
@@ -178,20 +409,34 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                   ),
 
                   _section('Experience'),
-                  AIBulletPointGenerator(
-                    jobTitle: 'Creative Professional',
-                    company: '',
-                    description: '',
-                    onGenerated: (bulletPoints) {
-                      state.controllers['experience']?.text = bulletPoints.join(
-                        '\n• ',
-                      );
+                  DynamicWorkExperienceSection(
+                    workExperiences: _workExperiences,
+                    onWorkExperiencesChanged: (experiences) {
+                      setState(() {
+                        _workExperiences = experiences;
+                        // Update JSON in hidden controller for BaseResumeForm
+                        state
+                            .controllerFor('workExperiences')
+                            .text = jsonEncode(
+                          experiences.map((e) => e.toJson()).toList(),
+                        );
+                      });
                     },
                   ),
-                  state.buildTextField('experience', 'Experience', maxLines: 4),
 
                   _section('Education'),
-                  state.buildTextField('education', 'Education', maxLines: 3),
+                  DynamicEducationSection(
+                    educations: _educations,
+                    onEducationsChanged: (educations) {
+                      setState(() {
+                        _educations = educations;
+                        // Update JSON in hidden controller for BaseResumeForm
+                        state.controllerFor('educations').text = jsonEncode(
+                          educations.map((e) => e.toJson()).toList(),
+                        );
+                      });
+                    },
+                  ),
 
                   _section('Projects'),
                   state.buildTextField('projects', 'Projects', maxLines: 3),

@@ -52,7 +52,9 @@ class _RequirementsBannerState extends State<RequirementsBanner> {
     return Card(
       color: allDone
           ? Colors.green.shade50
-          : Theme.of(context).colorScheme.surfaceVariant.withOpacity(.55),
+          : Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withOpacity(.55),
       margin: widget.margin,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),

@@ -15,6 +15,25 @@ class SavedResume {
     required this.data,
   });
 
+  // Convenience getters for common data fields
+  Map<String, String> get personalInfo =>
+      Map<String, String>.from(data['personalInfo'] ?? {});
+
+  List<Map<String, dynamic>> get workExperience =>
+      List<Map<String, dynamic>>.from(data['workExperience'] ?? []);
+
+  List<Map<String, dynamic>> get education =>
+      List<Map<String, dynamic>>.from(data['education'] ?? []);
+
+  List<String> get skills => List<String>.from(data['skills'] ?? []);
+
+  // Convenience setters for common data fields
+  set personalInfo(Map<String, String> value) => data['personalInfo'] = value;
+  set workExperience(List<Map<String, dynamic>> value) =>
+      data['workExperience'] = value;
+  set education(List<Map<String, dynamic>> value) => data['education'] = value;
+  set skills(List<String> value) => data['skills'] = value;
+
   factory SavedResume.fromJson(Map<String, dynamic> json) => SavedResume(
     id: json['id'] as String,
     title: json['title'] as String,

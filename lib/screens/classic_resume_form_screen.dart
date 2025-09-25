@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../models/saved_resume.dart';
-import '../services/resume_storage_service.dart';
-import '../services/cloud_resume_service.dart';
+import '../widgets/base_resume_form.dart';
+import '../widgets/requirements_banner.dart';
+import '../widgets/dynamic_sections.dart';
 import '../services/share_export_service.dart';
+import '../services/premium_service.dart';
+import '../widgets/ai_widgets.dart';
 
 class ClassicResumeFormScreen extends StatefulWidget {
-  final SavedResume? existingResume;
-  const ClassicResumeFormScreen({super.key, this.existingResume});
+  final SavedResume? existing;
+  const ClassicResumeFormScreen({super.key, this.existing});
 
   @override
   State<ClassicResumeFormScreen> createState() =>
@@ -14,117 +18,101 @@ class ClassicResumeFormScreen extends StatefulWidget {
 }
 
 class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _controllers = <String, TextEditingController>{
-    'name': TextEditingController(),
-    'email': TextEditingController(),
-    'phone': TextEditingController(),
-    'summary': TextEditingController(),
-    'skills': TextEditingController(),
-    'certifications': TextEditingController(),
-    'education': TextEditingController(),
-    'company': TextEditingController(),
-    'position': TextEditingController(),
-    'workDesc': TextEditingController(),
-  };
-
-  DateTime? _workStart, _workEnd;
-  final List<String> _skillsList = [
-    'Java',
-    'Core Java',
-    'Java Full Stack',
-    'JavaScript',
-    'Python',
-    'C++',
-    'C#',
-    'SQL',
-    'HTML',
-    'CSS',
-    'Dart',
-    'Flutter',
-    'React',
-    'Angular',
-    'Spring Boot',
-  ];
-  List<String> _filteredSkills = [];
+  List<WorkExperience> _workExperiences = [];
+  List<Education> _educations = [];
 
   @override
   void initState() {
     super.initState();
-    if (widget.existingResume != null) {
-      final data = widget.existingResume!.data;
-      _controllers.forEach((k, c) => c.text = data[k] ?? '');
-      if (data['workStart'] != null) {
-        _workStart = DateTime.tryParse(data['workStart']!);
-      }
-      if (data['workEnd'] != null) {
-        _workEnd = DateTime.tryParse(data['workEnd']!);
-      }
-    }
-    _controllers['skills']!.addListener(_onSkillChanged);
+    _loadExistingData();
   }
 
-  void _onSkillChanged() {
-    final input = _controllers['skills']!.text.toLowerCase();
-    setState(() {
-      _filteredSkills = input.isEmpty
-          ? []
-          : _skillsList
-                .where((s) => s.toLowerCase().startsWith(input))
-                .toList();
-    });
-  }
-
-  void _selectDate(BuildContext context, bool isStart) async {
-    final initial = isStart
-        ? (_workStart ?? DateTime.now())
-        : (_workEnd ?? DateTime.now());
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(1970),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _workStart = picked;
-        } else {
-          _workEnd = picked;
+  void _loadExistingData() {
+    if (widget.existing != null) {
+      // Load work experiences from JSON
+      if (widget.existing!.data['workExperiences'] != null) {
+        try {
+          final List<dynamic> workExpData = jsonDecode(
+            widget.existing!.data['workExperiences'],
+          );
+          _workExperiences = workExpData
+              .map((item) => WorkExperience.fromJson(item))
+              .toList();
+        } catch (e) {
+          _workExperiences = [];
         }
-      });
+      }
+
+      // Load education from JSON
+      if (widget.existing!.data['educations'] != null) {
+        try {
+          final List<dynamic> educationData = jsonDecode(
+            widget.existing!.data['educations'],
+          );
+          _educations = educationData
+              .map((item) => Education.fromJson(item))
+              .toList();
+        } catch (e) {
+          _educations = [];
+        }
+      }
     }
   }
 
-  Future<SavedResume?> _saveResume({bool returnResume = false}) async {
-    if (!(_formKey.currentState?.validate() ?? false)) return null;
-    final Map<String, dynamic> data = {
-      for (final e in _controllers.entries) e.key: e.value.text,
-    };
-    if (_workStart != null) data['workStart'] = _workStart!.toIso8601String();
-    if (_workEnd != null) data['workEnd'] = _workEnd!.toIso8601String();
-    final title = _controllers['name']!.text.isEmpty
-        ? 'My Resume'
-        : '${_controllers['name']!.text} Resume';
-    final resume = SavedResume(
-      id:
-          widget.existingResume?.id ??
-          ResumeStorageService.instance.generateId(),
-      title: widget.existingResume?.title ?? title,
-      template: 'Classic',
-      createdAt: widget.existingResume?.createdAt ?? DateTime.now(),
-      updatedAt: DateTime.now(),
-      data: data,
-    );
-    await ResumeStorageService.instance.saveOrUpdate(resume);
-    if (!mounted) return resume;
-    if (!returnResume) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Resume saved!')));
-      Navigator.pop(context);
+  String _getResumeContent(Map<String, TextEditingController> controllers) {
+    final buffer = StringBuffer();
+
+    // Add basic info
+    if (controllers['name']?.text.isNotEmpty == true) {
+      buffer.writeln('Name: ${controllers['name']!.text}');
     }
-    return resume;
+    if (controllers['email']?.text.isNotEmpty == true) {
+      buffer.writeln('Email: ${controllers['email']!.text}');
+    }
+    if (controllers['phone']?.text.isNotEmpty == true) {
+      buffer.writeln('Phone: ${controllers['phone']!.text}');
+    }
+
+    // Add summary
+    if (controllers['summary']?.text.isNotEmpty == true) {
+      buffer.writeln('\nProfessional Summary: ${controllers['summary']!.text}');
+    }
+
+    // Add skills
+    if (controllers['skills']?.text.isNotEmpty == true) {
+      buffer.writeln('\nSkills: ${controllers['skills']!.text}');
+    }
+
+    // Add dynamic work experiences
+    if (_workExperiences.isNotEmpty) {
+      buffer.writeln('\nWork Experience:');
+      for (final exp in _workExperiences) {
+        buffer.writeln('• ${exp.jobTitle} at ${exp.company}');
+        if (exp.description.isNotEmpty) {
+          buffer.writeln('  ${exp.description}');
+        }
+      }
+    }
+
+    // Add dynamic education
+    if (_educations.isNotEmpty) {
+      buffer.writeln('\nEducation:');
+      for (final edu in _educations) {
+        buffer.writeln('• ${edu.degree} from ${edu.institution}');
+        if (edu.description.isNotEmpty) {
+          buffer.writeln('  ${edu.description}');
+        }
+      }
+    }
+
+    // Add certifications
+    if (controllers['certifications']?.text.isNotEmpty == true) {
+      buffer.writeln(
+        '\nCertifications: ${controllers['certifications']!.text}',
+      );
+    }
+
+    return buffer.toString();
   }
 
   Widget _sectionTitle(String text) => Padding(
@@ -139,241 +127,286 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
     ),
   );
 
+  Future<void> _exportResume(String format) async {
+    final state = BaseResumeForm.of(context);
+    if (state == null) return;
+
+    // Validate form first (check if key fields are filled)
+    if (state.controllerFor('name').text.isEmpty ||
+        state.controllerFor('email').text.isEmpty ||
+        state.controllerFor('phone').text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all required fields first'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Create resume object manually for export
+      final Map<String, dynamic> data = {
+        for (final e in state.controllers.entries) e.key: e.value.text,
+      };
+
+      final resume = SavedResume(
+        id:
+            widget.existing?.id ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
+        title: state.controllerFor('name').text.isNotEmpty
+            ? '${state.controllerFor('name').text} Resume'
+            : 'Classic Resume',
+        template: 'Classic',
+        data: data,
+        createdAt: widget.existing?.createdAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Check premium access for different formats
+      if (!PremiumService.canExportFormat(format)) {
+        PremiumService.showUpgradeDialog(context, '$format Export');
+        return;
+      }
+
+      switch (format) {
+        case 'PDF':
+          await ShareExportService.instance.exportAndOpenPdf(resume);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                PremiumService.hasWatermark
+                    ? 'PDF exported with watermark - Upgrade to Premium for watermark-free exports!'
+                    : 'PDF export completed',
+              ),
+            ),
+          );
+          break;
+        case 'DOCX':
+          final file = await ShareExportService.instance.exportDoc(resume);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('DOCX exported to: ${file.path}')),
+          );
+          break;
+        case 'TXT':
+          final file = await ShareExportService.instance.exportTxt(resume);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('TXT exported to: ${file.path}')),
+          );
+          break;
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Classic Resume',
-          style: TextStyle(fontFamily: 'Times New Roman', color: Colors.black),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
-      backgroundColor: Colors.white,
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          children: [
-            _sectionTitle('Contact Info'),
-            _buildField('name', 'Full Name', required: true),
-            _buildField(
-              'email',
-              'Email',
-              required: true,
-              keyboard: TextInputType.emailAddress,
-            ),
-            _buildField('phone', 'Phone', keyboard: TextInputType.phone),
+    return BaseResumeForm(
+      existingResume: widget.existing,
+      template: 'Classic',
+      extraKeys: const [
+        'summary',
+        'skills',
+        'certifications',
+        'workExperiences',
+        'educations',
+      ],
+      child: Builder(
+        builder: (ctx) {
+          final state = BaseResumeForm.of(ctx)!;
 
-            _sectionTitle('Summary'),
-            _buildField('summary', 'Professional Summary', maxLines: 3),
+          // Initialize JSON data in controllers if not already set
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (state.controllerFor('workExperiences').text.isEmpty) {
+              state.controllerFor('workExperiences').text = jsonEncode(
+                _workExperiences.map((e) => e.toJson()).toList(),
+              );
+            }
+            if (state.controllerFor('educations').text.isEmpty) {
+              state.controllerFor('educations').text = jsonEncode(
+                _educations.map((e) => e.toJson()).toList(),
+              );
+            }
+          });
 
-            _sectionTitle('Skills'),
-            Stack(
-              children: [
-                _buildField(
-                  'skills',
-                  'Type to search/add skills (e.g. Ja...)',
-                  onChanged: (_) => _onSkillChanged(),
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text(
+                'Classic Resume',
+                style: TextStyle(
+                  fontFamily: 'Times New Roman',
+                  color: Colors.black,
                 ),
-                if (_filteredSkills.isNotEmpty)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: 56,
-                    child: Card(
-                      margin: EdgeInsets.zero,
-                      child: ListView(
-                        shrinkWrap: true,
-                        children: _filteredSkills
-                            .map(
-                              (skill) => ListTile(
-                                title: Text(
-                                  skill,
-                                  style: const TextStyle(fontFamily: 'Arial'),
-                                ),
-                                onTap: () {
-                                  _controllers['skills']!.text = skill;
-                                  setState(() => _filteredSkills.clear());
-                                },
-                              ),
-                            )
-                            .toList(),
+              ),
+              backgroundColor: Colors.white,
+              elevation: 0.5,
+              iconTheme: const IconThemeData(color: Colors.black),
+              actions: [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.download),
+                  onSelected: _exportResume,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'PDF',
+                      child: ListTile(
+                        leading: Icon(Icons.picture_as_pdf),
+                        title: Text('Export as PDF'),
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  ),
-              ],
-            ),
-
-            _sectionTitle('Work Experience'),
-            _buildField('company', 'Company Name'),
-            _buildField('position', 'Position'),
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _selectDate(context, true),
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Start Date',
-                        border: OutlineInputBorder(),
-                      ),
-                      child: Text(
-                        _workStart == null
-                            ? ''
-                            : "${_workStart!.year}-${_workStart!.month.toString().padLeft(2, '0')}-${_workStart!.day.toString().padLeft(2, '0')}",
-                        style: const TextStyle(fontFamily: 'Arial'),
+                    const PopupMenuItem(
+                      value: 'DOCX',
+                      child: ListTile(
+                        leading: Icon(Icons.description),
+                        title: Text('Export as DOCX'),
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _selectDate(context, false),
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'End Date',
-                        border: OutlineInputBorder(),
-                      ),
-                      child: Text(
-                        _workEnd == null
-                            ? ''
-                            : "${_workEnd!.year}-${_workEnd!.month.toString().padLeft(2, '0')}-${_workEnd!.day.toString().padLeft(2, '0')}",
-                        style: const TextStyle(fontFamily: 'Arial'),
+                    const PopupMenuItem(
+                      value: 'TXT',
+                      child: ListTile(
+                        leading: Icon(Icons.text_snippet),
+                        title: Text('Export as TXT'),
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            _buildField('workDesc', 'Description', maxLines: 2),
+            backgroundColor: Colors.white,
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RequirementsBanner(
+                    requiredFieldLabels: const {
+                      'name': 'Full Name',
+                      'phone': 'Mobile Number',
+                      'email': 'Email Address',
+                      'summary': 'Professional Summary',
+                      'skills': 'Skills',
+                    },
+                  ),
 
-            _sectionTitle('Education'),
-            _buildField('education', 'Education Details', maxLines: 2),
+                  _sectionTitle('Contact Info'),
+                  state.buildTextField('name', 'Full Name', required: true),
+                  state.buildTextField(
+                    'email',
+                    'Email Address',
+                    required: true,
+                    keyboard: TextInputType.emailAddress,
+                  ),
+                  state.buildTextField(
+                    'phone',
+                    'Mobile Number',
+                    required: true,
+                    keyboard: TextInputType.phone,
+                  ),
 
-            _sectionTitle('Certifications'),
-            _buildField('certifications', 'Certifications', maxLines: 2),
+                  _sectionTitle('Professional Summary'),
+                  AISummaryGenerator(
+                    name: state.controllers['name']?.text ?? '',
+                    targetRole: 'Professional',
+                    skills: (state.controllers['skills']?.text ?? '')
+                        .split(',')
+                        .map((s) => s.trim())
+                        .where((s) => s.isNotEmpty)
+                        .toList(),
+                    experience: _workExperiences
+                        .map(
+                          (exp) =>
+                              '${exp.jobTitle} at ${exp.company}: ${exp.description}',
+                        )
+                        .toList(),
+                    onGenerated: (summary) {
+                      state.controllers['summary']?.text = summary;
+                    },
+                  ),
+                  state.buildTextField(
+                    'summary',
+                    'Professional Summary',
+                    maxLines: 3,
+                    required: true,
+                  ),
 
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.cloud_upload_outlined),
-                    label: const Text('Cloud Save'),
-                    onPressed: () async {
-                      // Validate first
-                      if (!(_formKey.currentState?.validate() ?? false)) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Fix validation errors.'),
-                          ),
-                        );
-                        return;
-                      }
-                      await _saveResume(returnResume: true).then((
-                        resume,
-                      ) async {
-                        if (resume == null) return;
-                        if (!CloudResumeService.instance.canUploadClassic()) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Cloud limit (2 Classic) reached'),
-                            ),
-                          );
-                          return;
-                        }
-                        final ok = await CloudResumeService.instance
-                            .uploadClassic(resume);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              ok ? 'Uploaded to cloud' : 'Upload failed',
-                            ),
-                          ),
+                  _sectionTitle('Skills'),
+                  state.buildTextField(
+                    'skills',
+                    'Skills (comma separated)',
+                    maxLines: 2,
+                    required: true,
+                  ),
+
+                  _sectionTitle('Work Experience'),
+                  DynamicWorkExperienceSection(
+                    workExperiences: _workExperiences,
+                    onWorkExperiencesChanged: (experiences) {
+                      setState(() {
+                        _workExperiences = experiences;
+                        // Update JSON in hidden controller for BaseResumeForm
+                        state
+                            .controllerFor('workExperiences')
+                            .text = jsonEncode(
+                          experiences.map((e) => e.toJson()).toList(),
                         );
                       });
                     },
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.save),
-                    label: const Text('Save Local'),
-                    onPressed: _saveResume,
+
+                  _sectionTitle('Education'),
+                  DynamicEducationSection(
+                    educations: _educations,
+                    onEducationsChanged: (educations) {
+                      setState(() {
+                        _educations = educations;
+                        // Update JSON in hidden controller for BaseResumeForm
+                        state.controllerFor('educations').text = jsonEncode(
+                          educations.map((e) => e.toJson()).toList(),
+                        );
+                      });
+                    },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.email_outlined),
-                label: const Text('Share via Email'),
-                onPressed: () async {
-                  if (!(_formKey.currentState?.validate() ?? false)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Save first or fix errors')),
-                    );
-                    return;
-                  }
-                  // Ensure latest saved version
-                  final resume = await _saveResume(returnResume: true);
-                  if (resume != null) {
-                    await ShareExportService.instance.shareEmailClassic(resume);
-                  }
-                },
+
+                  _sectionTitle('Certifications'),
+                  state.buildTextField(
+                    'certifications',
+                    'Certifications',
+                    maxLines: 2,
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // ATS Optimization Panel
+                  ATSOptimizationPanel(
+                    content: _getResumeContent(state.controllers),
+                    jobDescription:
+                        '', // Could be enhanced to get from user input
+                  ),
+
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.save),
+                      onPressed: () => state.saveResume(),
+                      label: const Text('Save Classic Resume'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
-  }
-
-  Widget _buildField(
-    String key,
-    String label, {
-    bool required = false,
-    int maxLines = 1,
-    TextInputType? keyboard,
-    void Function(String)? onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: TextFormField(
-        controller: _controllers[key],
-        maxLines: maxLines,
-        keyboardType: keyboard,
-        style: const TextStyle(fontFamily: 'Arial', fontSize: 16),
-        decoration: InputDecoration(
-          labelText: required ? '$label *' : label,
-          border: const OutlineInputBorder(),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 14,
-            horizontal: 12,
-          ),
-        ),
-        validator: required
-            ? (v) => v == null || v.isEmpty ? '$label is required' : null
-            : null,
-        onChanged: onChanged,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    for (final c in _controllers.values) {
-      c.dispose();
-    }
-    super.dispose();
   }
 }

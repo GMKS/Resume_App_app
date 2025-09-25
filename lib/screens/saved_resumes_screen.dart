@@ -6,8 +6,8 @@ import '../services/resume_storage_service.dart';
 import '../services/share_export_service.dart';
 import '../services/reminder_service.dart';
 import '../services/auth_service.dart';
+import '../services/premium_service.dart';
 import 'resume_template_selection_screen.dart';
-import 'login_screen.dart';
 import '../main.dart'; // for loggedInNotifier
 
 // Form screens for editing:
@@ -32,6 +32,7 @@ class _SavedResumesScreenState extends State<SavedResumesScreen> {
   void initState() {
     super.initState();
     _initReminder();
+    _initResumeStorage();
   }
 
   Future<void> _initReminder() async {
@@ -39,11 +40,16 @@ class _SavedResumesScreenState extends State<SavedResumesScreen> {
     if (mounted) setState(() => _reminderInited = true);
   }
 
+  Future<void> _initResumeStorage() async {
+    // Initialize cloud sync when screen loads
+    await ResumeStorageService.instance.initialize();
+  }
+
   void _openEdit(SavedResume r) {
     Widget screen;
     switch (r.template) {
       case 'Classic':
-        screen = ClassicResumeFormScreen(existingResume: r);
+        screen = ClassicResumeFormScreen(existing: r);
         break;
       case 'Modern':
         screen = ModernResumeFormScreen(existingResume: r); // FIXED param name
@@ -58,7 +64,7 @@ class _SavedResumesScreenState extends State<SavedResumesScreen> {
         screen = CreativeResumeFormScreen(existing: r);
         break;
       default:
-        screen = ClassicResumeFormScreen(existingResume: r);
+        screen = ClassicResumeFormScreen(existing: r);
     }
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
@@ -180,6 +186,20 @@ class _SavedResumesScreenState extends State<SavedResumesScreen> {
         automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: const Text('Saved Resumes'),
         actions: [
+          // Cloud sync button (Premium only)
+          if (PremiumService.hasCloudSync)
+            IconButton(
+              tooltip: 'Sync with Cloud',
+              icon: const Icon(Icons.cloud_sync),
+              onPressed: () async {
+                await ResumeStorageService.instance.syncWithCloud();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Synced with cloud!')),
+                  );
+                }
+              },
+            ),
           IconButton(
             tooltip: 'Templates',
             icon: const Icon(Icons.add_box_outlined),
@@ -232,6 +252,7 @@ class _SavedResumesScreenState extends State<SavedResumesScreen> {
           return Column(
             children: [
               _reminderBanner(list),
+              _buildResumeLimitBanner(context, list.length),
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.only(
@@ -358,6 +379,71 @@ class _SavedResumesScreenState extends State<SavedResumesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ResumeDetailsScreen(resume: r)),
+    );
+  }
+
+  Widget _buildResumeLimitBanner(BuildContext context, int currentCount) {
+    if (PremiumService.isPremium) return const SizedBox.shrink();
+
+    final maxResumes = PremiumService.maxResumes;
+    final isNearLimit = currentCount >= maxResumes - 1;
+    final isAtLimit = currentCount >= maxResumes;
+
+    if (!isNearLimit) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isAtLimit ? Colors.red.shade50 : Colors.orange.shade50,
+        border: Border.all(
+          color: isAtLimit ? Colors.red.shade200 : Colors.orange.shade200,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isAtLimit ? Icons.error_outline : Icons.warning_outlined,
+            color: isAtLimit ? Colors.red : Colors.orange,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isAtLimit ? 'Resume Limit Reached' : 'Almost at Limit',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isAtLimit
+                        ? Colors.red.shade700
+                        : Colors.orange.shade700,
+                  ),
+                ),
+                Text(
+                  isAtLimit
+                      ? 'You\'ve reached the $maxResumes resume limit. Upgrade to Premium for unlimited resumes!'
+                      : 'You have $currentCount/$maxResumes resumes. Upgrade to Premium for unlimited storage!',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isAtLimit
+                        ? Colors.red.shade600
+                        : Colors.orange.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              PremiumService.showUpgradeDialog(context, 'Unlimited Resumes');
+            },
+            child: const Text('Upgrade'),
+          ),
+        ],
+      ),
     );
   }
 }
