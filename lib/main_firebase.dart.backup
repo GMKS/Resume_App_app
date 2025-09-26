@@ -1,0 +1,241 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'screens/app_initializer.dart';
+
+final ValueNotifier<bool> loggedInNotifier = ValueNotifier(false);
+
+// Error app to show when main app fails to initialize
+class ErrorApp extends StatelessWidget {
+  final String error;
+
+  const ErrorApp({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Resume Builder - Error',
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.red[50],
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 20),
+                const Text(
+                  'App Initialization Error',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Error: $error',
+                  style: const TextStyle(fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 30),
+                const Text(
+                  'Please check your internet connection and restart the app.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void main() async {
+  // Add error handling for debugging white screen
+  FlutterError.onError = (FlutterErrorDetails details) {
+    print('FLUTTER ERROR: ${details.exception}');
+    print('STACK TRACE: ${details.stack}');
+  };
+
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    runApp(const MyApp());
+  } catch (e, stackTrace) {
+    print('CRITICAL ERROR in main(): $e');
+    print('STACK TRACE: $stackTrace');
+    runApp(ErrorApp(error: e.toString()));
+  }
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  Future<void> _init() async {
+    try {
+      print('DEBUG: Starting service initialization...');
+
+      // Initialize core services with error handling
+      print('DEBUG: Initializing CurrencyService...');
+      await CurrencyService.initialize();
+
+      print('DEBUG: Initializing AnalyticsService...');
+      await AnalyticsService.initialize();
+
+      print('DEBUG: Initializing PremiumService...');
+      await PremiumService.initialize();
+
+      print('DEBUG: Initializing RetentionService...');
+      await RetentionService.initialize();
+
+      print('DEBUG: Initializing ReminderService...');
+      await ReminderService.instance.init();
+
+      // Track app launch
+      print('DEBUG: Tracking app launch...');
+      AnalyticsService.trackEvent('app_launched', {
+        'app_version': '1.0.0',
+        'platform': defaultTargetPlatform.name,
+      });
+
+      // Initialize auth service and check if user is already logged in
+      print('DEBUG: Initializing AuthService...');
+      await AuthService.instance.init();
+      final isLoggedIn = AuthService.instance.isLoggedIn;
+      loggedInNotifier.value = isLoggedIn;
+
+      // Debug logging
+      print('DEBUG: Auth initialized - isLoggedIn: $isLoggedIn');
+      print('DEBUG: Current user: ${AuthService.instance.currentUser}');
+      print('DEBUG: All services initialized successfully');
+    } catch (e, stackTrace) {
+      print('ERROR in _init(): $e');
+      print('STACK TRACE: $stackTrace');
+      // Don't rethrow - let the app continue with basic functionality
+    }
+  }
+
+  Future<bool> _shouldShowOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    return !(prefs.getBool('onboarding_completed') ?? false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Resume Builder',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.purple),
+      ),
+      home: FutureBuilder(
+        future: _init(),
+        builder: (context, snap) {
+          // Show loading screen
+          if (snap.connectionState != ConnectionState.done) {
+            return const Scaffold(
+              backgroundColor: Colors.white,
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Colors.purple),
+                    SizedBox(height: 20),
+                    Text(
+                      'Loading Resume Builder...',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // Handle initialization errors
+          if (snap.hasError) {
+            print('ERROR: App initialization failed: ${snap.error}');
+            return Scaffold(
+              backgroundColor: Colors.white,
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Initialization Error',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('${snap.error}', textAlign: TextAlign.center),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {
+                        // Force restart the app
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(builder: (_) => const MyApp()),
+                        );
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return FutureBuilder<bool>(
+            future: _shouldShowOnboarding(),
+            builder: (context, onboardingSnap) {
+              if (onboardingSnap.connectionState != ConnectionState.done) {
+                return const Scaffold(
+                  backgroundColor: Colors.white,
+                  body: Center(
+                    child: CircularProgressIndicator(color: Colors.purple),
+                  ),
+                );
+              }
+
+              // Handle onboarding check errors
+              if (onboardingSnap.hasError) {
+                print(
+                  'ERROR: Onboarding check failed: ${onboardingSnap.error}',
+                );
+                // Skip onboarding on error and go to login
+                return const LoginScreen();
+              }
+
+              // Show onboarding for first-time users
+              if (onboardingSnap.data == true) {
+                print('DEBUG: Showing onboarding screen');
+                return const OnboardingScreen();
+              }
+
+              // Regular app flow
+              return ValueListenableBuilder<bool>(
+                valueListenable: loggedInNotifier,
+                builder: (_, loggedIn, __) {
+                  print('DEBUG: Main app - loggedIn: $loggedIn');
+                  try {
+                    return loggedIn ? const HomeShell() : const LoginScreen();
+                  } catch (e) {
+                    print('ERROR: Failed to load main screens: $e');
+                    return const LoginScreen(); // Fallback to login
+                  }
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

@@ -1,0 +1,27 @@
+name: resume_builder_app
+description: "Resume Builder Flutter App with Node.js Backend"
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Core dependencies for Node.js backend
+  http: ^1.1.0
+  shared_preferences: ^2.2.3
+
+  # UI components
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

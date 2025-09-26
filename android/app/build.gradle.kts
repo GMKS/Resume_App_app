@@ -47,13 +47,45 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
     
-    // Build performance optimizations
+    // Build performance optimizations and APK size reduction
     packagingOptions {
         resources {
-            excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE", "META-INF/LICENSE.txt", "META-INF/NOTICE", "META-INF/NOTICE.txt")
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/ASL2.0",
+                "META-INF/LGPL2.1",
+                "META-INF/*.kotlin_module",
+                "**/kotlin/**",
+                "kotlin/**",
+                "META-INF/maven/**",
+                "META-INF/proguard/**",
+                "META-INF/com.android.tools/**",
+                "**/*.properties",
+                "DebugProbesKt.bin"
+            )
+        }
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+    
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
         }
     }
 }

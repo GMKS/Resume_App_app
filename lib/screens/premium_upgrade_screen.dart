@@ -15,7 +15,7 @@ class PremiumUpgradeScreen extends StatefulWidget {
 
 class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
   bool _isLoading = false;
-  String _selectedPlan = InAppPurchaseService.yearlyPremiumId;
+  final String _selectedPlan = InAppPurchaseService.yearlyPremiumId;
 
   @override
   void initState() {
@@ -109,7 +109,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
                       const SizedBox(height: 20),
                       Expanded(
                         child: ListView(
-                          children: [
+                          children: const [
                             _FeatureItem(
                               icon: Icons.design_services,
                               title: 'All 6 Professional Templates',

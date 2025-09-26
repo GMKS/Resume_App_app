@@ -53,7 +53,8 @@ class _ProfessionalResumeFormScreenState
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CustomizationScreen(templateType: 'Professional'),
+        builder: (context) =>
+            const CustomizationScreen(templateType: 'Professional'),
       ),
     );
 
@@ -292,8 +293,8 @@ class _ProfessionalResumeFormScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  RequirementsBanner(
-                    requiredFieldLabels: const {
+                  const RequirementsBanner(
+                    requiredFieldLabels: {
                       'name': 'Full Name',
                       'phone': 'Mobile Number',
                       'email': 'Email Address',

@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Resume Builder</string>
-    <!-- Add your real Facebook App ID below -->
-    <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
-    <!-- (Optional) Shown by some SDK dialogs -->
-    <string name="fb_login_protocol_scheme">fbYOUR_FACEBOOK_APP_ID</string>
 </resources>

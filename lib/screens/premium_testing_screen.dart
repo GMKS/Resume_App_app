@@ -32,12 +32,12 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Premium Testing'),
+        title: const Text('Premium Testing'),
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -45,11 +45,11 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
             Card(
               color: Colors.orange.shade50,
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Icon(Icons.warning, color: Colors.orange, size: 48),
-                    SizedBox(height: 8),
+                    const Icon(Icons.warning, color: Colors.orange, size: 48),
+                    const SizedBox(height: 8),
                     Text(
                       'Testing Mode Only',
                       style: TextStyle(
@@ -58,7 +58,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                         color: Colors.orange.shade800,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'This screen is only visible in development mode.\nRemove before production release.',
                       textAlign: TextAlign.center,
@@ -69,12 +69,12 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Current Status
             Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -86,16 +86,16 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                               : Icons.star_border,
                           color: _isPremium ? Colors.amber : Colors.grey,
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
                           'Current Status',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Container(
-                      padding: EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: _isPremium
                             ? Colors.green.shade50
@@ -111,7 +111,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                             _isPremium ? Icons.check_circle : Icons.cancel,
                             color: _isPremium ? Colors.green : Colors.red,
                           ),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _isPremium
@@ -127,9 +127,9 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                       ),
                     ),
                     if (_premiumStatus.isNotEmpty) ...[
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       Container(
-                        padding: EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(4),
@@ -149,12 +149,12 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Testing Controls
             Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -162,7 +162,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                       'Testing Controls',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
@@ -173,7 +173,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                                     await PremiumService.enablePremiumForTesting();
                                     _loadPremiumStatus();
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                                      const SnackBar(
                                         content: Text(
                                           'Premium access enabled for testing',
                                         ),
@@ -181,16 +181,16 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                                       ),
                                     );
                                   },
-                            icon: Icon(Icons.star),
-                            label: Text('Enable Premium'),
+                            icon: const Icon(Icons.star),
+                            label: const Text('Enable Premium'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: !_isPremium
@@ -199,7 +199,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                                     await PremiumService.disablePremiumForTesting();
                                     _loadPremiumStatus();
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                                      const SnackBar(
                                         content: Text(
                                           'Premium access disabled',
                                         ),
@@ -207,12 +207,12 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                                       ),
                                     );
                                   },
-                            icon: Icon(Icons.star_border),
-                            label: Text('Disable Premium'),
+                            icon: const Icon(Icons.star_border),
+                            label: const Text('Disable Premium'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
                               foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
@@ -223,12 +223,12 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Feature Status
             Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -236,7 +236,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                       'Feature Status',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     _buildFeatureRow(
                       'Templates',
                       '${PremiumService.availableTemplates.length}/6',
@@ -286,12 +286,12 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // Configuration Info
             Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -299,7 +299,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                       'Configuration',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     _buildConfigRow(
                       'Testing Mode',
                       AppConfig.enableTestingMode,
@@ -334,7 +334,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
     bool isEnabled,
   ) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           Icon(
@@ -342,15 +342,18 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
             color: isEnabled ? Colors.green : Colors.red,
             size: 20,
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
-                    Spacer(),
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
                     Text(
                       value,
                       style: TextStyle(
@@ -360,7 +363,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
                     ),
                   ],
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
                   description,
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -375,7 +378,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
 
   Widget _buildConfigRow(String title, bool value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           Icon(
@@ -383,7 +386,7 @@ class _PremiumTestingScreenState extends State<PremiumTestingScreen> {
             color: value ? Colors.blue : Colors.grey,
             size: 20,
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(child: Text(title)),
           Text(
             value ? 'ON' : 'OFF',

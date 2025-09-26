@@ -17,9 +17,9 @@ class GetStartedScreen extends StatelessWidget {
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
       },
-      child: Column(
+      child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
+        children: [
           Text(
             "Create your perfect resume, showcase your skills, and land your dream job.",
             textAlign: TextAlign.center,

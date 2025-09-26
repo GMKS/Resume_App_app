@@ -191,7 +191,7 @@ class _PremiumTestScreenState extends State<PremiumTestScreen> {
           Text(feature),
           Text(
             status,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.deepPurple,
             ),

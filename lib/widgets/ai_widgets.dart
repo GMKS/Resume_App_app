@@ -191,11 +191,11 @@ class _AIEnhancedTextFieldState extends State<AIEnhancedTextField> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
-                    const Icon(Icons.analytics, size: 20, color: Colors.purple),
-                    const SizedBox(width: 8),
-                    const Text(
+                    Icon(Icons.analytics, size: 20, color: Colors.purple),
+                    SizedBox(width: 8),
+                    Text(
                       'AI Feedback',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
@@ -296,8 +296,8 @@ class _AIBulletPointGeneratorState extends State<AIBulletPointGenerator> {
             children: [
               const Icon(Icons.auto_awesome, color: Colors.purple, size: 20),
               const SizedBox(width: 8),
-              Expanded(
-                child: const Text(
+              const Expanded(
+                child: Text(
                   'AI Bullet Point Generator',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
@@ -471,8 +471,8 @@ class _ATSOptimizationPanelState extends State<ATSOptimizationPanel> {
             children: [
               const Icon(Icons.verified_outlined, color: Colors.blue, size: 20),
               const SizedBox(width: 8),
-              Expanded(
-                child: const Text(
+              const Expanded(
+                child: Text(
                   'ATS Optimization',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
@@ -659,8 +659,8 @@ class _AISummaryGeneratorState extends State<AISummaryGenerator> {
             children: [
               const Icon(Icons.auto_awesome, color: Colors.purple, size: 20),
               const SizedBox(width: 8),
-              Expanded(
-                child: const Text(
+              const Expanded(
+                child: Text(
                   'AI Summary Generator',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),

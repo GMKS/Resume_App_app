@@ -29,7 +29,7 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
   Widget build(BuildContext context) {
     // Only show in testing mode and debug mode
     if (!AppConfig.enableTestingMode || !AppConfig.showDebugInfo) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     return Positioned(
@@ -54,12 +54,19 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
                   });
                 },
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.bug_report, color: Colors.orange, size: 16),
-                      SizedBox(width: 4),
+                      const Icon(
+                        Icons.bug_report,
+                        color: Colors.orange,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
                       Text(
                         _isPremium ? 'PREMIUM' : 'FREE',
                         style: TextStyle(
@@ -68,7 +75,7 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(width: 4),
+                      const SizedBox(width: 4),
                       Icon(
                         _isExpanded ? Icons.expand_less : Icons.expand_more,
                         color: Colors.white,
@@ -83,12 +90,12 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
               if (_isExpanded) ...[
                 Divider(color: Colors.grey[600], height: 1),
                 Container(
-                  padding: EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      const Text(
                         'Testing Controls',
                         style: TextStyle(
                           color: Colors.white,
@@ -96,7 +103,7 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
 
                       // Status info
                       Text(
@@ -107,7 +114,7 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
                           fontFamily: 'monospace',
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
 
                       // Control buttons
                       Row(
@@ -123,7 +130,7 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
                                     _updateStatus();
                                   },
                           ),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           _buildControlButton(
                             'Disable',
                             Colors.red,
@@ -137,7 +144,7 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
                         ],
                       ),
 
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
 
                       // Features summary
                       Text(
@@ -171,14 +178,14 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
     return InkWell(
       onTap: onPressed,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: onPressed != null ? color : Colors.grey[600],
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 10,
             fontWeight: FontWeight.bold,
@@ -192,6 +199,6 @@ class _DebugPremiumPanelState extends State<DebugPremiumPanel> {
 /// Mixin to easily add debug panel to any screen
 mixin DebugPremiumMixin<T extends StatefulWidget> on State<T> {
   Widget buildWithDebugPanel({required Widget child}) {
-    return Stack(children: [child, DebugPremiumPanel()]);
+    return Stack(children: [child, const DebugPremiumPanel()]);
   }
 }

@@ -24,10 +24,30 @@ class PremiumService {
         'Professional',
         'Creative',
         'OnePage',
+        'TwoPage', // New AI-powered template with document import
       ];
     }
     return ['Classic', 'Minimal']; // Free templates only
   }
+
+  // Premium Feature Access Control
+  static bool get hasCopyPasteFeature =>
+      _isPremium || AppConfig.bypassPremiumRestrictions;
+
+  static bool get hasDragDropFeature => true; // Available for all users
+
+  static bool get hasDocumentImport =>
+      _isPremium || AppConfig.bypassPremiumRestrictions;
+
+  static bool get hasCoverLetterFeature =>
+      _isPremium || AppConfig.bypassPremiumRestrictions;
+
+  static bool get hasVideoResumeFeature =>
+      _isPremium || AppConfig.bypassPremiumRestrictions;
+
+  static bool get hasPrewrittenContent => true; // Available for all users
+
+  static bool get hasGuidedCreation => true; // Available for all users
 
   // Resume Limit Control
   static int get maxResumes =>
@@ -71,7 +91,7 @@ class PremiumService {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.workspace_premium, color: Colors.deepPurple),
             SizedBox(width: 8),
@@ -83,23 +103,23 @@ class PremiumService {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('$feature is available in Premium version.'),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               'Upgrade now for:',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 8),
-            Text('• All 6 professional templates'),
-            Text('• Unlimited cloud storage'),
-            Text('• AI-powered content generation'),
-            Text('• Multiple export formats'),
-            Text('• Watermark-free exports'),
+            const SizedBox(height: 8),
+            const Text('• All 6 professional templates'),
+            const Text('• Unlimited cloud storage'),
+            const Text('• AI-powered content generation'),
+            const Text('• Multiple export formats'),
+            const Text('• Watermark-free exports'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Maybe Later'),
+            child: const Text('Maybe Later'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -110,7 +130,7 @@ class PremiumService {
               Navigator.pop(context);
               _navigateToUpgradeScreen(context);
             },
-            child: Text('Upgrade Now'),
+            child: const Text('Upgrade Now'),
           ),
         ],
       ),

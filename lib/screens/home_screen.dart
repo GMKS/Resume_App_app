@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../screens/resume_template_selection_screen.dart';
 import 'saved_resumes_screen.dart';
+import 'cover_letter_form_screen.dart';
+import 'prewritten_content_screen.dart';
+import 'video_resume_screen.dart';
 import 'premium_upgrade_screen.dart';
 import 'premium_test_screen.dart';
 import 'premium_testing_screen.dart';
@@ -144,6 +147,165 @@ class HomeScreen extends StatelessWidget {
                 },
               ),
             ),
+            const SizedBox(height: 16),
+
+            // New Features Section
+            const Text(
+              'Enhanced Features',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.purple,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Cover Letter Builder
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.teal.shade100,
+                  child: const Icon(Icons.email, color: Colors.teal),
+                ),
+                title: Row(
+                  children: [
+                    const Text(
+                      'Cover Letter Builder',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    if (!PremiumService.hasCoverLetterFeature) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'PRO',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                subtitle: const Text('AI-powered cover letter templates'),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.teal,
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const CoverLetterFormScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Content Assistant
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.indigo.shade100,
+                  child: const Icon(Icons.edit_note, color: Colors.indigo),
+                ),
+                title: const Text(
+                  'Content Assistant',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text('Pre-written content and guidance'),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.indigo,
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PrewrittenContentScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Video Resume
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.purple.shade100,
+                  child: const Icon(Icons.videocam, color: Colors.purple),
+                ),
+                title: Row(
+                  children: [
+                    const Text(
+                      'Video Resume',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    if (!PremiumService.hasVideoResumeFeature) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'PRO',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                subtitle: const Text('Create professional video resumes'),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.purple,
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VideoResumeScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
             freePlanBanner(context),
           ],
         ),
@@ -160,7 +322,7 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(Icons.workspace_premium, color: Colors.deepPurple),
+              const Icon(Icons.workspace_premium, color: Colors.deepPurple),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -196,7 +358,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.info, color: Colors.orange),
+                const Icon(Icons.info, color: Colors.orange),
                 const SizedBox(width: 8),
                 Text(
                   'Free Plan Limitations',

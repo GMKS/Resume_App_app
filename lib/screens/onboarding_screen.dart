@@ -475,7 +475,11 @@ class _FeatureHighlight extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.lightbulb_outline, size: 48, color: Colors.deepPurple),
+              const Icon(
+                Icons.lightbulb_outline,
+                size: 48,
+                color: Colors.deepPurple,
+              ),
               const SizedBox(height: 16),
               Text(
                 feature,
