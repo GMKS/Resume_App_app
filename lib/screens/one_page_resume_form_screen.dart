@@ -184,7 +184,7 @@ class _OnePageBodyState extends State<_OnePageBody> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            RequirementsBanner(
+            const RequirementsBanner(
               requiredFieldLabels: OnePageResumeFormScreen._requiredMap,
             ),
 

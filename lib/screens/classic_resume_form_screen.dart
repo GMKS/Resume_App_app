@@ -282,8 +282,8 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  RequirementsBanner(
-                    requiredFieldLabels: const {
+                  const RequirementsBanner(
+                    requiredFieldLabels: {
                       'name': 'Full Name',
                       'phone': 'Mobile Number',
                       'email': 'Email Address',

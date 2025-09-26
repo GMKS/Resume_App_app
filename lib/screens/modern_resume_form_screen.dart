@@ -228,7 +228,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Colors.purple;
+    const accent = Colors.purple;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Modern Resume'),
@@ -338,15 +338,11 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(
-                            Icons.info,
-                            color: Colors.purple,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
+                          Icon(Icons.info, color: Colors.purple, size: 28),
+                          SizedBox(width: 12),
+                          Text(
                             'Professional Summary',
                             style: TextStyle(
                               fontSize: 18,
@@ -354,10 +350,10 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                               color: Colors.purple,
                             ),
                           ),
-                          const Spacer(),
+                          Spacer(),
                           Icon(
                             Icons.auto_awesome,
-                            color: const Color.fromARGB(255, 157, 152, 202),
+                            color: Color.fromARGB(255, 157, 152, 202),
                             size: 20,
                           ),
                         ],
@@ -403,10 +399,10 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 28),
-                          const SizedBox(width: 8),
+                          Icon(Icons.star, color: Colors.amber, size: 28),
+                          SizedBox(width: 8),
                           Text(
                             'Skills',
                             style: TextStyle(
@@ -482,10 +478,10 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Text('🏢', style: TextStyle(fontSize: 24)),
-                          const SizedBox(width: 8),
+                          Text('🏢', style: TextStyle(fontSize: 24)),
+                          SizedBox(width: 8),
                           Text(
                             'Work Experience',
                             style: TextStyle(
@@ -611,10 +607,10 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Text('🎓', style: TextStyle(fontSize: 24)),
-                          const SizedBox(width: 8),
+                          Text('🎓', style: TextStyle(fontSize: 24)),
+                          SizedBox(width: 8),
                           Text(
                             'Education',
                             style: TextStyle(
@@ -717,14 +713,10 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(
-                            Icons.verified,
-                            color: Colors.blue,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 8),
+                          Icon(Icons.verified, color: Colors.blue, size: 28),
+                          SizedBox(width: 8),
                           Text(
                             'Certifications',
                             style: TextStyle(
@@ -764,14 +756,14 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.emoji_events,
                             color: Colors.orange,
                             size: 28,
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Text(
                             'Achievements & Hobbies',
                             style: TextStyle(

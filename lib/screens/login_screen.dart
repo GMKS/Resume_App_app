@@ -484,10 +484,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                       const SizedBox(height: 24),
-                      Opacity(
+                      const Opacity(
                         opacity: .55,
                         child: Row(
-                          children: const [
+                          children: [
                             Expanded(child: Divider(color: Colors.white54)),
                             SizedBox(width: 28),
                             Expanded(child: Divider(color: Colors.white54)),

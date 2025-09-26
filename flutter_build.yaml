@@ -1,0 +1,30 @@
+# Flutter build performance and size optimizations
+# This file controls Flutter build behavior
+
+# Tree shaking optimization
+flutter:
+  uses-material-design: true
+
+# Asset optimization
+assets:
+  # Only include necessary asset variants
+  - assets/images/
+  - assets/icons/
+
+# Font optimization
+fonts:
+  # Only include used font weights
+  - family: Roboto
+    fonts:
+      - asset: fonts/Roboto-Regular.ttf
+      - asset: fonts/Roboto-Bold.ttf
+        weight: 700
+
+# Build optimizations
+build:
+  # Enable tree shaking
+  tree-shake-icons: true
+  # Optimize Dart code
+  obfuscate: true
+  # Split debug info
+  split-debug-info: build/debug-info

@@ -64,8 +64,8 @@ class _SignupScreenState extends State<SignupScreen> {
               child: Container(
                 height: 180,
                 color: Colors.white.withOpacity(0.15),
-                child: Column(
-                  children: const [
+                child: const Column(
+                  children: [
                     SizedBox(height: 32),
                     FlutterLogo(size: 48),
                     SizedBox(height: 8),

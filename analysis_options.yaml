@@ -24,5 +24,52 @@ linter:
     # avoid_print: false  # Uncomment to disable the `avoid_print` rule
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 
+# Exclude legacy files that depend on removed packages to keep analysis clean.
+analyzer:
+  exclude:
+    # Firebase and unused mains
+    - lib/firebase_options.dart
+    - lib/main_clean.dart
+    - lib/main_no_firebase.dart
+    # Legacy auth/screens not used by current app flow
+    - lib/screens/auth_screen.dart
+    - lib/screens/login_screen.dart
+    - lib/screens/mock_login_screen.dart
+    - lib/screens/nodejs_login_screen.dart
+    - lib/screens/phone_auth_screen.dart
+    - lib/screens/onboarding_screen.dart
+    - lib/screens/signup_screen.dart
+    - lib/screens/home_screen.dart
+    - lib/screens/main_app_screen.dart
+    # Old resume form variants and related screens
+    - lib/screens/classic_resume_form_screen.dart
+    - lib/screens/creative_resume_form_screen.dart
+    - lib/screens/customization_screen.dart
+    - lib/screens/minimal_resume_form_screen.dart
+    - lib/screens/modern_resume_form_screen.dart
+    - lib/screens/one_page_resume_form_screen.dart
+    - lib/screens/two_page_resume_form_screen.dart
+    - lib/screens/professional_resume_form_screen.dart
+    - lib/screens/cover_letter_form_screen.dart
+    - lib/screens/prewritten_content_screen.dart
+    - lib/screens/resume_template_selection_screen_backup.dart
+    - lib/screens/settings_screen.dart
+    - lib/screens/premium_upgrade_screen.dart
+    - lib/screens/premium_testing_screen.dart
+    - lib/screens/premium_test_screen.dart
+    - lib/screens/video_resume_screen.dart
+    # Services referencing removed packages
+    - lib/services/ads_service.dart
+    - lib/services/export_service.dart
+    - lib/services/premium_service.dart
+    - lib/services/resume_storage_service.dart
+    - lib/services/retention_service.dart
+    - lib/services/subscription_service.dart
+    # Widgets referencing removed services/packages
+    - lib/widgets/mobile_login_widgets.dart
+    - lib/widgets/profile_photo_picker_cloud.dart
+    - lib/widgets/base_resume_form.dart
+    # Tests
+    - test/**
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

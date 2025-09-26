@@ -16,12 +16,11 @@ class AppConfig {
   static const bool enableAnalytics = true; // Enabled for production
 
   // Development Settings
-  static const bool showDebugInfo = true;
-  static const bool useTestCredentials = true;
+  static const bool showDebugInfo = false; // Disable for release
+  static const bool useTestCredentials = false; // Disable for release
 
   // Testing Configuration
-  static const bool enableTestingMode =
-      true; // Enable premium features for testing
+  static const bool enableTestingMode = false; // Disable for production release
   static const bool bypassPremiumRestrictions =
-      true; // Bypass premium restrictions during testing
+      false; // Disable for production release
 }

@@ -47,21 +47,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.account_circle, color: Colors.deepPurple),
-                      SizedBox(width: 8),
+                      const Icon(
+                        Icons.account_circle,
+                        color: Colors.deepPurple,
+                      ),
+                      const SizedBox(width: 8),
                       Text(
                         'Account',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ],
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text(
                     AuthService.instance.currentUser != null
                         ? 'Email: ${AuthService.instance.currentUser}'
                         : 'Not signed in',
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   if (AuthService.instance.isLoggedIn)
                     Text(
                       'Status: Logged In',
@@ -87,16 +90,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : Icons.star_border,
                         color: _isPremium ? Colors.amber : Colors.grey,
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
                         'Premium Status',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ],
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Container(
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: _isPremium
                           ? Colors.amber.withOpacity(0.1)
@@ -113,7 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _isPremium ? Icons.check_circle : Icons.cancel,
                           color: _isPremium ? Colors.green : Colors.red,
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _isPremium
@@ -129,9 +132,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   if (AppConfig.showDebugInfo && _premiumStatus.isNotEmpty) ...[
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4),
@@ -161,25 +164,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.bug_report, color: Colors.orange),
-                        SizedBox(width: 8),
+                        const Icon(Icons.bug_report, color: Colors.orange),
+                        const SizedBox(width: 8),
                         Text(
                           'Testing Controls',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ],
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.orange.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.warning, color: Colors.orange, size: 16),
-                          SizedBox(width: 4),
+                          const Icon(
+                            Icons.warning,
+                            color: Colors.orange,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
                             'Development Mode - Remove in Production',
                             style: TextStyle(
@@ -191,7 +198,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
@@ -202,7 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     await PremiumService.enablePremiumForTesting();
                                     _loadPremiumStatus();
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                                      const SnackBar(
                                         content: Text(
                                           'Premium access enabled for testing',
                                         ),
@@ -210,15 +217,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       ),
                                     );
                                   },
-                            icon: Icon(Icons.star),
-                            label: Text('Enable Premium'),
+                            icon: const Icon(Icons.star),
+                            label: const Text('Enable Premium'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
                             ),
                           ),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: !_isPremium
@@ -227,7 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     await PremiumService.disablePremiumForTesting();
                                     _loadPremiumStatus();
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
+                                      const SnackBar(
                                         content: Text(
                                           'Premium access disabled',
                                         ),
@@ -235,8 +242,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       ),
                                     );
                                   },
-                            icon: Icon(Icons.star_border),
-                            label: Text('Disable Premium'),
+                            icon: const Icon(Icons.star_border),
+                            label: const Text('Disable Premium'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
                               foregroundColor: Colors.white,
@@ -245,12 +252,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
-                    Text(
+                    const SizedBox(height: 12),
+                    const Text(
                       'Premium Features Available:',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       '• All 6 Templates: ${PremiumService.availableTemplates.join(", ")}',
                     ),
@@ -282,20 +289,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info, color: Colors.blue),
-                      SizedBox(width: 8),
+                      const Icon(Icons.info, color: Colors.blue),
+                      const SizedBox(width: 8),
                       Text(
                         'App Information',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ],
                   ),
-                  SizedBox(height: 16),
-                  Text('Version: 1.0.0'),
-                  Text('Build: Testing'),
+                  const SizedBox(height: 16),
+                  const Text('Version: 1.0.0'),
+                  const Text('Build: Testing'),
                   if (AppConfig.showDebugInfo) ...[
-                    SizedBox(height: 8),
-                    Text(
+                    const SizedBox(height: 8),
+                    const Text(
                       'Debug Mode: Active',
                       style: TextStyle(color: Colors.orange),
                     ),
@@ -306,26 +313,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           // Sign Out Button
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: () async {
               bool? confirm = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: Text('Sign Out'),
-                  content: Text('Are you sure you want to sign out?'),
+                  title: const Text('Sign Out'),
+                  content: const Text('Are you sure you want to sign out?'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: Text('Cancel'),
+                      child: const Text('Cancel'),
                     ),
                     ElevatedButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: Text('Sign Out'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
                         foregroundColor: Colors.white,
                       ),
+                      child: const Text('Sign Out'),
                     ),
                   ],
                 ),
@@ -340,12 +347,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
               }
             },
-            icon: Icon(Icons.logout),
-            label: Text('Sign Out'),
+            icon: const Icon(Icons.logout),
+            label: const Text('Sign Out'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
-              minimumSize: Size(double.infinity, 48),
+              minimumSize: const Size(double.infinity, 48),
             ),
           ),
         ],
