@@ -17,6 +17,8 @@ const resumes = [];
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
+// Control exposing OTPs in API responses (for local testing only)
+const EXPOSE_OTP = process.env.EXPOSE_OTP === "true";
 
 // Email transporter setup (optional - for production use real credentials)
 let transporter = null;
@@ -112,14 +114,17 @@ app.post("/api/register", async (req, res) => {
       console.log(`OTP for ${email}: ${otp}`);
     }
 
-    res.status(201).json({
+    const response = {
       success: true,
       message: "User registered successfully. OTP sent to email.",
       data: {
         userId: user.id,
-        otp: otp, // Remove in production
       },
-    });
+    };
+    if (EXPOSE_OTP) {
+      response.data.otp = otp;
+    }
+    res.status(201).json(response);
   } catch (error) {
     res
       .status(500)
@@ -148,11 +153,38 @@ app.post("/api/login", async (req, res) => {
         .json({ success: false, message: "Invalid credentials" });
     }
 
-    // Check if verified
+    // Check if verified; if not, send/resend OTP automatically
     if (!user.verified) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Please verify your email first" });
+      const otp = Math.floor(100000 + Math.random() * 900000);
+      user.otp = otp;
+      user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+      if (transporter) {
+        try {
+          await transporter.sendMail({
+            from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+            to: user.email,
+            subject: "Your OTP Code",
+            text: `Your verification code is ${otp}`,
+          });
+        } catch (mailErr) {
+          console.warn(
+            "Email send failed during login, falling back to console log:",
+            mailErr.message
+          );
+          console.log(`OTP for ${user.email}: ${otp}`);
+        }
+      } else {
+        console.log(`OTP for ${user.email}: ${otp}`);
+      }
+
+      const payload = {
+        success: false,
+        message:
+          "Please verify your email first. We've sent a verification code to your email.",
+      };
+      if (EXPOSE_OTP) payload.data = { otp };
+      return res.status(400).json(payload);
     }
 
     // Generate JWT
@@ -280,13 +312,27 @@ app.post("/api/auth/send-otp", (req, res) => {
     user.otp = otp;
     user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
+    if (transporter && isEmail) {
+      transporter
+        .sendMail({
+          from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+          to: user.email,
+          subject: "Your OTP Code",
+          text: `Your verification code is ${otp}`,
+        })
+        .catch((e) =>
+          console.warn("Email send failed (send-otp), using console log:", e)
+        );
+    }
+
     console.log(`OTP for ${isEmail ? user.email : user.phone}: ${otp}`);
 
-    return res.json({
+    const payload = {
       success: true,
       message: "OTP sent successfully",
-      data: { otp }, // remove in production
-    });
+    };
+    if (EXPOSE_OTP) payload.data = { otp };
+    return res.json(payload);
   } catch (error) {
     res
       .status(500)

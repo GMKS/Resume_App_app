@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'classic_resume_form_screen.dart';
+import 'modern_resume_form_screen.dart';
+import 'minimal_resume_form_screen.dart';
+import 'professional_resume_form_screen.dart';
+import 'creative_resume_form_screen.dart';
+import 'one_page_resume_form_screen.dart';
 
 class ResumeTemplateSelectionScreen extends StatelessWidget {
   const ResumeTemplateSelectionScreen({super.key});
@@ -18,10 +24,7 @@ class ResumeTemplateSelectionScreen extends StatelessWidget {
           children: [
             const Text(
               'Select a Resume Template',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -90,9 +93,30 @@ class ResumeTemplateSelectionScreen extends StatelessWidget {
       elevation: 4,
       child: InkWell(
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$title Template - Coming Soon!')),
-          );
+          Widget screen;
+          switch (title) {
+            case 'Classic':
+              screen = const ClassicResumeFormScreen();
+              break;
+            case 'Modern':
+              screen = const ModernResumeFormScreen();
+              break;
+            case 'Minimal':
+              screen = const MinimalResumeFormScreen();
+              break;
+            case 'Professional':
+              screen = const ProfessionalResumeFormScreen();
+              break;
+            case 'Creative':
+              screen = const CreativeResumeFormScreen();
+              break;
+            case 'One Page':
+              screen = const OnePageResumeFormScreen();
+              break;
+            default:
+              screen = const ClassicResumeFormScreen();
+          }
+          Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -111,10 +135,7 @@ class ResumeTemplateSelectionScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 description,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
             ],

@@ -6,6 +6,7 @@ import 'prewritten_content_screen.dart';
 import 'video_resume_screen.dart';
 import 'premium_upgrade_screen.dart';
 import 'premium_test_screen.dart';
+import 'settings_screen.dart';
 import 'premium_testing_screen.dart';
 import '../services/premium_service.dart';
 import '../services/auth_service.dart';
@@ -44,13 +45,11 @@ class HomeScreen extends StatelessWidget {
           ],
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.purple),
-            tooltip: 'Premium Test',
+            tooltip: 'Settings',
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const PremiumTestScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
               );
             },
           ),

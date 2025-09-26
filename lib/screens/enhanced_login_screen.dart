@@ -44,7 +44,9 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
   bool _showRegister = false;
   bool _showOTPVerification = false;
   String _verificationTarget = '';
-  String? _devOtp; // optional dev OTP from backend for testing
+  String?
+  _devOtp; // optional dev OTP from backend for testing (hidden unless debug)
+  bool _showDevOtp = false; // local toggle to reveal OTP when testing
 
   @override
   void initState() {
@@ -539,7 +541,7 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600),
               ),
-              if (_devOtp != null) ...[
+              if (_devOtp != null && _showDevOtp) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -568,6 +570,13 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
                       ),
                     ],
                   ),
+                ),
+              ] else if (_devOtp != null) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () => setState(() => _showDevOtp = true),
+                  icon: const Icon(Icons.visibility),
+                  label: const Text('Show debug OTP'),
                 ),
               ],
               const SizedBox(height: 30),
