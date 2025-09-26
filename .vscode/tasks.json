@@ -1,0 +1,28 @@
+{
+  // VS Code tasks for running/building the Flutter app using the cloud API URL
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Flutter: Run (Cloud API)",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "run",
+        "--dart-define=API_BASE_URL=https://resume-builder-api-8kc0.onrender.com/api"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Flutter: Build APK (Cloud API) [release]",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "build",
+        "apk",
+        "--release",
+        "--dart-define=API_BASE_URL=https://resume-builder-api-8kc0.onrender.com/api"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
