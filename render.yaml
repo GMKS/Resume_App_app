@@ -7,8 +7,6 @@ services:
     startCommand: npm start
     autoDeploy: true
     envVars:
-      - key: PORT
-        value: 3000
       - key: JWT_SECRET
         sync: false
       - key: EMAIL_SERVICE
