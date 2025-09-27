@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'dart:io';
 import '../models/saved_resume.dart';
 import '../models/branding.dart';
 import '../screens/customization_screen.dart';
@@ -143,22 +142,18 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
         updatedAt: DateTime.now(),
       );
 
-      final shareService = ShareExportService.instance;
-      File? file;
-
       switch (format) {
         case 'pdf':
-          file = await shareService.exportPdf(resume);
+          await ShareExportService.instance.exportAndOpenPdf(resume);
           break;
         case 'docx':
-          file = await shareService.exportDoc(resume);
+          await ShareExportService.instance.exportDoc(resume);
           break;
         case 'txt':
-          file = await shareService.exportTxt(resume);
+          await ShareExportService.instance.exportTxt(resume);
           break;
       }
-
-      if (file != null && mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Resume exported as ${format.toUpperCase()}')),
         );

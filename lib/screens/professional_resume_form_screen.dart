@@ -216,7 +216,6 @@ class _ProfessionalResumeFormScreenState
         'awards',
         'languages',
         'references',
-        'references',
         'profilePhotoBase64', // ADDED
         'workExperiences',
         'educations',

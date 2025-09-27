@@ -9,6 +9,8 @@ services:
     envVars:
       - key: JWT_SECRET
         sync: false
+      - key: EXPOSE_OTP
+        value: "true"
       - key: EMAIL_SERVICE
         value: gmail
       - key: EMAIL_USER

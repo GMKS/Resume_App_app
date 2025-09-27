@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/saved_resume.dart';
-import 'cloud_resume_service.dart';
 import 'premium_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class ResumeStorageService {
   ResumeStorageService._();
@@ -11,28 +9,13 @@ class ResumeStorageService {
   final ValueNotifier<List<SavedResume>> resumes =
       ValueNotifier<List<SavedResume>>([]);
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isInitialized = false;
 
   // Initialize with cloud data
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      try {
-        // Load resumes from cloud
-        final cloudResumes = await CloudResumeService.instance.all;
-        resumes.value = cloudResumes;
-
-        // Listen to real-time updates
-        CloudResumeService.instance.resumesStream.listen((cloudResumes) {
-          resumes.value = cloudResumes;
-        });
-      } catch (e) {
-        print('Error loading cloud resumes: $e');
-      }
-    }
+    // Cloud sync disabled in this build. Keep local-only store.
 
     _isInitialized = true;
   }
@@ -51,17 +34,7 @@ class ResumeStorageService {
     }
     resumes.value = list;
 
-    // Save to cloud if user is authenticated
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      try {
-        await CloudResumeService.instance.uploadResume(resume);
-        print('Resume saved to cloud successfully');
-      } catch (e) {
-        print('Error saving to cloud: $e');
-        // Note: Local version is still saved, so user doesn't lose data
-      }
-    }
+    // Cloud sync disabled in this build
   }
 
   SavedResume? getById(String id) {
@@ -106,15 +79,7 @@ class ResumeStorageService {
     list[idx] = updated;
     resumes.value = list;
 
-    // Save to cloud if user is authenticated
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      try {
-        await CloudResumeService.instance.uploadResume(updated);
-      } catch (e) {
-        print('Error updating resume in cloud: $e');
-      }
-    }
+    // Cloud sync disabled in this build
   }
 
   // Delete resume from both local and cloud
@@ -123,27 +88,11 @@ class ResumeStorageService {
     list.removeWhere((r) => r.id == id);
     resumes.value = list;
 
-    // Delete from cloud if user is authenticated
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      try {
-        await CloudResumeService.instance.deleteResume(id);
-      } catch (e) {
-        print('Error deleting resume from cloud: $e');
-      }
-    }
+    // Cloud sync disabled in this build
   }
 
   // Sync with cloud (useful after login)
   Future<void> syncWithCloud() async {
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      try {
-        final cloudResumes = await CloudResumeService.instance.all;
-        resumes.value = cloudResumes;
-      } catch (e) {
-        print('Error syncing with cloud: $e');
-      }
-    }
+    // Cloud sync disabled in this build
   }
 }

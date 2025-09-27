@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
 import '../services/premium_service.dart';
-import '../services/drag_drop_service.dart';
+// drag_drop_service removed; built-in flutter drag-drop used
 
 /// Reusable base form wrapper for resume templates.
 /// Provides:
@@ -46,7 +46,7 @@ class BaseResumeForm extends StatefulWidget {
 
 class _BaseResumeFormState extends State<BaseResumeForm> {
   final _formKey = GlobalKey<FormState>();
-  final _dragDropService = DragDropService();
+  // final _dragDropService = DragDropService();
 
   late final Map<String, TextEditingController> controllers;
   List<String> _draggableItems = [];
@@ -228,9 +228,9 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
               child: textField,
             );
           },
-          onWillAcceptWithDetails: (data) => true,
-          onAcceptWithDetails: (data) {
-            controller.text = data;
+          onWillAcceptWithDetails: (details) => true,
+          onAcceptWithDetails: (details) {
+            final String data = details.data;
             _notifyDataChanged();
           },
         ),
@@ -372,5 +372,30 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
       c.dispose();
     }
     super.dispose();
+  }
+}
+
+/// Minimal DraggableListItem for use in ReorderableListView.builder
+class DraggableListItem extends StatelessWidget {
+  final int index;
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const DraggableListItem({
+    super.key,
+    required this.index,
+    required this.child,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      key: key,
+      contentPadding: EdgeInsets.zero,
+      title: child,
+      trailing: const Icon(Icons.drag_handle),
+      onTap: onTap,
+    );
   }
 }

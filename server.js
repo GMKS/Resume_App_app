@@ -11,6 +11,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Diagnose malformed JSON early (express.json will 400 by default with html)
+app.use((err, req, res, next) => {
+  if (err && err.type === "entity.parse.failed") {
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "Invalid JSON payload",
+        error: err.message,
+      });
+  }
+  next(err);
+});
+
 // Mock MongoDB connection (for demo - replace with real connection)
 const users = [];
 const resumes = [];
@@ -60,6 +74,11 @@ app.get("/", (req, res) => {
       "DELETE /api/resumes/:id - Delete resume",
     ],
   });
+});
+
+// Auth health/echo endpoint to verify JSON handling remotely
+app.post("/api/auth/health", (req, res) => {
+  return res.json({ success: true, message: "Auth OK", echo: req.body || {} });
 });
 
 // User Registration
