@@ -7,9 +7,11 @@ import '../widgets/profile_photo_picker.dart';
 import '../widgets/requirements_banner.dart';
 import '../services/ai_resume_service.dart';
 import '../services/share_export_service.dart';
+import '../services/premium_service.dart';
 import '../widgets/ai_widgets.dart';
 import '../widgets/dynamic_sections.dart';
 import '../screens/customization_screen.dart';
+import '../widgets/skills_picker_field.dart';
 
 class ProfessionalResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -216,7 +218,6 @@ class _ProfessionalResumeFormScreenState
         'awards',
         'languages',
         'references',
-        'references',
         'profilePhotoBase64', // ADDED
         'workExperiences',
         'educations',
@@ -286,6 +287,64 @@ class _ProfessionalResumeFormScreenState
                     ),
                   ],
                 ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.share),
+                  onSelected: (choice) async {
+                    if (!PremiumService.isPremium) {
+                      PremiumService.showUpgradeDialog(context, 'Sharing');
+                      return;
+                    }
+                    final state = BaseResumeForm.of(context);
+                    if (state == null) return;
+                    final data = {
+                      for (final e in state.controllers.entries)
+                        e.key: e.value.text,
+                    };
+                    final resume = SavedResume(
+                      id:
+                          widget.existing?.id ??
+                          DateTime.now().millisecondsSinceEpoch.toString(),
+                      title: state.controllers['name']!.text.isEmpty
+                          ? 'My Resume'
+                          : '${state.controllers['name']!.text} Resume',
+                      template: 'Professional',
+                      createdAt: widget.existing?.createdAt ?? DateTime.now(),
+                      updatedAt: DateTime.now(),
+                      data: data,
+                    );
+                    try {
+                      if (choice == 'EMAIL') {
+                        await ShareExportService.instance.shareViaEmail(resume);
+                      } else if (choice == 'WHATSAPP') {
+                        await ShareExportService.instance.shareViaWhatsApp(
+                          resume,
+                        );
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Share failed: $e')),
+                      );
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'EMAIL',
+                      child: ListTile(
+                        leading: Icon(Icons.email_outlined),
+                        title: Text('Share via Email (Premium)'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'WHATSAPP',
+                      child: ListTile(
+                        leading: Icon(Icons.share_outlined),
+                        title: Text('Share via WhatsApp (Premium)'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
             body: SingleChildScrollView(
@@ -317,66 +376,41 @@ class _ProfessionalResumeFormScreenState
 
                   _section('Personal Information'),
                   state.buildTextField('name', 'Full Name', required: true),
-                  state.buildTextField(
-                    'phone',
-                    'Mobile Number',
-                    required: true,
-                    keyboard: TextInputType.phone,
-                  ),
-                  state.buildTextField(
-                    'email',
-                    'Email Address',
-                    required: true,
-                    keyboard: TextInputType.emailAddress,
-                  ),
-                  state.buildTextField('portfolio', 'Portfolio / Website'),
-                  state.buildTextField(
-                    'socialLinks',
-                    'LinkedIn / Behance / Dribbble',
-                    maxLines: 2,
-                  ),
 
-                  _section('Creative Summary'),
+                  // Executive Summary
+                  _section('Executive Summary'),
                   AISummaryGenerator(
                     name: state.controllers['name']?.text ?? '',
-                    targetRole: 'Creative Professional',
-                    skills: (state.controllers['skills']?.text ?? '')
+                    targetRole: _workExperiences.isNotEmpty
+                        ? _workExperiences.first.jobTitle
+                        : 'Professional',
+                    skills: (state.controllers['keySkills']?.text ?? '')
                         .split(',')
                         .map((s) => s.trim())
                         .where((s) => s.isNotEmpty)
                         .toList(),
-                    experience: [
-                      (state.controllers['experience']?.text ?? '').trim(),
-                    ].where((s) => s.isNotEmpty).toList(),
+                    experience: _workExperiences
+                        .map((exp) => exp.description)
+                        .where((desc) => desc.isNotEmpty)
+                        .toList(),
                     onGenerated: (summary) {
-                      state.controllers['creativeSummary']?.text = summary;
+                      state.controllers['executiveSummary']?.text = summary;
                     },
                   ),
                   state.buildTextField(
-                    'creativeSummary',
-                    'Creative Summary',
+                    'executiveSummary',
+                    '3–4 line Executive Summary',
                     maxLines: 4,
                   ),
 
-                  _section('Skills'),
-                  state.buildTextField(
-                    'skills',
-                    'Skills (comma separated)',
-                    maxLines: 2,
-                  ),
-                  state.buildTextField(
-                    'skillGraphs',
-                    'Skill Graph Data (description)',
-                    maxLines: 3,
+                  // Key Skills
+                  _section('Key Skills'),
+                  SkillsPickerField(
+                    controller: state.controllerFor('keySkills'),
+                    label: 'Key Skills',
                   ),
 
-                  _section('Tools & Software'),
-                  state.buildTextField(
-                    'tools',
-                    'Tools & Software',
-                    maxLines: 3,
-                  ),
-
+                  // (Share menu handled in the top AppBar)
                   _section('Experience'),
                   AIBulletPointGenerator(
                     jobTitle: 'Creative Professional',

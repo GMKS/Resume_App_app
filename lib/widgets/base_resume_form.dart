@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
 import '../services/premium_service.dart';
-import '../services/drag_drop_service.dart';
+// drag_drop_service removed; built-in flutter drag-drop used
 
 /// Reusable base form wrapper for resume templates.
 /// Provides:
@@ -23,6 +23,8 @@ class BaseResumeForm extends StatefulWidget {
   final List<Widget>? customSections; // NEW: for template-specific sections
   final Function(Map<String, dynamic>)?
   onDataChanged; // NEW: for real-time updates
+  // NEW: Opt-in flag to show the Drag & Drop section ordering panel
+  final bool showDragDropPanel;
 
   const BaseResumeForm({
     super.key,
@@ -34,6 +36,7 @@ class BaseResumeForm extends StatefulWidget {
     this.initialData,
     this.customSections,
     this.onDataChanged,
+    this.showDragDropPanel = false,
   });
 
   @override
@@ -46,10 +49,12 @@ class BaseResumeForm extends StatefulWidget {
 
 class _BaseResumeFormState extends State<BaseResumeForm> {
   final _formKey = GlobalKey<FormState>();
-  final _dragDropService = DragDropService();
+  // final _dragDropService = DragDropService();
 
   late final Map<String, TextEditingController> controllers;
   List<String> _draggableItems = [];
+  BuildContext?
+  _childContext; // context inside child subtree (where Scaffold lives)
 
   @override
   void initState() {
@@ -136,10 +141,17 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
     await ResumeStorageService.instance.saveOrUpdate(resume);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('${widget.template} resume saved')));
-    Navigator.pop(context);
+    final ctx = _childContext ?? context;
+    final messenger =
+        ScaffoldMessenger.maybeOf(ctx) ?? ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(
+      SnackBar(content: Text('${widget.template} resume saved')),
+    );
+    if (Navigator.canPop(ctx)) {
+      Navigator.pop(ctx);
+    } else if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
   }
 
   TextEditingController controllerFor(String key) =>
@@ -163,8 +175,20 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
       keyboardType: keyboard,
       decoration: InputDecoration(
         labelText: required ? '$label *' : label,
-        border: const OutlineInputBorder(),
         isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        border: const OutlineInputBorder(),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+        ),
         suffixIcon: PremiumService.hasCopyPasteFeature
             ? PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert, size: 18),
@@ -228,9 +252,9 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
               child: textField,
             );
           },
-          onWillAcceptWithDetails: (data) => true,
-          onAcceptWithDetails: (data) {
-            controller.text = data;
+          onWillAcceptWithDetails: (details) => true,
+          onAcceptWithDetails: (details) {
+            final String data = details.data;
             _notifyDataChanged();
           },
         ),
@@ -293,12 +317,14 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
           if (widget.customSections != null) ...widget.customSections!,
 
           // Drag & Drop Section List for Premium Users
-          if (PremiumService.hasDragDropFeature &&
+          if (widget.showDragDropPanel &&
+              PremiumService.hasDragDropFeature &&
               PremiumService.hasCopyPasteFeature &&
               _draggableItems.isNotEmpty)
             Container(
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(16),
+              clipBehavior: Clip.hardEdge,
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(12),
@@ -307,15 +333,24 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.drag_handle, color: Colors.blue),
-                      SizedBox(width: 8),
-                      Text(
-                        'Drag & Drop Sections',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
+                      const Icon(Icons.drag_handle, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Drag & Drop Sections',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ) ??
+                              const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
                         ),
                       ),
                     ],
@@ -323,6 +358,8 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
                   const SizedBox(height: 8),
                   const Text(
                     'Reorder sections by dragging them up or down',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 12),
@@ -360,7 +397,14 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
             ),
 
           // Main form content
-          Expanded(child: widget.child),
+          Expanded(
+            child: Builder(
+              builder: (ctx) {
+                _childContext = ctx;
+                return widget.child;
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -372,5 +416,33 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
       c.dispose();
     }
     super.dispose();
+  }
+}
+
+/// Minimal DraggableListItem for use in ReorderableListView.builder
+class DraggableListItem extends StatelessWidget {
+  final int index;
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const DraggableListItem({
+    super.key,
+    required this.index,
+    required this.child,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      key: key,
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: child,
+        trailing: const Icon(Icons.drag_handle),
+        onTap: onTap,
+      ),
+    );
   }
 }

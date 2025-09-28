@@ -6,6 +6,7 @@ import '../widgets/requirements_banner.dart';
 import '../widgets/profile_photo_picker.dart'; // ADD for photo picker
 import '../widgets/ai_widgets.dart';
 import '../widgets/dynamic_sections.dart';
+import '../widgets/skills_picker_field.dart';
 
 class OnePageResumeFormScreen extends StatelessWidget {
   final SavedResume? existing;
@@ -256,12 +257,10 @@ class _OnePageBodyState extends State<_OnePageBody> {
             ),
 
             _divider(),
-            _section('Key Skills (comma separated)'),
-            state.buildTextField(
-              'coreSkills',
-              '6–10 Relevant Skills',
-              required: true,
-              maxLines: 2,
+            _section('Key Skills'),
+            SkillsPickerField(
+              controller: state.controllerFor('coreSkills'),
+              label: '6–10 Relevant Skills',
             ),
 
             _divider(),

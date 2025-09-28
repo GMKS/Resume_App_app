@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import '../services/mock_auth_service.dart';
-import 'mock_resume_form_screen.dart';
+import 'classic_resume_form_screen.dart';
+import 'modern_resume_form_screen.dart';
+import 'minimal_resume_form_screen.dart';
+import 'professional_resume_form_screen.dart';
+import 'creative_resume_form_screen.dart';
+import 'saved_resumes_screen.dart';
+import 'settings_screen.dart';
 
 class MockHomeScreen extends StatelessWidget {
   const MockHomeScreen({super.key});
@@ -309,11 +315,28 @@ class MockHomeScreen extends StatelessWidget {
   }
 
   void _showTemplateForm(BuildContext context, String templateName) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => MockResumeFormScreen(templateName: templateName),
-      ),
-    );
+    Widget screen;
+    switch (templateName) {
+      case 'Professional':
+        screen = const ProfessionalResumeFormScreen();
+        break;
+      case 'Creative':
+        screen = const CreativeResumeFormScreen();
+        break;
+      case 'Modern':
+        screen = const ModernResumeFormScreen();
+        break;
+      case 'Minimal':
+        screen = const MinimalResumeFormScreen();
+        break;
+      case 'Classic':
+        screen = const ClassicResumeFormScreen();
+        break;
+      default:
+        screen = const ClassicResumeFormScreen();
+        break;
+    }
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => screen));
   }
 
   void _createNewResume(BuildContext context) {
@@ -365,11 +388,9 @@ class MockHomeScreen extends StatelessWidget {
   }
 
   void _showMyResumes(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('My Resumes feature - Navigation working!'),
-        backgroundColor: Colors.indigo,
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SavedResumesScreen()),
     );
   }
 
@@ -383,11 +404,9 @@ class MockHomeScreen extends StatelessWidget {
   }
 
   void _showSettings(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Settings feature - Navigation working!'),
-        backgroundColor: Colors.grey,
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SettingsScreen()),
     );
   }
 

@@ -9,11 +9,13 @@ class ApiService {
   // Example override:
   //   flutter run --dart-define=API_BASE_URL=http://127.0.0.1:3000/api
   static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
-  static const String _defaultBaseUrl = 'http://192.168.29.90:3000/api';
+  // Default to the deployed backend URL; override with --dart-define=API_BASE_URL when needed
+  static const String _defaultBaseUrl =
+      'https://resume-builder-api-8kc0.onrender.com/api';
   static String get baseUrl =>
       _envBaseUrl.isNotEmpty ? _envBaseUrl : _defaultBaseUrl;
 
-  static const Duration requestTimeout = Duration(seconds: 10);
+  static const Duration requestTimeout = Duration(seconds: 20);
   // For localhost testing: 'http://localhost:3000/api'
   // For production, change to your deployed backend URL
   // static const String baseUrl = 'https://your-backend.herokuapp.com/api';
@@ -23,8 +25,24 @@ class ApiService {
   // Headers for authenticated requests
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
+
+  static Map<String, dynamic> _safeJsonDecode(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {
+        'success': false,
+        'message': 'Unexpected response',
+        'data': decoded,
+      };
+    } catch (e) {
+      final snippet = body.length > 300 ? '${body.substring(0, 300)}…' : body;
+      return {'success': false, 'message': 'Server error', 'raw': snippet};
+    }
+  }
 
   // Initialize service and restore token
   static Future<void> init() async {
@@ -54,28 +72,37 @@ class ApiService {
     required String phone,
   }) async {
     try {
+      final normalizedEmail = email.trim().toLowerCase();
       final response = await http
           .post(
             Uri.parse('$baseUrl/register'),
-            headers: {'Content-Type': 'application/json'},
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
             body: jsonEncode({
               'name': name,
-              'email': email,
+              'email': normalizedEmail,
               'password': password,
               'phone': phone,
             }),
           )
           .timeout(requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final data = _safeJsonDecode(response.body);
 
-      if (response.statusCode == 201) {
+      final ok =
+          (response.statusCode == 201 || response.statusCode == 200) &&
+          (data['success'] == true);
+      if (ok) {
         return {'success': true, 'data': data};
       } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'Registration failed',
-        };
+        final msg = (data['message'] ?? '').toString().toLowerCase();
+        // Normalize common errors
+        final normalized = msg.contains('exists') || msg.contains('duplicate')
+            ? 'User already exists'
+            : data['message'] ?? 'Registration failed';
+        return {'success': false, 'message': normalized};
       }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
@@ -88,22 +115,46 @@ class ApiService {
     required String password,
   }) async {
     try {
+      final trimmed = identifier.trim();
+      final normalizedEmailOrPhone = trimmed.contains('@')
+          ? trimmed.toLowerCase()
+          : trimmed; // keep phone as-is
       final response = await http
           .post(
             Uri.parse('$baseUrl/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': identifier, 'password': password}),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            // Support both email and phone-based login by sending both keys.
+            // Backends that expect 'identifier' (email or phone) will use it;
+            // ones that expect 'email' will still work when identifier is an email.
+            body: jsonEncode({
+              'identifier': normalizedEmailOrPhone,
+              'email': normalizedEmailOrPhone,
+              'password': password,
+            }),
           )
           .timeout(requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final data = _safeJsonDecode(response.body);
 
+      // Treat success based on payload, not just HTTP 200. Some flows (unverified)
+      // intentionally return 200 with success=false and no token.
       if (response.statusCode == 200) {
-        await _saveToken(data['token']);
-        return {'success': true, 'data': data};
-      } else {
-        return {'success': false, 'message': data['message'] ?? 'Login failed'};
+        if (data['success'] == true && data['token'] is String) {
+          await _saveToken(data['token'] as String);
+          return {'success': true, 'data': data};
+        }
+        // No token yet – likely needs OTP verification or a specific error.
+        final rawMsg = (data['message'] ?? '').toString();
+        final msg = rawMsg.isEmpty ? 'Login requires verification' : rawMsg;
+        return {'success': false, 'message': msg, 'data': data['data']};
       }
+
+      final serverMsg = (data['message'] ?? '').toString();
+      final normalized = serverMsg.isEmpty ? 'Login failed' : serverMsg;
+      return {'success': false, 'message': normalized};
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
     }
@@ -115,15 +166,22 @@ class ApiService {
     String type = 'login',
   }) async {
     try {
+      final trimmed = identifier.trim();
+      final normalized = trimmed.contains('@')
+          ? trimmed.toLowerCase()
+          : trimmed;
       final response = await http
           .post(
             Uri.parse('$baseUrl/auth/send-otp'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'identifier': identifier, 'type': type}),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'identifier': normalized, 'type': type}),
           )
           .timeout(requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final data = _safeJsonDecode(response.body);
       return {
         'success': data['success'] ?? false,
         'message': data['message'] ?? 'Failed to send OTP',
@@ -140,15 +198,19 @@ class ApiService {
     required String otp,
   }) async {
     try {
+      final normalizedEmail = email.trim().toLowerCase();
       final response = await http
           .post(
             Uri.parse('$baseUrl/verify-otp'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'email': email, 'otp': otp}),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'email': normalizedEmail, 'otp': otp.trim()}),
           )
           .timeout(requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final data = _safeJsonDecode(response.body);
 
       if (response.statusCode == 200) {
         await _saveToken(data['token']);
@@ -170,15 +232,22 @@ class ApiService {
     required String otp,
   }) async {
     try {
+      final trimmed = identifier.trim();
+      final normalized = trimmed.contains('@')
+          ? trimmed.toLowerCase()
+          : trimmed;
       final response = await http
           .post(
             Uri.parse('$baseUrl/verify-otp'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'identifier': identifier, 'otp': otp}),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'identifier': normalized, 'otp': otp.trim()}),
           )
           .timeout(requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final data = _safeJsonDecode(response.body);
 
       if (response.statusCode == 200) {
         await _saveToken(data['token']);

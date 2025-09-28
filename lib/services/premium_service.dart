@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'analytics_service.dart';
-import 'in_app_purchase_service.dart';
 import '../screens/premium_upgrade_screen.dart';
 import '../config/app_config.dart';
 
@@ -9,7 +7,7 @@ import '../config/app_config.dart';
 class PremiumService {
   static bool _isPremium = false;
   static SharedPreferences? _prefs;
-  static InAppPurchaseService? _purchaseService;
+  // IAP disabled in this build; using local prefs toggle only
 
   static bool get isPremium =>
       _isPremium || AppConfig.bypassPremiumRestrictions;
@@ -147,69 +145,26 @@ class PremiumService {
   // Initialization
   static Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
-    _purchaseService = InAppPurchaseService();
-    await _purchaseService!.initialize();
     await checkSubscriptionStatus();
   }
 
   // Subscription Management
   static Future<bool> purchasePremium(String productId) async {
-    try {
-      AnalyticsService.trackEvent('premium_purchase_initiated', {
-        'product_id': productId,
-        'user_segment': await _getUserSegment(),
-      });
-
-      final success = await _purchaseService!.purchaseProduct(productId);
-
-      if (success) {
-        _isPremium = true;
-        await _prefs!.setBool('is_premium', true);
-        await _prefs!.setString('premium_product_id', productId);
-        await _prefs!.setString(
-          'premium_purchase_date',
-          DateTime.now().toIso8601String(),
-        );
-
-        AnalyticsService.trackConversion(
-          productId,
-          _getProductValue(productId),
-        );
-        AnalyticsService.setUserProperty('premium_user', 'true');
-        AnalyticsService.setUserProperty('premium_product', productId);
-      }
-
-      return success;
-    } catch (e) {
-      AnalyticsService.trackEvent('premium_purchase_failed', {
-        'product_id': productId,
-        'error': e.toString(),
-      });
-      return false;
-    }
+    // Stub: mark as premium locally
+    _isPremium = true;
+    await _prefs?.setBool('is_premium', true);
+    return true;
   }
 
   static Future<void> upgradeToPremium() async {
     _isPremium = true;
     await _prefs?.setBool('is_premium', true);
-    AnalyticsService.setUserProperty('premium_user', 'true');
   }
 
   static Future<void> checkSubscriptionStatus() async {
     try {
       // Check local storage first
       _isPremium = _prefs?.getBool('is_premium') ?? false;
-
-      // Verify with purchase service if available
-      if (_purchaseService != null && _purchaseService!.isAvailable) {
-        final hasSubscription = await _purchaseService!.hasActiveSubscription();
-        if (hasSubscription != _isPremium) {
-          _isPremium = hasSubscription;
-          await _prefs?.setBool('is_premium', _isPremium);
-        }
-      }
-
-      AnalyticsService.setUserProperty('premium_user', _isPremium.toString());
     } catch (e) {
       // Fallback to local storage
       _isPremium = _prefs?.getBool('is_premium') ?? false;
@@ -218,17 +173,8 @@ class PremiumService {
 
   // Get product value for analytics
   static double _getProductValue(String productId) {
-    final pricing = AnalyticsService.getPricingForUser();
-    switch (productId) {
-      case InAppPurchaseService.monthlyPremiumId:
-        return pricing['monthly_value'] ?? 4.99;
-      case InAppPurchaseService.yearlyPremiumId:
-        return pricing['yearly_value'] ?? 39.99;
-      case InAppPurchaseService.lifetimePremiumId:
-        return pricing['lifetime_value'] ?? 49.99;
-      default:
-        return 0.0;
-    }
+    // Static defaults
+    return 0.0;
   }
 
   // Get user segment for analytics
@@ -247,16 +193,12 @@ class PremiumService {
     _isPremium = true;
     await _prefs?.setBool('is_premium', true);
     await _prefs?.setBool('testing_premium_enabled', true);
-    AnalyticsService.setUserProperty('premium_user', 'true');
-    AnalyticsService.setUserProperty('premium_source', 'testing');
   }
 
   static Future<void> disablePremiumForTesting() async {
     _isPremium = false;
     await _prefs?.setBool('is_premium', false);
     await _prefs?.setBool('testing_premium_enabled', false);
-    AnalyticsService.setUserProperty('premium_user', 'false');
-    AnalyticsService.setUserProperty('premium_source', 'none');
   }
 
   // Legacy method for backward compatibility

@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
 import '../widgets/ai_widgets.dart';
+import '../widgets/profile_photo_picker.dart';
+import '../services/premium_service.dart';
+import '../services/share_export_service.dart';
+// skills handled via shared SkillsPickerField; no direct SkillsService import needed here
+import '../widgets/skills_picker_field.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ModernResumeFormScreen extends StatefulWidget {
   final SavedResume? existingResume;
@@ -14,11 +21,13 @@ class ModernResumeFormScreen extends StatefulWidget {
 
 class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _scrollController = ScrollController();
   final _controllers = <String, TextEditingController>{
     'name': TextEditingController(),
     'email': TextEditingController(),
     'phone': TextEditingController(),
     'summary': TextEditingController(),
+    'skills': TextEditingController(),
     'linkedin': TextEditingController(),
     'github': TextEditingController(),
     'portfolio': TextEditingController(),
@@ -27,29 +36,20 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     'hobbies': TextEditingController(),
   };
 
-  // Profile picture
-  ImageProvider? _profileImage;
+  final Map<String, FocusNode> _focusNodes = {
+    'name': FocusNode(),
+    'email': FocusNode(),
+    'phone': FocusNode(),
+    'linkedin': FocusNode(),
+    'github': FocusNode(),
+    'portfolio': FocusNode(),
+  };
 
-  // Skills
-  final List<String> _allSkills = [
-    'Flutter',
-    'Dart',
-    'JavaScript',
-    'Python',
-    'UI/UX',
-    'React',
-    'Figma',
-    'Java',
-    'C++',
-    'SQL',
-  ];
-  final Map<String, double> _skillRatings = {};
+  String? _profilePhotoB64;
 
-  // Work/Education Timeline
   final List<Map<String, dynamic>> _workTimeline = [];
   final List<Map<String, dynamic>> _eduTimeline = [];
 
-  // For adding new work/edu
   final _workCompany = TextEditingController();
   final _workRole = TextEditingController();
   DateTime? _workStart, _workEnd;
@@ -58,35 +58,27 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
   final _eduDegree = TextEditingController();
   DateTime? _eduStart, _eduEnd;
 
-  @override
-  void dispose() {
-    for (final c in _controllers.values) {
-      c.dispose();
-    }
-    _workCompany.dispose();
-    _workRole.dispose();
-    _eduSchool.dispose();
-    _eduDegree.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickProfileImage() async {
-    // For demo: use a placeholder, or use image_picker for real app
-    setState(() {
-      _profileImage = const AssetImage('assets/profile_placeholder.png');
-    });
+  void _onPhotoChanged(String? b64) {
+    setState(() => _profilePhotoB64 = b64);
   }
 
   void _addWork() {
     if (_workCompany.text.isEmpty ||
         _workRole.text.isEmpty ||
         _workStart == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill Company, Role and Start Date.'),
+          ),
+        );
+      }
       return;
     }
     setState(() {
       _workTimeline.add({
-        'company': _workCompany.text,
-        'role': _workRole.text,
+        'company': _workCompany.text.trim(),
+        'role': _workRole.text.trim(),
         'start': _workStart,
         'end': _workEnd,
       });
@@ -97,48 +89,40 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     });
   }
 
-  void _addEdu() {
-    if (_eduSchool.text.isEmpty ||
-        _eduDegree.text.isEmpty ||
-        _eduStart == null) {
-      return;
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
     }
-    setState(() {
-      _eduTimeline.add({
-        'school': _eduSchool.text,
-        'degree': _eduDegree.text,
-        'start': _eduStart,
-        'end': _eduEnd,
-      });
-      _eduSchool.clear();
-      _eduDegree.clear();
-      _eduStart = null;
-      _eduEnd = null;
-    });
+    for (final f in _focusNodes.values) {
+      f.dispose();
+    }
+    _workCompany.dispose();
+    _workRole.dispose();
+    _eduSchool.dispose();
+    _eduDegree.dispose();
+    super.dispose();
   }
 
-  Future<void> _pickDate(
-    BuildContext context,
-    ValueChanged<DateTime> onPicked, {
-    DateTime? initial,
-  }) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial ?? DateTime.now(),
-      firstDate: DateTime(1970),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) onPicked(picked);
-  }
-
-  Future<void> _saveResume() async {
-    if (!_formKey.currentState!.validate()) return;
-    final data = _controllers.map((k, c) => MapEntry(k, c.text));
-    data['skills'] = _skillRatings.entries
-        .map((e) => '${e.key}:${e.value}')
-        .join(',');
-    data['workTimeline'] = jsonEncode(
-      _workTimeline
+  Map<String, dynamic> _collectResumeData() {
+    return {
+      'personalInfo': {
+        'name': _controllers['name']!.text.trim(),
+        'email': _controllers['email']!.text.trim(),
+        'phone': _controllers['phone']!.text.trim(),
+        'linkedin': _controllers['linkedin']!.text.trim(),
+        if (_profilePhotoB64 != null && _profilePhotoB64!.isNotEmpty)
+          'profilePhotoBase64': _profilePhotoB64,
+      },
+      'summary': _controllers['summary']!.text,
+      // store skills both as list (modern) and as csv string to maximize exporter compatibility
+      'skills': _controllers['skills']!.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList(),
+      'skillsCsv': _controllers['skills']!.text,
+      'workExperience': _workTimeline
           .map(
             (e) => {
               'company': e['company'],
@@ -148,9 +132,19 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
             },
           )
           .toList(),
-    );
-    data['eduTimeline'] = jsonEncode(
-      _eduTimeline
+      // also include classic JSON-string fields expected by older exporter
+      'workExperiences': jsonEncode(
+        _workTimeline
+            .map(
+              (e) => {
+                'jobTitle': e['role'],
+                'company': e['company'],
+                'description': '',
+              },
+            )
+            .toList(),
+      ),
+      'education': _eduTimeline
           .map(
             (e) => {
               'school': e['school'],
@@ -160,27 +154,21 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
             },
           )
           .toList(),
-    );
-    final title = _controllers['name']!.text.isEmpty
-        ? 'My Resume'
-        : '${_controllers['name']!.text} Resume';
-    final resume = SavedResume(
-      id:
-          widget.existingResume?.id ??
-          ResumeStorageService.instance.generateId(),
-      title: widget.existingResume?.title ?? title,
-      template: 'Modern',
-      createdAt: widget.existingResume?.createdAt ?? DateTime.now(),
-      updatedAt: DateTime.now(),
-      data: data,
-    );
-    await ResumeStorageService.instance.saveOrUpdate(resume);
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Modern Resume saved!')));
-      Navigator.pop(context);
-    }
+      'educations': jsonEncode(
+        _eduTimeline
+            .map(
+              (e) => {
+                'degree': e['degree'],
+                'institution': e['school'],
+                'description': '',
+              },
+            )
+            .toList(),
+      ),
+      'certifications': _controllers['certifications']!.text,
+      'achievements': _controllers['achievements']!.text,
+      'hobbies': _controllers['hobbies']!.text,
+    };
   }
 
   String _getResumeContent() {
@@ -203,8 +191,9 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     }
 
     // Add skills
-    if (_skillRatings.isNotEmpty) {
-      buffer.writeln('\nSkills: ${_skillRatings.keys.join(', ')}');
+    final skillsText = _controllers['skills']?.text ?? '';
+    if (skillsText.trim().isNotEmpty) {
+      buffer.writeln('\nSkills: $skillsText');
     }
 
     // Add work experience
@@ -226,6 +215,76 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     return buffer.toString();
   }
 
+  void _addEdu() {
+    if (_eduSchool.text.isEmpty ||
+        _eduDegree.text.isEmpty ||
+        _eduStart == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill University, Degree and Start Date.'),
+          ),
+        );
+      }
+      return;
+    }
+    setState(() {
+      _eduTimeline.add({
+        'school': _eduSchool.text.trim(),
+        'degree': _eduDegree.text.trim(),
+        'start': _eduStart,
+        'end': _eduEnd,
+      });
+      _eduSchool.clear();
+      _eduDegree.clear();
+      _eduStart = null;
+      _eduEnd = null;
+    });
+  }
+
+  Future<void> _pickDate(
+    BuildContext context,
+    void Function(DateTime) onPicked, {
+    DateTime? initial,
+  }) async {
+    final now = DateTime.now();
+    final first = DateTime(now.year - 60, 1, 1);
+    final last = DateTime(now.year + 10, 12, 31);
+    final res = await showDatePicker(
+      context: context,
+      initialDate: initial ?? now,
+      firstDate: first,
+      lastDate: last,
+    );
+    if (res != null) onPicked(res);
+  }
+
+  Future<void> _saveResume() async {
+    final data = _collectResumeData();
+
+    final title = _controllers['name']!.text.isEmpty
+        ? 'My Resume'
+        : '${_controllers['name']!.text} Resume';
+
+    final resume = SavedResume(
+      id:
+          widget.existingResume?.id ??
+          ResumeStorageService.instance.generateId(),
+      title: widget.existingResume?.title ?? title,
+      template: 'Modern',
+      createdAt: widget.existingResume?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+      data: data,
+    );
+
+    await ResumeStorageService.instance.saveOrUpdate(resume);
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Modern Resume saved!')));
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     const accent = Colors.purple;
@@ -234,6 +293,55 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
         title: const Text('Modern Resume'),
         backgroundColor: accent,
         foregroundColor: Colors.white,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.share),
+            onSelected: (choice) async {
+              if (!PremiumService.isPremium) {
+                PremiumService.showUpgradeDialog(context, 'Sharing');
+                return;
+              }
+              final name = _controllers['name']?.text ?? '';
+              final resume = SavedResume(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                title: name.isNotEmpty ? '$name Resume' : 'Modern Resume',
+                template: 'Modern',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+                data: _collectResumeData(),
+              );
+              try {
+                if (choice == 'EMAIL') {
+                  await ShareExportService.instance.shareViaEmail(resume);
+                } else if (choice == 'WHATSAPP') {
+                  await ShareExportService.instance.shareViaWhatsApp(resume);
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'EMAIL',
+                child: ListTile(
+                  leading: Icon(Icons.email_outlined),
+                  title: Text('Share via Email (Premium)'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'WHATSAPP',
+                child: ListTile(
+                  leading: Icon(Icons.share_outlined),
+                  title: Text('Share via WhatsApp (Premium)'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -244,9 +352,10 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
         child: Form(
           key: _formKey,
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.all(18),
             children: [
-              // Profile + Contact
+              // Photo box only
               Card(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -254,84 +363,92 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                 elevation: 8,
                 child: Padding(
                   padding: const EdgeInsets.all(18),
-                  child: Row(
+                  child: Center(
+                    child: ProfilePhotoPicker(
+                      initialBase64: _profilePhotoB64,
+                      onChanged: _onPhotoChanged,
+                      size: 96,
+                      buttonBelow: true,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              // Contact box: Full Name, Email, Phone
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 8,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      GestureDetector(
-                        onTap: _pickProfileImage,
-                        child: CircleAvatar(
-                          radius: 38,
-                          backgroundColor: accent.withOpacity(0.2),
-                          backgroundImage: _profileImage,
-                          child: _profileImage == null
-                              ? const Icon(
-                                  Icons.camera_alt,
-                                  size: 32,
-                                  color: Colors.grey,
-                                )
-                              : null,
-                        ),
+                      _modernContactRow(
+                        null,
+                        _controllers['name']!,
+                        'Full Name',
+                        focusNode: _focusNodes['name'],
+                        bold: true,
+                        autofillHints: const [AutofillHints.name],
                       ),
-                      const SizedBox(width: 18),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _modernContactRow(
-                              Icons.person,
-                              _controllers['name']!,
-                              'Full Name',
-                            ),
-                            _modernContactRow(
-                              Icons.email,
-                              _controllers['email']!,
-                              'Email',
-                            ),
-                            _modernContactRow(
-                              Icons.phone,
-                              _controllers['phone']!,
-                              'Phone',
-                            ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.linked_camera,
-                                    color: Colors.blue,
-                                  ),
-                                  onPressed: () {},
-                                  tooltip: 'LinkedIn',
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.code,
-                                    color: Colors.black,
-                                  ),
-                                  onPressed: () {},
-                                  tooltip: 'GitHub',
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.web,
-                                    color: Colors.teal,
-                                  ),
-                                  onPressed: () {},
-                                  tooltip: 'Portfolio',
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                      _modernContactRow(
+                        null,
+                        _controllers['email']!,
+                        'Email',
+                        focusNode: _focusNodes['email'],
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
+                      ),
+                      _modernContactRow(
+                        null,
+                        _controllers['phone']!,
+                        'Phone Number',
+                        focusNode: _focusNodes['phone'],
+                        keyboardType: TextInputType.phone,
+                        autofillHints: const [AutofillHints.telephoneNumber],
                       ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 18),
-              // AI-Enhanced Summary Section
+              // LinkedIn box only
               Card(
-                color: accent.withOpacity(0.08),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 8,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: _modernContactRow(
+                    Icons.link,
+                    _controllers['linkedin']!,
+                    'LinkedIn URL',
+                    focusNode: _focusNodes['linkedin'],
+                    keyboardType: TextInputType.url,
+                    autofillHints: const [AutofillHints.url],
+                    suffixIcon: IconButton(
+                      tooltip: 'Open LinkedIn',
+                      icon: const Icon(Icons.open_in_new),
+                      color: Colors.purple,
+                      onPressed: () async {
+                        final raw = _controllers['linkedin']!.text.trim();
+                        if (raw.isEmpty) return;
+                        await _openUrl(raw);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              // AI-Enhanced Summary Section
+              Card(
+                color: Colors.white, // Clear, high-contrast background
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: accent.withOpacity(0.25)),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(18),
@@ -373,9 +490,13 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                         AISummaryGenerator(
                           name: _controllers['name']!.text,
                           targetRole: 'Professional', // Can be made dynamic
-                          skills: _skillRatings.keys.toList(),
+                          skills: (_controllers['skills']?.text ?? '')
+                              .split(',')
+                              .map((s) => s.trim())
+                              .where((s) => s.isNotEmpty)
+                              .toList(),
                           experience: _workTimeline
-                              .map((w) => w['position'] ?? '')
+                              .map((w) => (w['role'] ?? '').toString())
                               .cast<String>()
                               .toList(),
                           onGenerated: (summary) {
@@ -389,7 +510,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              // Skills
+              // Skills (no star ratings; searchable + manual input via shared widget)
               Card(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -401,7 +522,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.star, color: Colors.amber, size: 28),
+                          Icon(Icons.build, color: Colors.amber, size: 28),
                           SizedBox(width: 8),
                           Text(
                             'Skills',
@@ -414,55 +535,11 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _allSkills.map((skill) {
-                          final selected = _skillRatings.containsKey(skill);
-                          return FilterChip(
-                            label: Text(skill),
-                            selected: selected,
-                            selectedColor: accent.withOpacity(0.2),
-                            onSelected: (val) {
-                              setState(() {
-                                if (val) {
-                                  _skillRatings[skill] = 3;
-                                } else {
-                                  _skillRatings.remove(skill);
-                                }
-                              });
-                            },
-                          );
-                        }).toList(),
+                      // Shared picker field handles catalog + typed custom skills
+                      SkillsPickerField(
+                        controller: _controllers['skills']!,
+                        label: 'Skills',
                       ),
-                      if (_skillRatings.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        ..._skillRatings.entries.map(
-                          (e) => Row(
-                            children: [
-                              Text(
-                                e.key,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Expanded(
-                                child: Slider(
-                                  value: e.value,
-                                  min: 1,
-                                  max: 5,
-                                  divisions: 4,
-                                  label: '${e.value.round()}',
-                                  onChanged: (v) =>
-                                      setState(() => _skillRatings[e.key] = v),
-                                  activeColor: accent,
-                                ),
-                              ),
-                              Text('⭐' * e.value.round()),
-                            ],
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -638,7 +715,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                             child: TextFormField(
                               controller: _eduSchool,
                               decoration: const InputDecoration(
-                                labelText: 'School/College',
+                                labelText: 'University',
                               ),
                             ),
                           ),
@@ -728,6 +805,16 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _controllers['certifications'],
+                        decoration: const InputDecoration(
+                          labelText: 'Add certifications (comma separated)',
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         children: _controllers['certifications']!.text
@@ -779,14 +866,20 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                         controller: _controllers['achievements'],
                         decoration: const InputDecoration(
                           labelText: 'Achievements (comma separated)',
+                          filled: true,
+                          fillColor: Colors.white,
                         ),
+                        onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: _controllers['hobbies'],
                         decoration: const InputDecoration(
                           labelText: 'Hobbies (comma separated)',
+                          filled: true,
+                          fillColor: Colors.white,
                         ),
+                        onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: 8),
                       Wrap(
@@ -855,26 +948,103 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
   }
 
   Widget _modernContactRow(
-    IconData icon,
+    IconData? icon,
     TextEditingController controller,
-    String label,
-  ) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.purple, size: 20),
-        const SizedBox(width: 6),
-        Expanded(
-          child: TextFormField(
-            controller: controller,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              labelText: label,
-              border: InputBorder.none,
-              isDense: true,
-            ),
+    String label, {
+    FocusNode? focusNode,
+    TextInputType? keyboardType,
+    TextInputAction inputAction = TextInputAction.next,
+    Iterable<String>? autofillHints,
+    bool bold = false,
+    Widget? suffixIcon,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextFormField(
+        controller: controller,
+        style: TextStyle(
+          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        ),
+        focusNode: focusNode,
+        keyboardType: keyboardType,
+        textInputAction: inputAction,
+        autofillHints: autofillHints,
+        autocorrect:
+            !(keyboardType == TextInputType.emailAddress ||
+                keyboardType == TextInputType.url),
+        cursorColor: Colors.purple,
+        textAlignVertical: TextAlignVertical.center,
+        inputFormatters: keyboardType == TextInputType.phone
+            ? <TextInputFormatter>[
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+()\-\s]')),
+              ]
+            : null,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: icon == null
+              ? null
+              : IgnorePointer(
+                  ignoring: true,
+                  child: Icon(icon, color: Colors.purple, size: 18),
+                ),
+          suffixIcon: suffixIcon,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 10,
+            horizontal: 12,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.purple.shade300, width: 2),
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Future<void> _openUrl(String raw) async {
+    // Normalize URL (prepend https if missing scheme)
+    var url = raw.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the link')),
+        );
+      }
+    }
+  }
+
+  // Small footprint icon button for header social links
+  Widget _compactIconButton({
+    required IconData icon,
+    required Color color,
+    String? tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        tooltip: tooltip,
+        icon: Icon(icon, color: color, size: 18),
+        onPressed: onPressed,
+      ),
     );
   }
 

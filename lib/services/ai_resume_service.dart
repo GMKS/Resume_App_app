@@ -5,8 +5,11 @@ import 'premium_service.dart';
 /// AI-powered resume writing service using GPT for content generation
 class AIResumeService {
   static const String _baseUrl = 'https://api.openai.com/v1';
-  static const String _apiKey =
-      'YOUR_OPENAI_API_KEY'; // TODO: Add to environment variables
+  // Provide API key via --dart-define=OPENAI_API_KEY=sk-...
+  static const String _apiKey = String.fromEnvironment(
+    'OPENAI_API_KEY',
+    defaultValue: '',
+  );
 
   /// Generate professional bullet points for work experience
   static Future<List<String>> generateBulletPoints({
@@ -41,7 +44,11 @@ Requirements:
 Format as a JSON array of strings.
 ''';
 
-      final response = await _makeOpenAIRequest(prompt);
+      final response = await _makeOpenAIRequest(
+        prompt,
+        temperature: 0.9,
+        seed: DateTime.now().millisecondsSinceEpoch % 1000,
+      );
       return _parseBulletPoints(response);
     } catch (e) {
       // Fallback to template-based generation
@@ -58,6 +65,8 @@ Format as a JSON array of strings.
     String? industry,
   }) async {
     try {
+      // Add a small salt to encourage varied responses across runs
+      final salt = DateTime.now().millisecondsSinceEpoch % 1000;
       final prompt =
           '''
 Generate a professional resume summary for:
@@ -74,11 +83,16 @@ Requirements:
 - Include relevant keywords for ATS
 - Professional tone
 - Focus on value proposition
+ - Provide a slightly different phrasing from previous outputs
 
-Return only the summary text.
+ Return only the summary text.
 ''';
 
-      final response = await _makeOpenAIRequest(prompt);
+      final response = await _makeOpenAIRequest(
+        prompt,
+        temperature: 0.9,
+        seed: salt,
+      );
       return _parseSummary(response);
     } catch (e) {
       // Fallback summary
@@ -269,7 +283,16 @@ Format as JSON with keys: grammar, clarity, impact, tone, score, suggestions
   }
 
   // Private helper methods
-  static Future<String> _makeOpenAIRequest(String prompt) async {
+  static Future<String> _makeOpenAIRequest(
+    String prompt, {
+    double temperature = 0.7,
+    int? seed,
+  }) async {
+    if (_apiKey.isEmpty) {
+      throw Exception(
+        'Missing OpenAI API key. Pass --dart-define=OPENAI_API_KEY=... at build/run time.',
+      );
+    }
     final response = await http.post(
       Uri.parse('$_baseUrl/chat/completions'),
       headers: {
@@ -282,7 +305,8 @@ Format as JSON with keys: grammar, clarity, impact, tone, score, suggestions
           {'role': 'user', 'content': prompt},
         ],
         'max_tokens': 1000,
-        'temperature': 0.7,
+        'temperature': temperature,
+        if (seed != null) 'seed': seed,
       }),
     );
 

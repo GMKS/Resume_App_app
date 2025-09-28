@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/premium_service.dart';
-import '../services/analytics_service.dart';
-import '../services/in_app_purchase_service.dart';
 import '../services/currency_service.dart';
 
 class PremiumUpgradeScreen extends StatefulWidget {
@@ -15,16 +13,13 @@ class PremiumUpgradeScreen extends StatefulWidget {
 
 class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
   bool _isLoading = false;
-  final String _selectedPlan = InAppPurchaseService.yearlyPremiumId;
+  final String _selectedPlan = 'yearly';
 
   @override
   void initState() {
     super.initState();
     // Track premium screen view
-    AnalyticsService.trackEvent('premium_screen_viewed', {
-      'source_feature': widget.sourceFeature ?? 'direct',
-      'selected_plan': _selectedPlan,
-    });
+    // Analytics disabled in this build
   }
 
   @override
@@ -242,20 +237,7 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
     setState(() => _isLoading = true);
 
     // Get product ID
-    String productId;
-    switch (planType) {
-      case 'monthly':
-        productId = InAppPurchaseService.monthlyPremiumId;
-        break;
-      case 'yearly':
-        productId = InAppPurchaseService.yearlyPremiumId;
-        break;
-      case 'lifetime':
-        productId = InAppPurchaseService.lifetimePremiumId;
-        break;
-      default:
-        productId = InAppPurchaseService.yearlyPremiumId;
-    }
+    final productId = planType; // simple id mapping
 
     try {
       final success = await PremiumService.purchasePremium(productId);

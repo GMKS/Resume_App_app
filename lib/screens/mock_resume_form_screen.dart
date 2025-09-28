@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/resume_storage_service.dart';
 
 // Mock Resume Form Screen
 class MockResumeFormScreen extends StatelessWidget {
@@ -125,15 +126,33 @@ class MockResumeFormScreen extends StatelessWidget {
               child: Column(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '$templateName resume saved successfully!',
-                          ),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                    onPressed: () async {
+                      try {
+                        // Persist a minimal entry so mock flows can save
+                        ResumeStorageService.instance.saveEmptyTemplate(
+                          templateName,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '$templateName resume saved successfully!',
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          Navigator.of(context).pop();
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Save failed: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
                     },
                     icon: const Icon(Icons.save),
                     label: const Text('Save Resume'),

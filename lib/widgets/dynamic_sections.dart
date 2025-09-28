@@ -107,12 +107,14 @@ class DynamicWorkExperienceSection extends StatefulWidget {
   final List<WorkExperience> workExperiences;
   final Function(List<WorkExperience>) onWorkExperiencesChanged;
   final Color? accentColor;
+  final bool atsFriendly;
 
   const DynamicWorkExperienceSection({
     super.key,
     required this.workExperiences,
     required this.onWorkExperiencesChanged,
     this.accentColor,
+    this.atsFriendly = false,
   });
 
   @override
@@ -160,30 +162,40 @@ class _DynamicWorkExperienceSectionState
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = widget.accentColor ?? Colors.blue;
+    final accentColor = widget.atsFriendly
+        ? (widget.accentColor ?? Colors.black87)
+        : (widget.accentColor ?? Colors.blue);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(Icons.work, color: accentColor, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              'Work Experience',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: accentColor,
+            if (!widget.atsFriendly) ...[
+              Icon(Icons.work, color: accentColor, size: 24),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(
+                'Work Experience',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             ElevatedButton.icon(
               onPressed: _addWorkExperience,
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add Experience'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
+                backgroundColor: widget.atsFriendly
+                    ? Colors.black87
+                    : accentColor,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -196,11 +208,19 @@ class _DynamicWorkExperienceSectionState
         const SizedBox(height: 16),
         if (widget.workExperiences.isEmpty)
           Card(
+            elevation: widget.atsFriendly ? 0 : null,
+            shape: widget.atsFriendly
+                ? RoundedRectangleBorder(
+                    side: BorderSide(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4),
+                  )
+                : null,
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  Icon(Icons.work_outline, size: 48, color: Colors.grey[400]),
+                  if (!widget.atsFriendly)
+                    Icon(Icons.work_outline, size: 48, color: Colors.grey[400]),
                   const SizedBox(height: 8),
                   Text(
                     'No work experience added yet',
@@ -221,6 +241,13 @@ class _DynamicWorkExperienceSectionState
             final experience = entry.value;
 
             return Card(
+              elevation: widget.atsFriendly ? 0 : null,
+              shape: widget.atsFriendly
+                  ? RoundedRectangleBorder(
+                      side: BorderSide(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(4),
+                    )
+                  : null,
               margin: const EdgeInsets.only(bottom: 16),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -257,6 +284,9 @@ class _DynamicWorkExperienceSectionState
                             decoration: const InputDecoration(
                               labelText: 'Job Title *',
                               border: OutlineInputBorder(),
+                              isDense: true,
+                              filled: true,
+                              fillColor: Colors.white,
                             ),
                             onChanged: (value) {
                               experience.jobTitle = value;
@@ -271,6 +301,9 @@ class _DynamicWorkExperienceSectionState
                             decoration: const InputDecoration(
                               labelText: 'Company *',
                               border: OutlineInputBorder(),
+                              isDense: true,
+                              filled: true,
+                              fillColor: Colors.white,
                             ),
                             onChanged: (value) {
                               experience.company = value;
@@ -286,6 +319,9 @@ class _DynamicWorkExperienceSectionState
                       decoration: const InputDecoration(
                         labelText: 'Location',
                         border: OutlineInputBorder(),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
                       ),
                       onChanged: (value) {
                         experience.location = value;
@@ -359,12 +395,14 @@ class DynamicEducationSection extends StatefulWidget {
   final List<Education> educations;
   final Function(List<Education>) onEducationsChanged;
   final Color? accentColor;
+  final bool atsFriendly;
 
   const DynamicEducationSection({
     super.key,
     required this.educations,
     required this.onEducationsChanged,
     this.accentColor,
+    this.atsFriendly = false,
   });
 
   @override
@@ -409,30 +447,40 @@ class _DynamicEducationSectionState extends State<DynamicEducationSection> {
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = widget.accentColor ?? Colors.teal;
+    final accentColor = widget.atsFriendly
+        ? (widget.accentColor ?? Colors.black87)
+        : (widget.accentColor ?? Colors.teal);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(Icons.school, color: accentColor, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              'Education',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: accentColor,
+            if (!widget.atsFriendly) ...[
+              Icon(Icons.school, color: accentColor, size: 24),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(
+                'Education',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             ElevatedButton.icon(
               onPressed: _addEducation,
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add Education'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
+                backgroundColor: widget.atsFriendly
+                    ? Colors.black87
+                    : accentColor,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -445,15 +493,23 @@ class _DynamicEducationSectionState extends State<DynamicEducationSection> {
         const SizedBox(height: 16),
         if (widget.educations.isEmpty)
           Card(
+            elevation: widget.atsFriendly ? 0 : null,
+            shape: widget.atsFriendly
+                ? RoundedRectangleBorder(
+                    side: BorderSide(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4),
+                  )
+                : null,
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  Icon(
-                    Icons.school_outlined,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
+                  if (!widget.atsFriendly)
+                    Icon(
+                      Icons.school_outlined,
+                      size: 48,
+                      color: Colors.grey[400],
+                    ),
                   const SizedBox(height: 8),
                   Text(
                     'No education added yet',
@@ -474,6 +530,13 @@ class _DynamicEducationSectionState extends State<DynamicEducationSection> {
             final education = entry.value;
 
             return Card(
+              elevation: widget.atsFriendly ? 0 : null,
+              shape: widget.atsFriendly
+                  ? RoundedRectangleBorder(
+                      side: BorderSide(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(4),
+                    )
+                  : null,
               margin: const EdgeInsets.only(bottom: 16),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -522,7 +585,7 @@ class _DynamicEducationSectionState extends State<DynamicEducationSection> {
                           child: TextFormField(
                             initialValue: education.institution,
                             decoration: const InputDecoration(
-                              labelText: 'Institution *',
+                              labelText: 'University *',
                               border: OutlineInputBorder(),
                             ),
                             onChanged: (value) {

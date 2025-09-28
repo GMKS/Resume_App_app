@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'resume_template_selection_screen.dart';
 import 'smart_assist_screen.dart';
+import 'saved_resumes_screen.dart';
+import 'settings_screen.dart';
 
 class SimpleHomeScreen extends StatelessWidget {
   const SimpleHomeScreen({super.key});
@@ -16,8 +18,9 @@ class SimpleHomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Settings - Coming Soon!')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
               );
             },
           ),
@@ -119,9 +122,10 @@ class SimpleHomeScreen extends StatelessWidget {
                     Icons.folder,
                     Colors.blue,
                     'View and manage your resumes',
-                    () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('My Resumes - Coming Soon!'),
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SavedResumesScreen(),
                       ),
                     ),
                   ),

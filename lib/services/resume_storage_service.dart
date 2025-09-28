@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/saved_resume.dart';
-import 'cloud_resume_service.dart';
 import 'premium_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'node_api_service.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ResumeStorageService {
   ResumeStorageService._();
@@ -11,27 +14,72 @@ class ResumeStorageService {
   final ValueNotifier<List<SavedResume>> resumes =
       ValueNotifier<List<SavedResume>>([]);
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isInitialized = false;
+  // Map local resume ids -> remote (backend) ids
+  final Map<String, String> _remoteIdMap = {};
 
   // Initialize with cloud data
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      try {
-        // Load resumes from cloud
-        final cloudResumes = await CloudResumeService.instance.all;
-        resumes.value = cloudResumes;
-
-        // Listen to real-time updates
-        CloudResumeService.instance.resumesStream.listen((cloudResumes) {
-          resumes.value = cloudResumes;
-        });
-      } catch (e) {
-        print('Error loading cloud resumes: $e');
+    // Load remote id map
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('remote_id_map');
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          decoded.forEach((k, v) {
+            if (k is String && v is String) _remoteIdMap[k] = v;
+          });
+        }
       }
+    } catch (_) {}
+
+    // If premium and authenticated, pull latest resumes from backend
+    if (PremiumService.hasCloudSync && ApiService.isAuthenticated) {
+      try {
+        final result = await ApiService.getResumes(page: 1, limit: 100);
+        if (result['success'] == true && result['data'] is List) {
+          final List data = result['data'] as List;
+          final list = <SavedResume>[];
+          for (final item in data) {
+            if (item is Map) {
+              final map = item.cast<String, dynamic>();
+              // Expecting server fields similar to our model
+              final id = (map['id'] ?? map['_id'] ?? '').toString();
+              if (id.isEmpty) continue;
+              final createdAtRaw =
+                  (map['createdAt'] ??
+                          map['created_at'] ??
+                          DateTime.now().toIso8601String())
+                      .toString();
+              final updatedAtRaw =
+                  (map['updatedAt'] ?? map['updated_at'] ?? createdAtRaw)
+                      .toString();
+              final r = SavedResume(
+                id: id, // Use remote id directly for simplicity
+                title: (map['title'] ?? 'Untitled').toString(),
+                template: (map['template'] ?? 'Classic').toString(),
+                createdAt: DateTime.tryParse(createdAtRaw) ?? DateTime.now(),
+                updatedAt: DateTime.tryParse(updatedAtRaw) ?? DateTime.now(),
+                data: {
+                  'personalInfo': map['personalInfo'] ?? {},
+                  'workExperience': map['workExperience'] ?? [],
+                  'education': map['education'] ?? [],
+                  'skills': map['skills'] ?? [],
+                  if (map['data'] is Map)
+                    ...Map<String, dynamic>.from(map['data']),
+                },
+              );
+              list.add(r);
+              _remoteIdMap[id] = id; // direct mapping when pulling from cloud
+            }
+          }
+          resumes.value = list;
+          await _persistRemoteIdMap();
+        }
+      } catch (_) {}
     }
 
     _isInitialized = true;
@@ -51,16 +99,78 @@ class ResumeStorageService {
     }
     resumes.value = list;
 
-    // Save to cloud if user is authenticated
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
+    // Cloud sync via Node API for premium users
+    if (PremiumService.hasCloudSync && ApiService.isAuthenticated) {
       try {
-        await CloudResumeService.instance.uploadResume(resume);
-        print('Resume saved to cloud successfully');
-      } catch (e) {
-        print('Error saving to cloud: $e');
-        // Note: Local version is still saved, so user doesn't lose data
+        final payload = {
+          'title': resume.title,
+          'template': resume.template,
+          'personalInfo': resume.personalInfo,
+          if (resume.data['summary'] != null) 'summary': resume.data['summary'],
+          'workExperience': resume.workExperience,
+          'education': resume.education,
+          // Convert skills (List<String>) into a list of maps expected by API if needed
+          'skills': resume.skills
+              .map((s) => {'label': s, 'rating': 0})
+              .toList(),
+          'updatedAt': resume.updatedAt.toIso8601String(),
+        };
+
+        final remoteId = _remoteIdMap[resume.id];
+        if (remoteId != null && remoteId.isNotEmpty) {
+          // Try update first
+          final result = await ApiService.updateResume(
+            resumeId: remoteId,
+            updateData: payload,
+          );
+          if (result['success'] != true) {
+            // Fallback: create if update failed
+            final createRes = await ApiService.createResume(
+              title: resume.title,
+              template: resume.template,
+              personalInfo: resume.personalInfo,
+              summary: resume.data['summary'],
+              workExperience: resume.workExperience,
+              education: resume.education,
+              skills: resume.skills
+                  .map((s) => {'label': s, 'rating': 0})
+                  .toList(),
+            );
+            final newId = _extractId(createRes['data']);
+            if (newId != null) {
+              _remoteIdMap[resume.id] = newId;
+              await _persistRemoteIdMap();
+            }
+          }
+        } else {
+          // No remote id yet – create
+          final createRes = await ApiService.createResume(
+            title: resume.title,
+            template: resume.template,
+            personalInfo: resume.personalInfo,
+            summary: resume.data['summary'],
+            workExperience: resume.workExperience,
+            education: resume.education,
+            skills: resume.skills
+                .map((s) => {'label': s, 'rating': 0})
+                .toList(),
+          );
+          final newId = _extractId(createRes['data']);
+          if (newId != null) {
+            _remoteIdMap[resume.id] = newId;
+            await _persistRemoteIdMap();
+          }
+        }
+      } catch (_) {
+        // ignore network errors for now
       }
+    } else if (PremiumService.hasCloudSync) {
+      // Fallback for offline state: persist a JSON copy to app documents as a placeholder
+      try {
+        final dir = await getApplicationDocumentsDirectory();
+        final f = File('${dir.path}/resumes_${resume.id}.json');
+        await f.writeAsString(jsonEncode(resume.toJson()));
+      } catch (_) {}
     }
   }
 
@@ -106,14 +216,20 @@ class ResumeStorageService {
     list[idx] = updated;
     resumes.value = list;
 
-    // Save to cloud if user is authenticated
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
+    // Cloud sync rename
+    if (PremiumService.hasCloudSync && ApiService.isAuthenticated) {
       try {
-        await CloudResumeService.instance.uploadResume(updated);
-      } catch (e) {
-        print('Error updating resume in cloud: $e');
-      }
+        final remoteId = _remoteIdMap[id];
+        if (remoteId != null && remoteId.isNotEmpty) {
+          await ApiService.updateResume(
+            resumeId: remoteId,
+            updateData: {
+              'title': newTitle,
+              'updatedAt': DateTime.now().toIso8601String(),
+            },
+          );
+        }
+      } catch (_) {}
     }
   }
 
@@ -123,27 +239,93 @@ class ResumeStorageService {
     list.removeWhere((r) => r.id == id);
     resumes.value = list;
 
-    // Delete from cloud if user is authenticated
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
+    // Cloud delete
+    if (PremiumService.hasCloudSync) {
       try {
-        await CloudResumeService.instance.deleteResume(id);
-      } catch (e) {
-        print('Error deleting resume from cloud: $e');
-      }
+        if (ApiService.isAuthenticated) {
+          final remoteId = _remoteIdMap[id] ?? id;
+          await ApiService.deleteResume(remoteId);
+        }
+
+        // Remove local placeholder file if any
+        final dir = await getApplicationDocumentsDirectory();
+        final f = File('${dir.path}/resumes_$id.json');
+        if (await f.exists()) await f.delete();
+
+        // Remove mapping
+        _remoteIdMap.remove(id);
+        await _persistRemoteIdMap();
+      } catch (_) {}
     }
   }
 
   // Sync with cloud (useful after login)
   Future<void> syncWithCloud() async {
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      try {
-        final cloudResumes = await CloudResumeService.instance.all;
-        resumes.value = cloudResumes;
-      } catch (e) {
-        print('Error syncing with cloud: $e');
+    if (!(PremiumService.hasCloudSync && ApiService.isAuthenticated)) return;
+    try {
+      final result = await ApiService.getResumes(page: 1, limit: 100);
+      if (result['success'] == true && result['data'] is List) {
+        final List data = result['data'] as List;
+        final list = <SavedResume>[];
+        for (final item in data) {
+          if (item is Map) {
+            final map = item.cast<String, dynamic>();
+            final id = (map['id'] ?? map['_id'] ?? '').toString();
+            if (id.isEmpty) continue;
+            final createdAtRaw =
+                (map['createdAt'] ??
+                        map['created_at'] ??
+                        DateTime.now().toIso8601String())
+                    .toString();
+            final updatedAtRaw =
+                (map['updatedAt'] ?? map['updated_at'] ?? createdAtRaw)
+                    .toString();
+            final r = SavedResume(
+              id: id,
+              title: (map['title'] ?? 'Untitled').toString(),
+              template: (map['template'] ?? 'Classic').toString(),
+              createdAt: DateTime.tryParse(createdAtRaw) ?? DateTime.now(),
+              updatedAt: DateTime.tryParse(updatedAtRaw) ?? DateTime.now(),
+              data: {
+                'personalInfo': map['personalInfo'] ?? {},
+                'workExperience': map['workExperience'] ?? [],
+                'education': map['education'] ?? [],
+                'skills': map['skills'] ?? [],
+                if (map['data'] is Map)
+                  ...Map<String, dynamic>.from(map['data']),
+              },
+            );
+            list.add(r);
+            _remoteIdMap[id] = id;
+          }
+        }
+        resumes.value = list;
+        await _persistRemoteIdMap();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistRemoteIdMap() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('remote_id_map', jsonEncode(_remoteIdMap));
+    } catch (_) {}
+  }
+
+  String? _extractId(dynamic data) {
+    if (data is Map) {
+      final map = data.cast<String, dynamic>();
+      final flatId = map['id'] ?? map['_id'];
+      if (flatId is String && flatId.isNotEmpty) return flatId;
+      // common nested shapes: { data: { id: ... } } or { resume: { id: ... } }
+      for (final key in ['data', 'resume']) {
+        final nested = map[key];
+        if (nested is Map) {
+          final nid = (nested['id'] ?? nested['_id']);
+          if (nid is String && nid.isNotEmpty) return nid;
+        }
       }
     }
+    return null;
   }
 }
