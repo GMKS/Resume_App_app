@@ -66,9 +66,12 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 24),
@@ -106,6 +109,7 @@ class HomeScreen extends StatelessWidget {
                   color: Colors.purple,
                 ),
                 onTap: () {
+                  FocusScope.of(context).unfocus();
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -137,6 +141,7 @@ class HomeScreen extends StatelessWidget {
                   color: Colors.blue,
                 ),
                 onTap: () {
+                  FocusScope.of(context).unfocus();
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -198,6 +203,8 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ],
                   ],
+                    ),
+                  ),
                 ),
                 subtitle: const Text('AI-powered cover letter templates'),
                 trailing: const Icon(
@@ -205,6 +212,7 @@ class HomeScreen extends StatelessWidget {
                   color: Colors.teal,
                 ),
                 onTap: () {
+                  FocusScope.of(context).unfocus();
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -237,6 +245,7 @@ class HomeScreen extends StatelessWidget {
                   color: Colors.indigo,
                 ),
                 onTap: () {
+                  FocusScope.of(context).unfocus();
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -294,6 +303,7 @@ class HomeScreen extends StatelessWidget {
                   color: Colors.purple,
                 ),
                 onTap: () {
+                  FocusScope.of(context).unfocus();
                   Navigator.push(
                     context,
                     MaterialPageRoute(

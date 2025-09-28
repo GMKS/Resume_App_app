@@ -4,9 +4,12 @@ import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
 import '../widgets/requirements_banner.dart';
 import '../widgets/dynamic_sections.dart';
+import '../widgets/skills_picker_field.dart';
 import '../services/share_export_service.dart';
 import '../services/premium_service.dart';
 import '../widgets/ai_widgets.dart';
+import '../widgets/reorderable_sections.dart';
+// Removed skills keyword suggestions; adding summary keyword chips inline.
 
 class ClassicResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -20,6 +23,7 @@ class ClassicResumeFormScreen extends StatefulWidget {
 class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
   List<WorkExperience> _workExperiences = [];
   List<Education> _educations = [];
+  bool _atsFriendly = true;
 
   @override
   void initState() {
@@ -127,6 +131,95 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
     ),
   );
 
+  // Consistent section card wrapper for cleaner visual grouping
+  Widget _sectionCard({
+    required String title,
+    IconData? icon,
+    required Widget child,
+  }) {
+    final border = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+      side: _atsFriendly
+          ? BorderSide(color: Colors.grey.shade300)
+          : BorderSide(color: Colors.transparent),
+    );
+    return Card(
+      elevation: _atsFriendly ? 0 : 1,
+      shape: border,
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (!_atsFriendly && icon != null) ...[
+                  Icon(icon, size: 20, color: Colors.black87),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Inline keyword suggestions for Professional Summary
+  static const List<String> _summarySuggestions = [
+    'Results-driven',
+    'Detail-oriented',
+    'Proven track record',
+    'Strong communication skills',
+    'Team player',
+    'Innovative thinker',
+    'Self-motivated',
+  ];
+
+  Widget _buildSummarySuggestions(TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        const Text(
+          'Suggestions',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _summarySuggestions.map((s) {
+            return ActionChip(
+              label: Text(s),
+              onPressed: () {
+                final existing = controller.text;
+                // Avoid duplicates (case-insensitive contains)
+                if (existing.toLowerCase().contains(s.toLowerCase())) return;
+                final sep = existing.trim().isEmpty
+                    ? ''
+                    : (existing.trim().endsWith('.') ? ' ' : '. ');
+                controller.text = existing + sep + s;
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
   Future<void> _exportResume(String format) async {
     final state = BaseResumeForm.of(context);
     if (state == null) return;
@@ -148,6 +241,7 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
       final Map<String, dynamic> data = {
         for (final e in state.controllers.entries) e.key: e.value.text,
       };
+      data['ats_friendly'] = _atsFriendly ? 'true' : 'false';
 
       final resume = SavedResume(
         id:
@@ -212,6 +306,8 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
         'certifications',
         'workExperiences',
         'educations',
+        // Persist the order of the main sections (summary, skills, experience)
+        'sectionOrder',
       ],
       child: Builder(
         builder: (ctx) {
@@ -231,6 +327,87 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
             }
           });
 
+          // Determine initial order for draggable sections
+          List<String> order = ['summary', 'skills', 'experience'];
+          try {
+            final raw = state.controllerFor('sectionOrder').text;
+            if (raw.isNotEmpty) {
+              final parsed = jsonDecode(raw);
+              if (parsed is List) {
+                order = parsed.map((e) => e.toString()).toList();
+              }
+            }
+          } catch (_) {}
+
+          // Build SectionItem map
+          Map<String, SectionItem> sectionBuilders() {
+            return {
+              'summary': SectionItem(
+                keyId: 'summary',
+                title: 'Professional Summary',
+                build: () => _sectionCard(
+                  title: 'Professional Summary',
+                  icon: Icons.badge,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      state.buildTextField(
+                        'summary',
+                        'Professional Summary',
+                        maxLines: 3,
+                        required: true,
+                      ),
+                      _buildSummarySuggestions(state.controllerFor('summary')),
+                    ],
+                  ),
+                ),
+              ),
+              'skills': SectionItem(
+                keyId: 'skills',
+                title: 'Skills',
+                build: () => _sectionCard(
+                  title: 'Skills',
+                  icon: Icons.handyman,
+                  child: SkillsPickerField(
+                    controller: state.controllerFor('skills'),
+                    label: 'Skills',
+                  ),
+                ),
+              ),
+              'experience': SectionItem(
+                keyId: 'experience',
+                title: 'Work Experience',
+                build: () => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionTitle('Work Experience'),
+                    DynamicWorkExperienceSection(
+                      workExperiences: _workExperiences,
+                      onWorkExperiencesChanged: (experiences) {
+                        setState(() {
+                          _workExperiences = experiences;
+                          // Update JSON in hidden controller for BaseResumeForm
+                          state
+                              .controllerFor('workExperiences')
+                              .text = jsonEncode(
+                            experiences.map((e) => e.toJson()).toList(),
+                          );
+                        });
+                      },
+                      atsFriendly: _atsFriendly,
+                    ),
+                  ],
+                ),
+              ),
+            };
+          }
+
+          final all = sectionBuilders();
+          final sections = order
+              .where(all.containsKey)
+              .map((k) => all[k]!)
+              .toList(growable: false);
+
           return Scaffold(
             appBar: AppBar(
               title: const Text(
@@ -243,6 +420,11 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
               backgroundColor: Colors.white,
               elevation: 0.5,
               iconTheme: const IconThemeData(color: Colors.black),
+              centerTitle: false,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(color: Colors.grey.shade200, height: 1),
+              ),
               actions: [
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.download),
@@ -274,6 +456,64 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                     ),
                   ],
                 ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.share),
+                  onSelected: (choice) async {
+                    final state = BaseResumeForm.of(context);
+                    if (state == null) return;
+                    final data = {
+                      for (final e in state.controllers.entries)
+                        e.key: e.value.text,
+                    };
+                    final resume = SavedResume(
+                      id:
+                          widget.existing?.id ??
+                          DateTime.now().millisecondsSinceEpoch.toString(),
+                      title: state.controllerFor('name').text.isNotEmpty
+                          ? '${state.controllerFor('name').text} Resume'
+                          : 'Classic Resume',
+                      template: 'Classic',
+                      data: data,
+                      createdAt: widget.existing?.createdAt ?? DateTime.now(),
+                      updatedAt: DateTime.now(),
+                    );
+                    try {
+                      if (!PremiumService.isPremium) {
+                        PremiumService.showUpgradeDialog(context, 'Sharing');
+                        return;
+                      }
+                      if (choice == 'EMAIL') {
+                        await ShareExportService.instance.shareViaEmail(resume);
+                      } else if (choice == 'WHATSAPP') {
+                        await ShareExportService.instance.shareViaWhatsApp(
+                          resume,
+                        );
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Share failed: $e')),
+                      );
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'EMAIL',
+                      child: ListTile(
+                        leading: Icon(Icons.email_outlined),
+                        title: Text('Share via Email (Premium)'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'WHATSAPP',
+                      child: ListTile(
+                        leading: Icon(Icons.share_outlined),
+                        title: Text('Share via WhatsApp (Premium)'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
             backgroundColor: Colors.white,
@@ -291,71 +531,44 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                       'skills': 'Skills',
                     },
                   ),
-
-                  _sectionTitle('Contact Info'),
-                  state.buildTextField('name', 'Full Name', required: true),
-                  state.buildTextField(
-                    'email',
-                    'Email Address',
-                    required: true,
-                    keyboard: TextInputType.emailAddress,
+                  _sectionCard(
+                    title: 'Contact Info',
+                    icon: Icons.contact_page,
+                    child: Column(
+                      children: [
+                        state.buildTextField(
+                          'name',
+                          'Full Name',
+                          required: true,
+                        ),
+                        const SizedBox(height: 12),
+                        state.buildTextField(
+                          'email',
+                          'Email Address',
+                          required: true,
+                          keyboard: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 12),
+                        state.buildTextField(
+                          'phone',
+                          'Mobile Number',
+                          required: true,
+                          keyboard: TextInputType.phone,
+                        ),
+                      ],
+                    ),
                   ),
-                  state.buildTextField(
-                    'phone',
-                    'Mobile Number',
-                    required: true,
-                    keyboard: TextInputType.phone,
-                  ),
-
-                  _sectionTitle('Professional Summary'),
-                  AISummaryGenerator(
-                    name: state.controllers['name']?.text ?? '',
-                    targetRole: 'Professional',
-                    skills: (state.controllers['skills']?.text ?? '')
-                        .split(',')
-                        .map((s) => s.trim())
-                        .where((s) => s.isNotEmpty)
-                        .toList(),
-                    experience: _workExperiences
-                        .map(
-                          (exp) =>
-                              '${exp.jobTitle} at ${exp.company}: ${exp.description}',
-                        )
-                        .toList(),
-                    onGenerated: (summary) {
-                      state.controllers['summary']?.text = summary;
-                    },
-                  ),
-                  state.buildTextField(
-                    'summary',
-                    'Professional Summary',
-                    maxLines: 3,
-                    required: true,
-                  ),
-
-                  _sectionTitle('Skills'),
-                  state.buildTextField(
-                    'skills',
-                    'Skills (comma separated)',
-                    maxLines: 2,
-                    required: true,
-                  ),
-
-                  _sectionTitle('Work Experience'),
-                  DynamicWorkExperienceSection(
-                    workExperiences: _workExperiences,
-                    onWorkExperiencesChanged: (experiences) {
-                      setState(() {
-                        _workExperiences = experiences;
-                        // Update JSON in hidden controller for BaseResumeForm
-                        state
-                            .controllerFor('workExperiences')
-                            .text = jsonEncode(
-                          experiences.map((e) => e.toJson()).toList(),
+                  // Draggable sections: Summary, Skills, Experience (Premium)
+                  if (PremiumService.hasDragDropFeature)
+                    ReorderableResumeSections(
+                      sections: sections,
+                      onOrderChanged: (newOrder) {
+                        // Persist order as JSON string in hidden controller
+                        state.controllerFor('sectionOrder').text = jsonEncode(
+                          newOrder,
                         );
-                      });
-                    },
-                  ),
+                      },
+                    ),
 
                   _sectionTitle('Education'),
                   DynamicEducationSection(
@@ -369,16 +582,31 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                         );
                       });
                     },
+                    atsFriendly: _atsFriendly,
                   ),
 
-                  _sectionTitle('Certifications'),
-                  state.buildTextField(
-                    'certifications',
-                    'Certifications',
-                    maxLines: 2,
+                  _sectionCard(
+                    title: 'Certifications',
+                    icon: Icons.workspace_premium,
+                    child: state.buildTextField(
+                      'certifications',
+                      'Certifications',
+                      maxLines: 2,
+                    ),
                   ),
 
                   const SizedBox(height: 32),
+
+                  // ATS-friendly mode toggle
+                  SwitchListTile.adaptive(
+                    value: _atsFriendly,
+                    onChanged: (v) => setState(() => _atsFriendly = v),
+                    title: const Text('ATS-friendly formatting'),
+                    subtitle: const Text(
+                      'Simplifies layout and headings for better ATS parsing.',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
                   // ATS Optimization Panel
                   ATSOptimizationPanel(
@@ -386,6 +614,36 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                     jobDescription:
                         '', // Could be enhanced to get from user input
                   ),
+
+                  const SizedBox(height: 16),
+                  if (_atsFriendly) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ATS Preview (Plain Text)',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _getResumeContent(state.controllers),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 24),
                   SizedBox(

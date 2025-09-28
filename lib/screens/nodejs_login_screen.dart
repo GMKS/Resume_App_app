@@ -56,9 +56,31 @@ class _NodeJSLoginScreenState extends State<NodeJSLoginScreen> {
           MaterialPageRoute(builder: (context) => const SimpleHomeScreen()),
         );
       } else {
-        setState(() {
-          _statusMessage = result['message'] ?? 'Login failed';
-        });
+        final msg = (result['message'] ?? '').toString().toLowerCase();
+        if (msg.contains('invalid user') || msg.contains('not found')) {
+          // Try OTP login path automatically
+          final target = _emailController.text.trim();
+          final otpResp = await _authService.sendOTP(
+            identifier: target,
+            type: 'login',
+          );
+          if (otpResp['success'] == true) {
+            setState(() {
+              _isOTPMode = true;
+              _otpIdentifier = target;
+              _statusMessage =
+                  'We couldn\'t log you in directly. We\'ve sent an OTP to verify your account.';
+            });
+          } else {
+            setState(() {
+              _statusMessage = result['message'] ?? 'Login failed';
+            });
+          }
+        } else {
+          setState(() {
+            _statusMessage = result['message'] ?? 'Login failed';
+          });
+        }
       }
     } catch (e) {
       setState(() {

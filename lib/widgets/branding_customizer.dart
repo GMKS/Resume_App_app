@@ -40,7 +40,12 @@ class _BrandingCustomizerState extends State<BrandingCustomizer> {
           initialValue: _theme.primaryColor,
           onChanged: (v) =>
               _update(() => _theme = _theme.copyWith(primaryColor: v)),
-          decoration: const InputDecoration(border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+          ),
         ),
         const SizedBox(height: 12),
         const Text('Accent Color (hex)'),
@@ -48,7 +53,12 @@ class _BrandingCustomizerState extends State<BrandingCustomizer> {
           initialValue: _theme.accentColor,
           onChanged: (v) =>
               _update(() => _theme = _theme.copyWith(accentColor: v)),
-          decoration: const InputDecoration(border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+          ),
         ),
         const SizedBox(height: 12),
         const Text('Font Family'),
@@ -56,7 +66,12 @@ class _BrandingCustomizerState extends State<BrandingCustomizer> {
           initialValue: _theme.fontFamily,
           onChanged: (v) =>
               _update(() => _theme = _theme.copyWith(fontFamily: v)),
-          decoration: const InputDecoration(border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+          ),
         ),
       ],
     );

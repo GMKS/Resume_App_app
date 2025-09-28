@@ -4,8 +4,11 @@ import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
 import '../widgets/requirements_banner.dart';
 import '../widgets/dynamic_sections.dart';
+import '../widgets/skills_picker_field.dart';
 import '../services/share_export_service.dart';
 import '../widgets/ai_widgets.dart';
+import '../services/premium_service.dart';
+import '../widgets/reorderable_sections.dart';
 
 class MinimalResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -190,6 +193,7 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
         'certifications',
         'workExperiences',
         'educations',
+        'sectionOrder',
       ],
       child: Builder(
         builder: (ctx) {
@@ -208,6 +212,100 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
               );
             }
           });
+
+          // Load persisted order or default
+          List<String> order = ['summary', 'skills', 'experience'];
+          try {
+            final raw = state.controllerFor('sectionOrder').text;
+            if (raw.isNotEmpty) {
+              final parsed = jsonDecode(raw);
+              if (parsed is List) {
+                order = parsed.map((e) => e.toString()).toList();
+              }
+            }
+          } catch (_) {}
+
+          Map<String, SectionItem> sectionBuilders() {
+            return {
+              'summary': SectionItem(
+                keyId: 'summary',
+                title: 'Summary',
+                build: () => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _section('Summary'),
+                    AISummaryGenerator(
+                      name: state.controllers['name']?.text ?? '',
+                      targetRole: 'Professional',
+                      skills: (state.controllers['skills']?.text ?? '')
+                          .split(',')
+                          .map((s) => s.trim())
+                          .where((s) => s.isNotEmpty)
+                          .toList(),
+                      experience: _workExperiences
+                          .map(
+                            (exp) =>
+                                '${exp.jobTitle} at ${exp.company}: ${exp.description}',
+                          )
+                          .toList(),
+                      onGenerated: (summary) {
+                        state.controllers['summary']?.text = summary;
+                      },
+                    ),
+                    state.buildTextField(
+                      'summary',
+                      'Summary',
+                      maxLines: 3,
+                      required: true,
+                    ),
+                  ],
+                ),
+              ),
+              'experience': SectionItem(
+                keyId: 'experience',
+                title: 'Experience',
+                build: () => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _section('Experience'),
+                    DynamicWorkExperienceSection(
+                      workExperiences: _workExperiences,
+                      onWorkExperiencesChanged: (experiences) {
+                        setState(() {
+                          _workExperiences = experiences;
+                          state
+                              .controllerFor('workExperiences')
+                              .text = jsonEncode(
+                            experiences.map((e) => e.toJson()).toList(),
+                          );
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              'skills': SectionItem(
+                keyId: 'skills',
+                title: 'Skills',
+                build: () => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _section('Skills'),
+                    SkillsPickerField(
+                      controller: state.controllerFor('skills'),
+                      label: 'Skills',
+                    ),
+                  ],
+                ),
+              ),
+            };
+          }
+
+          final all = sectionBuilders();
+          final sections = order
+              .where(all.containsKey)
+              .map((k) => all[k]!)
+              .toList(growable: false);
 
           return Scaffold(
             appBar: AppBar(
@@ -238,6 +336,64 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
                       child: ListTile(
                         leading: Icon(Icons.text_snippet),
                         title: Text('Export as TXT'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.share),
+                  onSelected: (choice) async {
+                    if (!PremiumService.isPremium) {
+                      PremiumService.showUpgradeDialog(context, 'Sharing');
+                      return;
+                    }
+                    final state = BaseResumeForm.of(context);
+                    if (state == null) return;
+                    final data = {
+                      for (final e in state.controllers.entries)
+                        e.key: e.value.text,
+                    };
+                    final resume = SavedResume(
+                      id:
+                          widget.existing?.id ??
+                          DateTime.now().millisecondsSinceEpoch.toString(),
+                      title: state.controllerFor('name').text.isNotEmpty
+                          ? '${state.controllerFor('name').text} Resume'
+                          : 'Minimal Resume',
+                      template: 'Minimal',
+                      data: data,
+                      createdAt: widget.existing?.createdAt ?? DateTime.now(),
+                      updatedAt: DateTime.now(),
+                    );
+                    try {
+                      if (choice == 'EMAIL') {
+                        await ShareExportService.instance.shareViaEmail(resume);
+                      } else if (choice == 'WHATSAPP') {
+                        await ShareExportService.instance.shareViaWhatsApp(
+                          resume,
+                        );
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Share failed: $e')),
+                      );
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'EMAIL',
+                      child: ListTile(
+                        leading: Icon(Icons.email_outlined),
+                        title: Text('Share via Email (Premium)'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'WHATSAPP',
+                      child: ListTile(
+                        leading: Icon(Icons.share_outlined),
+                        title: Text('Share via WhatsApp (Premium)'),
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
@@ -275,47 +431,16 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
                     keyboard: TextInputType.emailAddress,
                   ),
 
-                  _section('Summary'),
-                  AISummaryGenerator(
-                    name: state.controllers['name']?.text ?? '',
-                    targetRole: 'Professional',
-                    skills: (state.controllers['skills']?.text ?? '')
-                        .split(',')
-                        .map((s) => s.trim())
-                        .where((s) => s.isNotEmpty)
-                        .toList(),
-                    experience: _workExperiences
-                        .map(
-                          (exp) =>
-                              '${exp.jobTitle} at ${exp.company}: ${exp.description}',
-                        )
-                        .toList(),
-                    onGenerated: (summary) {
-                      state.controllers['summary']?.text = summary;
-                    },
-                  ),
-                  state.buildTextField(
-                    'summary',
-                    'Summary',
-                    maxLines: 3,
-                    required: true,
-                  ),
-
-                  _section('Experience'),
-                  DynamicWorkExperienceSection(
-                    workExperiences: _workExperiences,
-                    onWorkExperiencesChanged: (experiences) {
-                      setState(() {
-                        _workExperiences = experiences;
-                        // Update JSON in hidden controller for BaseResumeForm
-                        state
-                            .controllerFor('workExperiences')
-                            .text = jsonEncode(
-                          experiences.map((e) => e.toJson()).toList(),
+                  // Draggable sections: Summary, Skills, Experience (Premium)
+                  if (PremiumService.hasDragDropFeature)
+                    ReorderableResumeSections(
+                      sections: sections,
+                      onOrderChanged: (newOrder) {
+                        state.controllerFor('sectionOrder').text = jsonEncode(
+                          newOrder,
                         );
-                      });
-                    },
-                  ),
+                      },
+                    ),
 
                   _section('Education'),
                   DynamicEducationSection(
@@ -330,15 +455,6 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
                       });
                     },
                   ),
-
-                  _section('Skills'),
-                  state.buildTextField(
-                    'skills',
-                    'Skills (comma separated)',
-                    maxLines: 2,
-                    required: true,
-                  ),
-
                   _section('Certifications'),
                   state.buildTextField(
                     'certifications',

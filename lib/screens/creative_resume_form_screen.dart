@@ -7,8 +7,10 @@ import '../widgets/base_resume_form.dart';
 import '../widgets/profile_photo_picker.dart';
 import '../widgets/requirements_banner.dart';
 import '../widgets/dynamic_sections.dart';
+import '../widgets/skills_picker_field.dart';
 import '../widgets/ai_widgets.dart';
 import '../services/share_export_service.dart';
+import '../services/premium_service.dart';
 
 class CreativeResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -272,6 +274,63 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                   onPressed: _openCustomization,
                 ),
                 PopupMenuButton<String>(
+                  icon: const Icon(Icons.share),
+                  onSelected: (choice) async {
+                    if (!PremiumService.isPremium) {
+                      PremiumService.showUpgradeDialog(context, 'Sharing');
+                      return;
+                    }
+                    final state = BaseResumeForm.of(context);
+                    if (state == null) return;
+                    final data = {
+                      for (final e in state.controllers.entries)
+                        e.key: e.value.text,
+                    };
+                    final resume = SavedResume(
+                      id:
+                          widget.existing?.id ??
+                          DateTime.now().millisecondsSinceEpoch.toString(),
+                      title:
+                          state.controllers['name']?.text ?? 'Creative Resume',
+                      template: 'Creative',
+                      data: data,
+                      createdAt: DateTime.now(),
+                      updatedAt: DateTime.now(),
+                    );
+                    try {
+                      if (choice == 'EMAIL') {
+                        await ShareExportService.instance.shareViaEmail(resume);
+                      } else if (choice == 'WHATSAPP') {
+                        await ShareExportService.instance.shareViaWhatsApp(
+                          resume,
+                        );
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Share failed: $e')),
+                      );
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'EMAIL',
+                      child: ListTile(
+                        leading: Icon(Icons.email_outlined),
+                        title: Text('Share via Email (Premium)'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'WHATSAPP',
+                      child: ListTile(
+                        leading: Icon(Icons.share_outlined),
+                        title: Text('Share via WhatsApp (Premium)'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+                PopupMenuButton<String>(
                   icon: const Icon(Icons.download),
                   onSelected: _exportResume,
                   itemBuilder: (context) => [
@@ -385,10 +444,9 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                   ),
 
                   _section('Skills'),
-                  state.buildTextField(
-                    'skills',
-                    'Skills (comma separated)',
-                    maxLines: 2,
+                  SkillsPickerField(
+                    controller: state.controllerFor('skills'),
+                    label: 'Skills',
                   ),
                   state.buildTextField(
                     'skillGraphs',

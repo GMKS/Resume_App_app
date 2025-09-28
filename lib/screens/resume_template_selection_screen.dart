@@ -93,6 +93,7 @@ class ResumeTemplateSelectionScreen extends StatelessWidget {
       elevation: 4,
       child: InkWell(
         onTap: () {
+          FocusScope.of(context).unfocus();
           Widget screen;
           switch (title) {
             case 'Classic':

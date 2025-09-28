@@ -69,6 +69,7 @@ class _AIEnhancedTextFieldState extends State<AIEnhancedTextField> {
   ContentFeedback? _feedback;
   bool _isAnalyzing = false;
   bool _showFeedback = false;
+  String? _error;
 
   @override
   void initState() {
@@ -99,6 +100,7 @@ class _AIEnhancedTextFieldState extends State<AIEnhancedTextField> {
     if (!mounted) return;
     setState(() {
       _isAnalyzing = true;
+      _error = null;
     });
 
     try {
@@ -117,6 +119,7 @@ class _AIEnhancedTextFieldState extends State<AIEnhancedTextField> {
       if (mounted) {
         setState(() {
           _isAnalyzing = false;
+          _error = e.toString();
         });
       }
     }
@@ -177,6 +180,30 @@ class _AIEnhancedTextFieldState extends State<AIEnhancedTextField> {
                 ),
               ),
             ],
+          ),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'AI is unavailable: ${_error!.contains('OPENAI_API_KEY') ? 'Missing API key. Please configure OPENAI_API_KEY.' : _error!}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
         if (_feedback != null && _showFeedback) ...[
@@ -617,10 +644,12 @@ class AISummaryGenerator extends StatefulWidget {
 class _AISummaryGeneratorState extends State<AISummaryGenerator> {
   bool _isGenerating = false;
   String? _generatedSummary;
+  String? _error;
 
   Future<void> _generateSummary() async {
     setState(() {
       _isGenerating = true;
+      _error = null;
     });
 
     try {
@@ -638,6 +667,7 @@ class _AISummaryGeneratorState extends State<AISummaryGenerator> {
     } catch (e) {
       setState(() {
         _isGenerating = false;
+        _error = e.toString();
       });
     }
   }
@@ -746,6 +776,30 @@ class _AISummaryGeneratorState extends State<AISummaryGenerator> {
                         ),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'AI is unavailable: ${_error!.contains('OPENAI_API_KEY') ? 'Missing API key. Please configure OPENAI_API_KEY.' : _error!}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
                   ),
                 ],
               ),

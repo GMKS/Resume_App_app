@@ -1,7 +1,24 @@
 import 'package:flutter/material.dart';
 import 'screens/enhanced_login_screen.dart';
+import 'services/currency_service.dart';
+import 'services/premium_service.dart';
+import 'services/node_api_service.dart';
+import 'services/resume_storage_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await CurrencyService.initialize();
+  } catch (_) {}
+  try {
+    await PremiumService.initialize();
+  } catch (_) {}
+  try {
+    await ApiService.init();
+  } catch (_) {}
+  try {
+    await ResumeStorageService.instance.initialize();
+  } catch (_) {}
   runApp(const MyApp());
 }
 

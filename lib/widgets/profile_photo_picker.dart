@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// Minimal profile photo picker that stores image as base64 string.
 class ProfilePhotoPicker extends StatefulWidget {
@@ -7,12 +9,15 @@ class ProfilePhotoPicker extends StatefulWidget {
   final ValueChanged<String?> onChanged;
   // Visual diameter of the avatar in logical pixels. Default ~80 (radius 40)
   final double size;
+  // When true, shows the Change Photo button below the avatar instead of inline
+  final bool buttonBelow;
 
   const ProfilePhotoPicker({
     super.key,
     this.initialBase64,
     required this.onChanged,
     this.size = 80,
+    this.buttonBelow = false,
   });
 
   @override
@@ -29,8 +34,6 @@ class _ProfilePhotoPickerState extends State<ProfilePhotoPicker> {
   }
 
   Future<void> _pickImage() async {
-    // Simple placeholder: show dialog to clear or keep; no file picker dependency.
-    // Extend later with image_picker package if needed.
     final choice = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -38,14 +41,19 @@ class _ProfilePhotoPickerState extends State<ProfilePhotoPicker> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(ctx, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Remove photo'),
               onTap: () => Navigator.pop(ctx, 'remove'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo),
-              title: const Text('Use sample avatar'),
-              onTap: () => Navigator.pop(ctx, 'sample'),
             ),
           ],
         ),
@@ -53,18 +61,22 @@ class _ProfilePhotoPickerState extends State<ProfilePhotoPicker> {
     );
 
     if (!mounted) return;
-    if (choice == 'remove') {
+    if (choice == 'camera' || choice == 'gallery') {
+      final picker = ImagePicker();
+      final source = choice == 'camera'
+          ? ImageSource.camera
+          : ImageSource.gallery;
+      final picked = await picker.pickImage(source: source, imageQuality: 75);
+      if (picked != null) {
+        final file = File(picked.path);
+        final bytes = await file.readAsBytes();
+        final b64 = base64Encode(bytes);
+        setState(() => _b64 = b64);
+        widget.onChanged(b64);
+      }
+    } else if (choice == 'remove') {
       setState(() => _b64 = null);
       widget.onChanged(null);
-    } else if (choice == 'sample') {
-      // Generate a tiny transparent PNG placeholder
-      final bytes = base64Decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAA' // 1x1 transparent PNG
-        'AAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=',
-      );
-      final b64 = base64Encode(bytes);
-      setState(() => _b64 = b64);
-      widget.onChanged(b64);
     }
   }
 
@@ -84,6 +96,21 @@ class _ProfilePhotoPickerState extends State<ProfilePhotoPicker> {
       }
     } else {
       avatar = CircleAvatar(radius: radius, child: const Icon(Icons.person));
+    }
+
+    if (widget.buttonBelow) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          avatar,
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            onPressed: _pickImage,
+            icon: const Icon(Icons.camera_alt, size: 16),
+            label: const Text('Change Photo'),
+          ),
+        ],
+      );
     }
 
     return Row(

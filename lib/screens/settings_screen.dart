@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/premium_service.dart';
-import '../services/auth_service.dart';
+import '../services/hybrid_auth_service.dart';
+import '../services/currency_service.dart';
 import '../config/app_config.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -10,14 +11,50 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label:',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(color: Colors.grey[800]),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isPremium = false;
   String _premiumStatus = '';
+  late final HybridAuthService _auth;
 
   @override
   void initState() {
     super.initState();
     _loadPremiumStatus();
+    _auth = HybridAuthService();
+    // Ensure auth is initialized so we can show current user if available
+    _auth.init().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _loadPremiumStatus() {
@@ -59,17 +96,183 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    AuthService.instance.currentUser != null
-                        ? 'Email: ${AuthService.instance.currentUser}'
-                        : 'Not signed in',
-                  ),
-                  const SizedBox(height: 8),
-                  if (AuthService.instance.isLoggedIn)
-                    Text(
-                      'Status: Logged In',
-                      style: TextStyle(fontSize: 12, color: Colors.green[600]),
+                  if (_auth.isLoggedIn) ...[
+                    // Name
+                    _InfoRow(
+                      label: 'Name',
+                      value:
+                          (_auth.currentUser?['name'] as String?)
+                                  ?.trim()
+                                  .isNotEmpty ==
+                              true
+                          ? (_auth.currentUser?['name'] as String)
+                          : (_auth.userName?.isNotEmpty == true
+                                ? _auth.userName!
+                                : (_auth.userEmail ?? '—')),
                     ),
+                    const SizedBox(height: 6),
+                    // Email
+                    _InfoRow(
+                      label: 'Email',
+                      value:
+                          _auth.userEmail ??
+                          (_auth.currentUser?['email'] as String? ?? '—'),
+                    ),
+                    const SizedBox(height: 6),
+                    // Phone
+                    _InfoRow(
+                      label: 'Phone',
+                      value:
+                          (_auth.currentUser?['phone'] as String?)
+                                  ?.trim()
+                                  .isNotEmpty ==
+                              true
+                          ? (_auth.currentUser?['phone'] as String)
+                          : '—',
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.deepPurple.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.deepPurple),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.vpn_key,
+                                size: 16,
+                                color: Colors.deepPurple,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Provider: ${_auth.currentProvider.toString().split('.').last.toUpperCase()}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.deepPurple,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.green),
+                          ),
+                          child: Row(
+                            children: const [
+                              Icon(
+                                Icons.check_circle,
+                                size: 16,
+                                color: Colors.green,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Status: Logged In',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    const Text('Not signed in'),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          // Pricing & Upgrade Section
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.workspace_premium,
+                        color: Colors.deepPurple,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Premium Pricing',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _priceChip(
+                        'Monthly',
+                        CurrencyService.formatPrice('monthly'),
+                        '/mo',
+                      ),
+                      const SizedBox(width: 8),
+                      _priceChip(
+                        'Yearly',
+                        CurrencyService.formatPrice('yearly'),
+                        '/yr',
+                        highlight: true,
+                        note: 'Save 58%',
+                      ),
+                      const SizedBox(width: 8),
+                      _priceChip(
+                        'Lifetime',
+                        CurrencyService.formatPrice('lifetime'),
+                        'one-time',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    CurrencyService.getSubscriptionTerms(),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isPremium
+                          ? null
+                          : () {
+                              PremiumService.showUpgradeDialog(
+                                context,
+                                'Premium Features',
+                              );
+                            },
+                      icon: const Icon(Icons.upgrade),
+                      label: Text(
+                        _isPremium ? 'Premium Active' : 'Upgrade to Premium',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -339,7 +542,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
 
               if (confirm == true) {
-                await AuthService.instance.logout();
+                await _auth.logout();
                 if (mounted) {
                   Navigator.of(
                     context,
@@ -359,4 +562,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
+
+Widget _priceChip(
+  String title,
+  String price,
+  String period, {
+  bool highlight = false,
+  String? note,
+}) {
+  return Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: highlight
+            ? Colors.deepPurple.withOpacity(0.08)
+            : Colors.grey.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: highlight ? Colors.deepPurple : Colors.grey.shade300,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: highlight ? Colors.deepPurple : Colors.black87,
+                ),
+              ),
+              if (note != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    note,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            price,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: highlight ? Colors.deepPurple : Colors.black87,
+            ),
+          ),
+          Text(period, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        ],
+      ),
+    ),
+  );
 }
