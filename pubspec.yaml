@@ -16,8 +16,12 @@ dependencies:
   shared_preferences: ^2.2.3
   path_provider: ^2.1.4
   share_plus: ^7.2.2
+  # Removed flutter_email_sender and whatsapp_share2 in favor of share_plus chooser
   image_picker: ^1.1.2
   url_launcher: ^6.2.5
+  pdf: ^3.11.0
+  path: ^1.9.0
+  archive: ^3.6.1
 
   # UI components
   cupertino_icons: ^1.0.6

@@ -294,6 +294,7 @@ class ApiService {
     List<Map<String, dynamic>>? workExperience,
     List<Map<String, dynamic>>? education,
     List<Map<String, dynamic>>? skills,
+    Map<String, dynamic>? extraData,
   }) async {
     try {
       final response = await http.post(
@@ -307,14 +308,14 @@ class ApiService {
           if (workExperience != null) 'workExperience': workExperience,
           if (education != null) 'education': education,
           if (skills != null) 'skills': skills,
+          if (extraData != null) 'data': extraData,
         }),
       );
-
-      final data = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
       return {
-        'success': data['success'] ?? false,
-        'data': data['data'],
-        'message': data['message'],
+        'success': decoded['success'] ?? false,
+        'data': decoded['data'],
+        'message': decoded['message'],
       };
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};

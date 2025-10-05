@@ -22,5 +22,5 @@ class AppConfig {
   // Testing Configuration
   static const bool enableTestingMode = false; // Disable for production release
   static const bool bypassPremiumRestrictions =
-      false; // Disable for production release
+      true; // Enable for testing sharing functionality
 }

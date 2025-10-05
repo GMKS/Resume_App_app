@@ -4,6 +4,12 @@ import '../models/saved_resume.dart';
 import '../services/premium_service.dart';
 import 'dart:typed_data';
 import 'package:share_plus/share_plus.dart';
+import 'modern_pdf_exporter.dart';
+import 'one_page_pdf_exporter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:archive/archive.dart' as ar;
+import 'package:url_launcher/url_launcher.dart';
 
 /// Export service that generates simple ATS-friendly outputs.
 /// PDF generation is implemented with a minimal, dependency-free PDF writer
@@ -17,63 +23,143 @@ class ShareExportService {
   /// and bullets for maximal ATS compatibility.
   Future<File> exportAndOpenPdf(SavedResume resume) async {
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final fileName = '${_sanitize(resume.title)}_$ts.pdf';
-    final file = File('${Directory.systemTemp.path}/$fileName');
+    final outDir = await _getExportBaseDir();
+    final file = File(
+      p.join(outDir.path, '${_sanitize(resume.title)}_$ts.pdf'),
+    );
 
-    final lines = _buildAtsLines(resume);
-    final pdfBytes = _buildMinimalPdf(lines);
-    await file.writeAsBytes(pdfBytes, flush: true);
+    // If explicitly marked ATS-friendly, use minimal writer; otherwise use styled exporter for all templates
+    final atsFriendly =
+        (resume.data['ats_friendly'] ?? '').toString() == 'true';
+    if (!atsFriendly) {
+      // Route One Page to its dedicated exporter to match UI preview
+      final lower = resume.template.toLowerCase();
+      final bytes = lower == 'one page'
+          ? await OnePagePdfExporter.build(resume)
+          : await ModernPdfExporter.build(resume);
+      await file.writeAsBytes(bytes, flush: true);
+    } else {
+      final lines = _buildAtsLines(resume);
+      final pdfBytes = _buildMinimalPdf(lines);
+      await file.writeAsBytes(pdfBytes, flush: true);
+    }
     return file;
   }
 
-  /// Create a fake DOCX file (really just text content with .docx extension).
+  /// Create a valid DOCX (WordprocessingML) that mirrors the ATS-friendly content.
   Future<File> exportDoc(SavedResume resume) async {
-    return _writeTempText(
-      resume,
-      extension: 'docx',
-      header: 'DOCX (placeholder)\n',
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final outDir = await _getExportBaseDir();
+    final file = File(
+      p.join(outDir.path, '${_sanitize(resume.title)}_$ts.docx'),
     );
+    final lines = _buildAtsLines(resume);
+    final bytes = _buildDocxFromLines(lines);
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
   }
 
   /// Create a TXT export with plain-text representation.
   Future<File> exportTxt(SavedResume resume) async {
-    return _writeTempText(resume, extension: 'txt', header: 'TXT Export\n');
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final outDir = await _getExportBaseDir();
+    final file = File(
+      p.join(outDir.path, '${_sanitize(resume.title)}_$ts.txt'),
+    );
+    final content = _buildAtsLines(resume).join('\n');
+    await file.writeAsString(content);
+    return file;
   }
 
   // --- Premium-only Share Helpers ---
   Future<void> shareViaEmail(SavedResume resume) async {
+    print(
+      'DEBUG: shareViaEmail called. Premium status: ${PremiumService.isPremium}',
+    );
     if (!PremiumService.isPremium) {
+      print('DEBUG: Premium check failed, throwing exception');
       throw Exception('Email sharing is a Premium feature.');
     }
+    print('DEBUG: Starting PDF export for email share');
     final file = await exportAndOpenPdf(resume);
+    print('DEBUG: PDF exported to: ${file.path}');
+    final shareFile = await _copyToShareCache(file);
+    print('DEBUG: Share file copied to cache: ${shareFile.path}');
     final subject = 'Resume - ${resume.title}';
-    final text = 'Please find my resume attached.';
-    await Share.shareXFiles(
-      [
-        XFile(
-          file.path,
-          mimeType: 'application/pdf',
-          name: file.uri.pathSegments.last,
-        ),
-      ],
-      subject: subject,
-      text: text,
-    );
+    const text = 'Please find my resume attached.';
+    try {
+      print('DEBUG: Attempting share via Share.shareXFiles');
+      await Share.shareXFiles(
+        [
+          XFile(
+            shareFile.path,
+            mimeType: 'application/pdf',
+            name: shareFile.uri.pathSegments.last,
+          ),
+        ],
+        subject: subject,
+        text: text,
+      );
+      print('DEBUG: Share.shareXFiles completed successfully');
+    } catch (e) {
+      print('DEBUG: Share.shareXFiles failed: $e');
+      final uri = Uri(
+        scheme: 'mailto',
+        queryParameters: {'subject': subject, 'body': text},
+      );
+      print('DEBUG: Attempting fallback mailto: $uri');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        print('DEBUG: Mailto fallback launched');
+      } else {
+        print('DEBUG: Mailto fallback not available');
+      }
+    }
   }
 
   Future<void> shareViaWhatsApp(SavedResume resume) async {
+    print(
+      'DEBUG: shareViaWhatsApp called. Premium status: ${PremiumService.isPremium}',
+    );
     if (!PremiumService.isPremium) {
+      print('DEBUG: Premium check failed, throwing exception');
       throw Exception('WhatsApp sharing is a Premium feature.');
     }
+    print('DEBUG: Starting PDF export for WhatsApp share');
     final file = await exportAndOpenPdf(resume);
+    print('DEBUG: PDF exported to: ${file.path}');
+    final shareFile = await _copyToShareCache(file);
+    print('DEBUG: Share file copied to cache: ${shareFile.path}');
     // share_plus will open the system share sheet, allowing WhatsApp selection
-    await Share.shareXFiles([
-      XFile(
-        file.path,
-        mimeType: 'application/pdf',
-        name: file.uri.pathSegments.last,
-      ),
-    ], text: 'Sharing my resume: ${resume.title}');
+    try {
+      print('DEBUG: Attempting share via Share.shareXFiles');
+      await Share.shareXFiles([
+        XFile(
+          shareFile.path,
+          mimeType: 'application/pdf',
+          name: shareFile.uri.pathSegments.last,
+        ),
+      ], text: 'Sharing my resume: ${resume.title}');
+      print('DEBUG: Share.shareXFiles completed successfully');
+    } catch (e) {
+      print('DEBUG: Share.shareXFiles failed: $e');
+      final text = Uri.encodeComponent('Sharing my resume: ${resume.title}');
+      final uri = Uri.parse('whatsapp://send?text=$text');
+      print('DEBUG: Attempting WhatsApp fallback: $uri');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        print('DEBUG: WhatsApp fallback launched');
+      } else {
+        print('DEBUG: WhatsApp not available, trying web fallback');
+        final web = Uri.parse('https://wa.me/?text=$text');
+        if (await canLaunchUrl(web)) {
+          await launchUrl(web, mode: LaunchMode.externalApplication);
+          print('DEBUG: Web fallback launched');
+        } else {
+          print('DEBUG: No WhatsApp fallback available');
+        }
+      }
+    }
   }
 
   // --- Minimal PDF generator (single page, Helvetica, ASCII only) ---
@@ -188,20 +274,35 @@ class ShareExportService {
   // Build ATS-friendly content lines from resume data
   List<String> _buildAtsLines(SavedResume resume) {
     final d = resume.data;
-    // final bool atsOn = (d['ats_friendly']?.toString().toLowerCase() == 'true');
-
     final lines = <String>[];
-    String name = (d['name'] ?? '').toString().trim();
-    String email = (d['email'] ?? '').toString().trim();
-    String phone = (d['phone'] ?? '').toString().trim();
+
+    // Personal info: support both flat and nested structures
+    final info = (d['personalInfo'] is Map)
+        ? Map<String, dynamic>.from(d['personalInfo'])
+        : <String, dynamic>{};
+    String name = (info['name'] ?? d['name'] ?? '').toString().trim();
+    String email = (info['email'] ?? d['email'] ?? '').toString().trim();
+    String phone = (info['phone'] ?? d['phone'] ?? '').toString().trim();
+    // Accept both linkedIn and linkedin keys
+    String linkedIn =
+        (info['linkedin'] ??
+                info['linkedIn'] ??
+                d['linkedIn'] ??
+                d['linkedin'] ??
+                '')
+            .toString()
+            .trim();
+    String portfolio = (d['portfolio'] ?? info['portfolio'] ?? '')
+        .toString()
+        .trim();
     String summary = (d['summary'] ?? '').toString().trim();
-    String skills = (d['skills'] ?? '').toString().trim();
-    String certs = (d['certifications'] ?? '').toString().trim();
 
     if (name.isNotEmpty) lines.add(_asciiSafe(name.toUpperCase()));
     final contact = [
-      if (email.isNotEmpty) email,
-      if (phone.isNotEmpty) phone,
+      if (email.isNotEmpty) 'Email: $email',
+      if (phone.isNotEmpty) 'Phone: $phone',
+      if (linkedIn.isNotEmpty) 'LinkedIn: $linkedIn',
+      if (portfolio.isNotEmpty) 'Portfolio: $portfolio',
     ].where((e) => e.isNotEmpty).join(' | ');
     if (contact.isNotEmpty) lines.add(_asciiSafe(contact));
     if (lines.isNotEmpty) lines.add('');
@@ -212,23 +313,51 @@ class ShareExportService {
       lines.add('');
     }
 
-    if (skills.isNotEmpty) {
+    // Skills: list, list of maps, or csv fallback; for One Page prefer coreSkills
+    final skillsList = _extractSkills(d);
+    if (skillsList.isNotEmpty) {
       lines.add('SKILLS');
-      final items = skills
-          .split(',')
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-      if (items.isNotEmpty) {
-        for (final s in items) {
-          lines.add('- ${_asciiSafe(s)}');
-        }
-        lines.add('');
+      for (final s in skillsList) {
+        lines.add('- ${_asciiSafe(s)}');
       }
+      lines.add('');
     }
 
-    // Work Experiences (JSON string in classic form)
-    if ((d['workExperiences'] ?? '').toString().isNotEmpty) {
+    // Work Experience: prefer modern array, fallback to classic JSON string
+    List<Map<String, dynamic>> work = (d['workExperience'] is List)
+        ? List<Map<String, dynamic>>.from(d['workExperience'])
+        : <Map<String, dynamic>>[];
+    // One Page stores JSON in workExperiencesJson
+    if (work.isEmpty &&
+        (d['workExperiencesJson'] ?? '').toString().isNotEmpty) {
+      try {
+        final list = jsonDecode(d['workExperiencesJson']) as List<dynamic>;
+        work = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      } catch (_) {}
+    }
+    if (work.isNotEmpty) {
+      lines.add('WORK EXPERIENCE');
+      for (final w in work) {
+        final role = (w['jobTitle'] ?? w['role'] ?? '').toString().trim();
+        final company = (w['company'] ?? '').toString().trim();
+        final start = (w['startDate'] ?? w['start'] ?? '').toString();
+        final end = (w['endDate'] ?? w['end'] ?? '').toString();
+        final dr = _dateRange(start, end);
+        final heading = [
+          role,
+          if (company.isNotEmpty) 'at $company',
+          if (dr.isNotEmpty) '($dr)',
+        ].where((e) => e.isNotEmpty).join(' ');
+        if (heading.isNotEmpty) lines.add('- ${_asciiSafe(heading)}');
+        final desc = (w['description'] ?? '').toString().trim();
+        if (desc.isNotEmpty) {
+          for (final w in _wrapByChars(_asciiSafe(desc), 86)) {
+            lines.add('  $w');
+          }
+        }
+      }
+      lines.add('');
+    } else if ((d['workExperiences'] ?? '').toString().isNotEmpty) {
       try {
         final list = jsonDecode(d['workExperiences']) as List<dynamic>;
         if (list.isNotEmpty) {
@@ -254,8 +383,37 @@ class ShareExportService {
       } catch (_) {}
     }
 
-    // Education (JSON string in classic form)
-    if ((d['educations'] ?? '').toString().isNotEmpty) {
+    // Education: prefer modern array, fallback to classic JSON string
+    List<Map<String, dynamic>> edu = (d['education'] is List)
+        ? List<Map<String, dynamic>>.from(d['education'])
+        : <Map<String, dynamic>>[];
+    if (edu.isEmpty && (d['educationsJson'] ?? '').toString().isNotEmpty) {
+      try {
+        final list = jsonDecode(d['educationsJson']) as List<dynamic>;
+        edu = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      } catch (_) {}
+    }
+    if (edu.isNotEmpty) {
+      lines.add('EDUCATION');
+      for (final e in edu) {
+        final degree = (e['degree'] ?? '').toString().trim();
+        final school =
+            (e['school'] ?? e['institution'] ?? e['university'] ?? '')
+                .toString()
+                .trim();
+        final dr = _dateRange(
+          (e['startDate'] ?? e['start'] ?? '').toString(),
+          (e['endDate'] ?? e['end'] ?? '').toString(),
+        );
+        final heading = [
+          degree,
+          if (school.isNotEmpty) 'at $school',
+          if (dr.isNotEmpty) '($dr)',
+        ].where((x) => x.isNotEmpty).join(' ');
+        if (heading.isNotEmpty) lines.add('- ${_asciiSafe(heading)}');
+      }
+      lines.add('');
+    } else if ((d['educations'] ?? '').toString().isNotEmpty) {
       try {
         final list = jsonDecode(d['educations']) as List<dynamic>;
         if (list.isNotEmpty) {
@@ -281,9 +439,60 @@ class ShareExportService {
       } catch (_) {}
     }
 
+    final certs = (d['certifications'] ?? '').toString().trim();
     if (certs.isNotEmpty) {
       lines.add('CERTIFICATIONS');
       for (final w in _wrapByChars(_asciiSafe(certs), 90)) {
+        lines.add('- $w');
+      }
+      lines.add('');
+    }
+
+    final projects = (d['projects'] ?? '').toString().trim();
+    if (projects.isNotEmpty) {
+      lines.add('PROJECTS');
+      for (final w in _wrapByChars(_asciiSafe(projects), 90)) {
+        lines.add('- $w');
+      }
+      lines.add('');
+    }
+
+    final hobbies = (d['hobbies'] ?? '').toString().trim();
+    if (hobbies.isNotEmpty) {
+      lines.add('HOBBIES');
+      for (final w in _wrapByChars(_asciiSafe(hobbies), 90)) {
+        lines.add('- $w');
+      }
+      lines.add('');
+    }
+
+    final achievements = (d['achievements'] ?? '').toString().trim();
+    if (achievements.isNotEmpty) {
+      lines.add('ACHIEVEMENTS');
+      for (final w in _wrapByChars(_asciiSafe(achievements), 90)) {
+        lines.add('- $w');
+      }
+      lines.add('');
+    }
+
+    // One Page extras
+    final awards = (d['awards'] ?? '').toString().trim();
+    if (awards.isNotEmpty) {
+      lines.add('AWARDS');
+      for (final a
+          in awards
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)) {
+        lines.add('- ${_asciiSafe(a)}');
+      }
+      lines.add('');
+    }
+
+    final languages = (d['languages'] ?? '').toString().trim();
+    if (languages.isNotEmpty) {
+      lines.add('LANGUAGES');
+      for (final w in _wrapByChars(_asciiSafe(languages), 90)) {
         lines.add('- $w');
       }
       lines.add('');
@@ -295,29 +504,75 @@ class ShareExportService {
       lines.add('Generated with Resume Builder (Free tier)');
     }
 
-    // atsOn is currently always "on" in Classic; kept for future styling
     return lines;
   }
 
+  // Helper: accept skills in multiple shapes
+  List<String> _extractSkills(Map<String, dynamic> data) {
+    final v = data['skills'];
+    if (v is List) {
+      if (v.isEmpty) return _skillsFromCsv(data);
+      if (v.first is String) {
+        return v.cast<String>();
+      }
+      if (v.first is Map) {
+        return v
+            .map((e) => (e['label'] ?? e['name'] ?? e.toString()).toString())
+            .cast<String>()
+            .toList();
+      }
+      return v.map((e) => e.toString()).cast<String>().toList();
+    }
+    return _skillsFromCsv(data);
+  }
+
+  List<String> _skillsFromCsv(Map<String, dynamic> data) {
+    // Prefer One Page key 'coreSkills', fallback to generic 'skillsCsv'
+    final csv = ((data['coreSkills'] ?? data['skillsCsv']) ?? '').toString();
+    if (csv.isEmpty) return const [];
+    return csv
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  // Compact date range from ISO strings (YYYY-MM)
+  String _dateRange(String startIso, String endIso) {
+    String fmt(String iso) {
+      if (iso.isEmpty) return '';
+      try {
+        final dt = DateTime.tryParse(iso);
+        if (dt == null) return '';
+        final m = dt.month.toString().padLeft(2, '0');
+        return '${dt.year}-$m';
+      } catch (_) {
+        return '';
+      }
+    }
+
+    final s = fmt(startIso);
+    final e = fmt(endIso);
+    if (s.isEmpty && e.isEmpty) return '';
+    return e.isEmpty ? '$s - Present' : '$s - $e';
+  }
+
   // --- Helpers ---
-  Future<File> _writeTempText(
-    SavedResume resume, {
-    required String extension,
-    String header = '',
-  }) async {
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final fileName = '${_sanitize(resume.title)}_$ts.$extension';
-    final file = File('${Directory.systemTemp.path}/$fileName');
-    final content = StringBuffer()
-      ..writeln(header)
-      ..writeln('Title: ${resume.title}')
-      ..writeln('Template: ${resume.template}')
-      ..writeln('Created: ${resume.createdAt.toIso8601String()}')
-      ..writeln('Updated: ${resume.updatedAt.toIso8601String()}')
-      ..writeln('--- Data ---')
-      ..writeln(const JsonEncoder.withIndent('  ').convert(resume.data));
-    await file.writeAsString(content.toString());
-    return file;
+  // --- Export directory helper (user-visible Resumes folder) ---
+  Future<Directory> _getExportBaseDir() async {
+    Directory base;
+    if (Platform.isAndroid) {
+      base =
+          (await getExternalStorageDirectory()) ??
+          await getTemporaryDirectory();
+    } else {
+      base = await getApplicationDocumentsDirectory();
+    }
+    final out = Directory(p.join(base.path, 'Resumes'));
+    if (!await out.exists()) {
+      await out.create(recursive: true);
+    }
+    return out;
   }
 
   String _sanitize(String input) {
@@ -365,4 +620,114 @@ class ShareExportService {
     if (current.isNotEmpty) lines.add(current.toString());
     return lines;
   }
+
+  /// Copy file into a cache directory for sharing to ensure FileProvider-accessible URI
+  Future<File> _copyToShareCache(File file) async {
+    final cache = await getTemporaryDirectory();
+    final shareDir = Directory(p.join(cache.path, 'share-cache'));
+    if (!await shareDir.exists()) {
+      await shareDir.create(recursive: true);
+    }
+    final dest = File(p.join(shareDir.path, p.basename(file.path)));
+    if (await dest.exists()) {
+      await dest.delete();
+    }
+    return file.copy(dest.path);
+  }
+
+  // ===================== DOCX helpers (WordprocessingML) =====================
+
+  Uint8List _buildDocxFromLines(List<String> lines) {
+    final zip = ar.Archive();
+    zip.addFile(ar.ArchiveFile.string('[Content_Types].xml', _contentTypesXml));
+    zip.addFile(ar.ArchiveFile.string('_rels/.rels', _relsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/app.xml', _appPropsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/core.xml', _corePropsXml));
+    zip.addFile(ar.ArchiveFile.string('word/styles.xml', _stylesXml));
+    zip.addFile(ar.ArchiveFile.string('word/settings.xml', _settingsXml));
+    zip.addFile(
+      ar.ArchiveFile.string('word/_rels/document.xml.rels', _wordRelsXml),
+    );
+    zip.addFile(
+      ar.ArchiveFile.string('word/document.xml', _buildDocXmlFromLines(lines)),
+    );
+    final bytes = ar.ZipEncoder().encode(zip)!;
+    return Uint8List.fromList(bytes);
+  }
+
+  String _buildDocXmlFromLines(List<String> lines) {
+    String esc(String s) => s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    final parts = lines
+        .map((l) => l.trimRight())
+        .map(
+          (l) =>
+              '<w:p><w:r><w:rPr><w:noProof/></w:rPr><w:t>${esc(l)}</w:t></w:r></w:p>',
+        )
+        .join();
+    return '''<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    $parts
+  </w:body>
+</w:document>''';
+  }
+
+  // OOXML static parts
+  static const String _contentTypesXml =
+      '''<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
+</Types>''';
+
+  static const String _relsXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>''';
+
+  static const String _wordRelsXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+</Relationships>''';
+
+  static const String _stylesXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:qFormat/>
+  </w:style>
+  <w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont">
+    <w:name w:val="Default Paragraph Font"/>
+  </w:style>
+</w:styles>''';
+
+  static const String _settingsXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:proofState w:spelling="clean" w:grammar="clean"/>
+</w:settings>''';
+
+  static const String _appPropsXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>Resume Builder</Application>
+  <DocSecurity>0</DocSecurity>
+  <ScaleCrop>false</ScaleCrop>
+  <Company></Company>
+</Properties>''';
+
+  static const String _corePropsXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>Resume</dc:title>
+  <dc:subject></dc:subject>
+  <dc:creator>Resume Builder</dc:creator>
+  <cp:keywords>resume</cp:keywords>
+  <cp:lastModifiedBy>Resume Builder</cp:lastModifiedBy>
+</cp:coreProperties>''';
 }

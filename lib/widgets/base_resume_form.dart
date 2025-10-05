@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
@@ -117,7 +118,39 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
 
   /// Call this to validate + save the resume.
   Future<void> saveResume() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      // Try to show a helpful message even if the child Scaffold is below us
+      try {
+        final overlayCtx = Navigator.of(context).overlay?.context;
+        final messenger = overlayCtx != null
+            ? ScaffoldMessenger.maybeOf(overlayCtx)
+            : ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('Please fill all required fields')),
+        );
+      } catch (_) {}
+      return;
+    }
+
+    // Enforce: block save if overlapping dates exist in work/education
+    final overlapProblems = _detectDateOverlapsInControllers();
+    if (overlapProblems.isNotEmpty) {
+      try {
+        final overlayCtx = Navigator.of(context).overlay?.context;
+        final messenger = overlayCtx != null
+            ? ScaffoldMessenger.maybeOf(overlayCtx)
+            : ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Cannot save: overlapping dates found in ${overlapProblems.join(' and ')}. Please resolve before saving.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } catch (_) {}
+      return;
+    }
 
     final Map<String, dynamic> data = {
       for (final e in controllers.entries) e.key: e.value.text,
@@ -142,16 +175,87 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
 
     if (!mounted) return;
     final ctx = _childContext ?? context;
-    final messenger =
-        ScaffoldMessenger.maybeOf(ctx) ?? ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(
-      SnackBar(content: Text('${widget.template} resume saved')),
-    );
+    try {
+      // Prefer a messenger tied to the current Navigator overlay for reliability
+      final overlayCtx =
+          Navigator.of(ctx).overlay?.context ??
+          Navigator.of(context).overlay?.context;
+      final messenger = overlayCtx != null
+          ? ScaffoldMessenger.maybeOf(overlayCtx)
+          : (ScaffoldMessenger.maybeOf(ctx) ??
+                ScaffoldMessenger.maybeOf(context));
+      messenger?.showSnackBar(
+        SnackBar(content: Text('${widget.template} resume saved')),
+      );
+    } catch (_) {}
     if (Navigator.canPop(ctx)) {
       Navigator.pop(ctx);
     } else if (Navigator.canPop(context)) {
       Navigator.pop(context);
     }
+  }
+
+  // --- Helpers: overlap detection for dynamic sections stored as JSON ---
+  List<String> _detectDateOverlapsInControllers() {
+    final issues = <String>[];
+
+    bool overlapsFor(String? jsonStr) {
+      if (jsonStr == null || jsonStr.trim().isEmpty) return false;
+      try {
+        final list = (jsonDecode(jsonStr) as List).cast<Map>();
+        DateTime? parse(Object? v) {
+          if (v == null) return null;
+          try {
+            return DateTime.tryParse(v.toString());
+          } catch (_) {
+            return null;
+          }
+        }
+
+        bool overlaps(DateTime? s1, DateTime? e1, DateTime? s2, DateTime? e2) {
+          if (s1 == null || s2 == null) return false; // need starts to compare
+          final end1 = e1 ?? DateTime(9999, 12, 31);
+          final end2 = e2 ?? DateTime(9999, 12, 31);
+          int ym(DateTime d) => d.year * 12 + d.month;
+          final s1m = ym(DateTime(s1.year, s1.month));
+          final e1m = ym(DateTime(end1.year, end1.month));
+          final s2m = ym(DateTime(s2.year, s2.month));
+          final e2m = ym(DateTime(end2.year, end2.month));
+          return s1m <= e2m && s2m <= e1m;
+        }
+
+        for (var i = 0; i < list.length; i++) {
+          final a = list[i];
+          final s1 = parse(a['startDate']);
+          final e1 = parse(a['endDate']);
+          for (var j = i + 1; j < list.length; j++) {
+            final b = list[j];
+            if (overlaps(s1, e1, parse(b['startDate']), parse(b['endDate']))) {
+              return true;
+            }
+          }
+        }
+        return false;
+      } catch (_) {
+        // If parsing fails, do not block save on this field
+        return false;
+      }
+    }
+
+    // Check common keys used by templates using dynamic sections
+    final workJson = controllers['workExperiences']?.text ?? '';
+    final workJsonAlt = controllers['workExperiencesJson']?.text ?? '';
+    final eduJson = controllers['educations']?.text ?? '';
+    final eduJsonAlt = controllers['educationsJson']?.text ?? '';
+
+    if (overlapsFor(workJson) || overlapsFor(workJsonAlt)) {
+      issues.add('Work Experience');
+    }
+    if (overlapsFor(eduJson) || overlapsFor(eduJsonAlt)) {
+      issues.add('Education');
+    }
+
+    return issues;
   }
 
   TextEditingController controllerFor(String key) =>

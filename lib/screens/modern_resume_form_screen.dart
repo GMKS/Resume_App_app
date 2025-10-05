@@ -10,6 +10,7 @@ import '../services/share_export_service.dart';
 // skills handled via shared SkillsPickerField; no direct SkillsService import needed here
 import '../widgets/skills_picker_field.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/ai_resume_service.dart';
 
 class ModernResumeFormScreen extends StatefulWidget {
   final SavedResume? existingResume;
@@ -35,6 +36,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     'achievements': TextEditingController(),
     'hobbies': TextEditingController(),
   };
+  List<String> _summaryIdeas = [];
 
   final Map<String, FocusNode> _focusNodes = {
     'name': FocusNode(),
@@ -55,11 +57,118 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
   DateTime? _workStart, _workEnd;
 
   final _eduSchool = TextEditingController();
+  final _eduCollege = TextEditingController();
   final _eduDegree = TextEditingController();
   DateTime? _eduStart, _eduEnd;
+  bool _atsFriendly = false;
+
+  // --- Overlap detection helpers (month granularity) ---
+  bool _datesOverlap(DateTime? s1, DateTime? e1, DateTime? s2, DateTime? e2) {
+    if (s1 == null || s2 == null) return false; // need starts to compare
+    final end1 = e1 ?? DateTime(9999, 12, 31);
+    final end2 = e2 ?? DateTime(9999, 12, 31);
+    int ym(DateTime d) => d.year * 12 + d.month;
+    final s1m = ym(DateTime(s1.year, s1.month));
+    final e1m = ym(DateTime(end1.year, end1.month));
+    final s2m = ym(DateTime(s2.year, s2.month));
+    final e2m = ym(DateTime(end2.year, end2.month));
+    return s1m <= e2m && s2m <= e1m;
+  }
+
+  List<String> _findOverlapsForTimeline(
+    List<Map<String, dynamic>> items, {
+    String label = 'Item',
+  }) {
+    final msgs = <String>[];
+    for (var i = 0; i < items.length; i++) {
+      for (var j = i + 1; j < items.length; j++) {
+        final s1 = items[i]['start'] as DateTime?;
+        final e1 = items[i]['end'] as DateTime?;
+        final s2 = items[j]['start'] as DateTime?;
+        final e2 = items[j]['end'] as DateTime?;
+        if (_datesOverlap(s1, e1, s2, e2)) {
+          msgs.add('$label ${i + 1} overlaps with $label ${j + 1}');
+        }
+      }
+    }
+    return msgs;
+  }
 
   void _onPhotoChanged(String? b64) {
     setState(() => _profilePhotoB64 = b64);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Hydrate form if editing an existing resume
+    final existing = widget.existingResume;
+    if (existing != null) {
+      final info = Map<String, dynamic>.from(
+        existing.data['personalInfo'] ?? {},
+      );
+      _controllers['name']!.text = (info['name'] ?? '').toString();
+      _controllers['email']!.text = (info['email'] ?? '').toString();
+      _controllers['phone']!.text = (info['phone'] ?? '').toString();
+      _controllers['linkedin']!.text = (info['linkedin'] ?? '').toString();
+      _profilePhotoB64 =
+          (info['profilePhotoBase64'] ?? '').toString().isNotEmpty
+          ? (info['profilePhotoBase64'] as String)
+          : null;
+      _controllers['summary']!.text = (existing.data['summary'] ?? '')
+          .toString();
+      // Skills can be list or csv
+      if (existing.data['skills'] is List) {
+        final list = List<String>.from(existing.data['skills']);
+        _controllers['skills']!.text = list.join(', ');
+      } else if (existing.data['skillsCsv'] is String) {
+        _controllers['skills']!.text = existing.data['skillsCsv'];
+      }
+      // Work timeline
+      if (existing.data['workExperience'] is List) {
+        for (final w in existing.workExperience) {
+          _workTimeline.add({
+            'company': (w['company'] ?? '').toString(),
+            'role': (w['role'] ?? '').toString(),
+            'start': _tryParseDate(w['start']),
+            'end': _tryParseDate(w['end']),
+          });
+        }
+      }
+      // Education timeline
+      if (existing.data['education'] is List) {
+        for (final e in existing.education) {
+          _eduTimeline.add({
+            'school': (e['school'] ?? '').toString(),
+            'college': (e['college'] ?? '').toString(),
+            'degree': (e['degree'] ?? '').toString(),
+            'start': _tryParseDate(e['start']),
+            'end': _tryParseDate(e['end']),
+          });
+        }
+      }
+      // Certifications / achievements / hobbies
+      _controllers['certifications']!.text =
+          (existing.data['certifications'] ?? '').toString();
+      _controllers['achievements']!.text = (existing.data['achievements'] ?? '')
+          .toString();
+      _controllers['hobbies']!.text = (existing.data['hobbies'] ?? '')
+          .toString();
+      // Load ATS flag
+      try {
+        _atsFriendly =
+            (existing.data['ats_friendly'] ?? '').toString() == 'true';
+      } catch (_) {}
+    }
+  }
+
+  DateTime? _tryParseDate(dynamic iso) {
+    if (iso == null) return null;
+    try {
+      return DateTime.tryParse(iso.toString());
+    } catch (_) {
+      return null;
+    }
   }
 
   void _addWork() {
@@ -101,6 +210,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     _workRole.dispose();
     _eduSchool.dispose();
     _eduDegree.dispose();
+    _eduCollege.dispose();
     super.dispose();
   }
 
@@ -148,6 +258,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
           .map(
             (e) => {
               'school': e['school'],
+              'college': e['college'],
               'degree': e['degree'],
               'start': (e['start'] as DateTime?)?.toIso8601String(),
               'end': (e['end'] as DateTime?)?.toIso8601String(),
@@ -168,6 +279,8 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
       'certifications': _controllers['certifications']!.text,
       'achievements': _controllers['achievements']!.text,
       'hobbies': _controllers['hobbies']!.text,
+      // Persist ATS-friendly choice for exporter routing
+      'ats_friendly': _atsFriendly ? 'true' : 'false',
     };
   }
 
@@ -215,6 +328,36 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     return buffer.toString();
   }
 
+  Future<void> _generateSummaryBullets() async {
+    final skills = _controllers['skills']!.text
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (skills.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Add at least one skill to generate ideas'),
+          ),
+        );
+      }
+      return;
+    }
+    try {
+      // Use target role as name field for now; can be extended later
+      final ideas = await AIResumeService.generateBulletPoints(
+        jobTitle: 'Professional Summary',
+        company: '',
+        description: 'Key skills: ${skills.join(', ')}',
+        count: 4,
+      );
+      if (mounted) setState(() => _summaryIdeas = ideas);
+    } catch (_) {
+      if (mounted) setState(() => _summaryIdeas = []);
+    }
+  }
+
   void _addEdu() {
     if (_eduSchool.text.isEmpty ||
         _eduDegree.text.isEmpty ||
@@ -231,11 +374,13 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     setState(() {
       _eduTimeline.add({
         'school': _eduSchool.text.trim(),
+        'college': _eduCollege.text.trim(),
         'degree': _eduDegree.text.trim(),
         'start': _eduStart,
         'end': _eduEnd,
       });
       _eduSchool.clear();
+      _eduCollege.clear();
       _eduDegree.clear();
       _eduStart = null;
       _eduEnd = null;
@@ -260,6 +405,33 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
   }
 
   Future<void> _saveResume() async {
+    // Commit any pending inputs not yet added to timelines
+    _commitPendingInputs();
+    // Enforce: block save when overlaps exist
+    final workOverlaps = _findOverlapsForTimeline(
+      _workTimeline,
+      label: 'Experience',
+    );
+    final eduOverlaps = _findOverlapsForTimeline(
+      _eduTimeline,
+      label: 'Education',
+    );
+    if (workOverlaps.isNotEmpty || eduOverlaps.isNotEmpty) {
+      final parts = <String>[];
+      if (workOverlaps.isNotEmpty) parts.add('Work Experience');
+      if (eduOverlaps.isNotEmpty) parts.add('Education');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Cannot save: overlapping dates found in ${parts.join(' and ')}. Please resolve before saving.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
     final data = _collectResumeData();
 
     final title = _controllers['name']!.text.isEmpty
@@ -283,6 +455,41 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
       context,
     ).showSnackBar(const SnackBar(content: Text('Modern Resume saved!')));
     Navigator.pop(context);
+  }
+
+  void _commitPendingInputs() {
+    // Add pending work if fields are filled but 'Add' wasn't tapped
+    if (_workCompany.text.trim().isNotEmpty &&
+        _workRole.text.trim().isNotEmpty &&
+        _workStart != null) {
+      _workTimeline.add({
+        'company': _workCompany.text.trim(),
+        'role': _workRole.text.trim(),
+        'start': _workStart,
+        'end': _workEnd,
+      });
+      _workCompany.clear();
+      _workRole.clear();
+      _workStart = null;
+      _workEnd = null;
+    }
+    // Add pending education if fields are filled but 'Add' wasn't tapped
+    if (_eduSchool.text.trim().isNotEmpty &&
+        _eduDegree.text.trim().isNotEmpty &&
+        _eduStart != null) {
+      _eduTimeline.add({
+        'school': _eduSchool.text.trim(),
+        'college': _eduCollege.text.trim(),
+        'degree': _eduDegree.text.trim(),
+        'start': _eduStart,
+        'end': _eduEnd,
+      });
+      _eduSchool.clear();
+      _eduCollege.clear();
+      _eduDegree.clear();
+      _eduStart = null;
+      _eduEnd = null;
+    }
   }
 
   @override
@@ -484,6 +691,44 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                         maxLines: 4,
                         enableAI: true,
                       ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.format_list_bulleted),
+                            label: const Text('Generate bullet ideas'),
+                            onPressed: _generateSummaryBullets,
+                          ),
+                          const SizedBox(width: 12),
+                          if (_summaryIdeas.isNotEmpty)
+                            Expanded(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: _summaryIdeas
+                                    .map(
+                                      (idea) => ActionChip(
+                                        label: Text(
+                                          idea,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            final cur =
+                                                _controllers['summary']!.text;
+                                            _controllers['summary']!.text =
+                                                cur.isEmpty
+                                                ? idea
+                                                : '$cur\n• $idea';
+                                          });
+                                        },
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       // AI Summary Generator
                       if (_controllers['name']!.text.isNotEmpty)
@@ -568,6 +813,68 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      // Overlap warning for work items
+                      Builder(
+                        builder: (context) {
+                          final overlaps = _findOverlapsForTimeline(
+                            _workTimeline,
+                            label: 'Experience',
+                          );
+                          if (overlaps.isEmpty)
+                            return const SizedBox(height: 12);
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                            child: Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                border: Border.all(color: Colors.red.shade200),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.warning_amber,
+                                        color: Colors.red,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Expanded(
+                                        child: Text(
+                                          'Overlapping work experience dates detected',
+                                          style: TextStyle(
+                                            color: Colors.red,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ...overlaps
+                                      .map(
+                                        (m) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: Text(
+                                            m,
+                                            style: const TextStyle(
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       ..._workTimeline.map(
@@ -698,11 +1005,76 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                           ),
                         ],
                       ),
+                      // Overlap warning for education items
+                      Builder(
+                        builder: (context) {
+                          final overlaps = _findOverlapsForTimeline(
+                            _eduTimeline,
+                            label: 'Education',
+                          );
+                          if (overlaps.isEmpty)
+                            return const SizedBox(height: 12);
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                            child: Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                border: Border.all(color: Colors.red.shade200),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.warning_amber,
+                                        color: Colors.red,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Expanded(
+                                        child: Text(
+                                          'Overlapping education dates detected',
+                                          style: TextStyle(
+                                            color: Colors.red,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ...overlaps
+                                      .map(
+                                        (m) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: Text(
+                                            m,
+                                            style: const TextStyle(
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                       const SizedBox(height: 12),
                       ..._eduTimeline.map(
                         (e) => _timelineTile(
                           title: e['degree'],
-                          subtitle: e['school'],
+                          subtitle: [e['school'], e['college']]
+                              .whereType<String>()
+                              .where((s) => s.trim().isNotEmpty)
+                              .join(' • '),
                           start: e['start'],
                           end: e['end'],
                           color: Colors.teal,
@@ -716,6 +1088,15 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                               controller: _eduSchool,
                               decoration: const InputDecoration(
                                 labelText: 'University',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _eduCollege,
+                              decoration: const InputDecoration(
+                                labelText: 'College',
                               ),
                             ),
                           ),
@@ -925,6 +1306,15 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                 content: _getResumeContent(),
                 jobDescription:
                     'Paste job description here for better ATS optimization',
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                value: _atsFriendly,
+                onChanged: (v) => setState(() => _atsFriendly = v),
+                title: const Text('ATS-friendly formatting'),
+                subtitle: const Text(
+                  'Simplifies layout and headings for better ATS parsing.',
+                ),
               ),
               const SizedBox(height: 32),
               SizedBox(

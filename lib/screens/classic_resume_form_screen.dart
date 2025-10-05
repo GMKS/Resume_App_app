@@ -377,26 +377,18 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
               'experience': SectionItem(
                 keyId: 'experience',
                 title: 'Work Experience',
-                build: () => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sectionTitle('Work Experience'),
-                    DynamicWorkExperienceSection(
-                      workExperiences: _workExperiences,
-                      onWorkExperiencesChanged: (experiences) {
-                        setState(() {
-                          _workExperiences = experiences;
-                          // Update JSON in hidden controller for BaseResumeForm
-                          state
-                              .controllerFor('workExperiences')
-                              .text = jsonEncode(
-                            experiences.map((e) => e.toJson()).toList(),
-                          );
-                        });
-                      },
-                      atsFriendly: _atsFriendly,
-                    ),
-                  ],
+                build: () => DynamicWorkExperienceSection(
+                  workExperiences: _workExperiences,
+                  onWorkExperiencesChanged: (experiences) {
+                    setState(() {
+                      _workExperiences = experiences;
+                      // Update JSON in hidden controller for BaseResumeForm
+                      state.controllerFor('workExperiences').text = jsonEncode(
+                        experiences.map((e) => e.toJson()).toList(),
+                      );
+                    });
+                  },
+                  atsFriendly: _atsFriendly,
                 ),
               ),
             };
@@ -570,7 +562,6 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                       },
                     ),
 
-                  _sectionTitle('Education'),
                   DynamicEducationSection(
                     educations: _educations,
                     onEducationsChanged: (educations) {

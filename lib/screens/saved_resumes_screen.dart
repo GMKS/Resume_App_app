@@ -3,6 +3,15 @@ import '../services/resume_storage_service.dart';
 import '../models/saved_resume.dart';
 import '../services/premium_service.dart';
 import '../services/share_export_service.dart';
+import 'modern_resume_preview.dart';
+import 'classic_resume_preview.dart';
+import 'modern_resume_form_screen.dart';
+import 'classic_resume_form_screen.dart';
+import 'minimal_resume_form_screen.dart';
+import 'professional_resume_form_screen.dart';
+import 'creative_resume_form_screen.dart';
+import 'one_page_resume_form_screen.dart';
+import 'one_page_resume_preview.dart';
 
 class SavedResumesScreen extends StatelessWidget {
   const SavedResumesScreen({super.key});
@@ -35,18 +44,132 @@ class SavedResumesScreen extends StatelessWidget {
                   '${r.template} • Updated ${_formatTime(r.updatedAt)}',
                 ),
                 onTap: () {
-                  // Open editor based on template (lightweight placeholder)
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Open ${r.template} editor')),
-                  );
+                  final t = r.template.toLowerCase();
+                  if (t == 'modern') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ModernResumeFormScreen(existingResume: r),
+                      ),
+                    );
+                  } else if (t == 'classic') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ClassicResumeFormScreen(existing: r),
+                      ),
+                    );
+                  } else if (t == 'minimal') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MinimalResumeFormScreen(existing: r),
+                      ),
+                    );
+                  } else if (t == 'professional') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ProfessionalResumeFormScreen(existing: r),
+                      ),
+                    );
+                  } else if (t == 'creative') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CreativeResumeFormScreen(existing: r),
+                      ),
+                    );
+                  } else if (t == 'one page') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OnePageResumeFormScreen(existing: r),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Unknown template: ${r.template}'),
+                      ),
+                    );
+                  }
                 },
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) async {
                     switch (value) {
                       case 'edit':
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Edit ${r.title}')),
-                        );
+                        if (r.template.toLowerCase() == 'modern') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ModernResumeFormScreen(existingResume: r),
+                              ),
+                            );
+                          }
+                        } else if (r.template.toLowerCase() == 'classic') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ClassicResumeFormScreen(existing: r),
+                              ),
+                            );
+                          }
+                        } else if (r.template.toLowerCase() == 'minimal') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    MinimalResumeFormScreen(existing: r),
+                              ),
+                            );
+                          }
+                        } else if (r.template.toLowerCase() == 'professional') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ProfessionalResumeFormScreen(existing: r),
+                              ),
+                            );
+                          }
+                        } else if (r.template.toLowerCase() == 'creative') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    CreativeResumeFormScreen(existing: r),
+                              ),
+                            );
+                          }
+                        } else if (r.template.toLowerCase() == 'one page') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    OnePageResumeFormScreen(existing: r),
+                              ),
+                            );
+                          }
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Editor for ${r.template} not wired yet',
+                              ),
+                            ),
+                          );
+                        }
                         break;
                       case 'save':
                         // Force update timestamp
@@ -106,9 +229,42 @@ class SavedResumesScreen extends StatelessWidget {
                           PremiumService.showUpgradeDialog(context, 'Preview');
                           return;
                         }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Preview coming soon')),
-                        );
+                        if (r.template.toLowerCase() == 'modern') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ModernResumePreview(resume: r),
+                              ),
+                            );
+                          }
+                        } else if (r.template.toLowerCase() == 'classic') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ClassicResumePreview(resume: r),
+                              ),
+                            );
+                          }
+                        } else if (r.template.toLowerCase() == 'one page') {
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => OnePageResumePreview(resume: r),
+                              ),
+                            );
+                          }
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Preview is not available for ${r.template} yet',
+                              ),
+                            ),
+                          );
+                        }
                         break;
                       case 'share_email':
                         if (!PremiumService.isPremium) {

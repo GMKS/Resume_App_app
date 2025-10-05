@@ -132,6 +132,9 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
       final Map<String, dynamic> data = {
         for (final e in state.controllers.entries) e.key: e.value.text,
       };
+      // Include ATS flag if present
+      final ats = state.controllers['ats_friendly']?.text ?? '';
+      if (ats.isNotEmpty) data['ats_friendly'] = ats;
 
       final resume = SavedResume(
         id:
@@ -245,6 +248,7 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
         'workExperiences',
         'educations',
         'branding',
+        'ats_friendly',
       ],
       child: Builder(
         builder: (ctx) {
@@ -516,6 +520,21 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                     content: _getResumeContent(state.controllers),
                     jobDescription:
                         '', // Can be enhanced to accept job description input
+                  ),
+
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    value: (state.controllerFor('ats_friendly').text == 'true'),
+                    onChanged: (v) {
+                      state.controllerFor('ats_friendly').text = v
+                          ? 'true'
+                          : 'false';
+                      setState(() {});
+                    },
+                    title: const Text('ATS-friendly formatting'),
+                    subtitle: const Text(
+                      'Simplifies layout and headings for better ATS parsing.',
+                    ),
                   ),
 
                   const SizedBox(height: 28),

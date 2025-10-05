@@ -144,6 +144,9 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
       final Map<String, dynamic> data = {
         for (final e in state.controllers.entries) e.key: e.value.text,
       };
+      // Persist ATS flag if present in controller
+      final ats = state.controllers['ats_friendly']?.text ?? '';
+      if (ats.isNotEmpty) data['ats_friendly'] = ats;
 
       final resume = SavedResume(
         id:
@@ -194,6 +197,7 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
         'workExperiences',
         'educations',
         'sectionOrder',
+        'ats_friendly',
       ],
       child: Builder(
         builder: (ctx) {
@@ -475,6 +479,21 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
                     content: _getResumeContent(state.controllers),
                     jobDescription:
                         '', // Could be enhanced to get from user input
+                  ),
+
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    value: (state.controllerFor('ats_friendly').text == 'true'),
+                    onChanged: (v) {
+                      state.controllerFor('ats_friendly').text = v
+                          ? 'true'
+                          : 'false';
+                      setState(() {});
+                    },
+                    title: const Text('ATS-friendly formatting'),
+                    subtitle: const Text(
+                      'Simplifies layout and headings for better ATS parsing.',
+                    ),
                   ),
 
                   const SizedBox(height: 28),
