@@ -12,8 +12,8 @@ class OnePageResumeFormScreen extends StatelessWidget {
   final SavedResume? existing;
   const OnePageResumeFormScreen({super.key, this.existing});
 
-  // Updated required field set (others are optional)
-  static const _requiredMap = {
+  // FIX: typed map (no stray import inside)
+  static const Map<String, String> _requiredMap = {
     'name': 'Full Name',
     'phone': 'Phone Number',
     'email': 'Email Address',
@@ -47,6 +47,8 @@ class OnePageResumeFormScreen extends StatelessWidget {
         // Dynamic data as JSON
         'workExperiencesJson',
         'educationsJson',
+        // ATS flag
+        'ats_friendly',
       ],
       child: const _OnePageBody(),
     );
@@ -94,6 +96,8 @@ class _OnePageBodyState extends State<_OnePageBody> {
           _workExperiences = workList
               .map((e) => WorkExperience.fromJson(e))
               .toList();
+          // Ensure hidden controller is in sync for saving/export
+          state.controllerFor('workExperiencesJson').text = workJson;
         } catch (e) {
           // If parsing fails, keep default
         }
@@ -105,6 +109,8 @@ class _OnePageBodyState extends State<_OnePageBody> {
         try {
           final List<dynamic> eduList = json.decode(eduJson);
           _educations = eduList.map((e) => Education.fromJson(e)).toList();
+          // Ensure hidden controller is in sync for saving/export
+          state.controllerFor('educationsJson').text = eduJson;
         } catch (e) {
           // If parsing fails, keep default
         }
@@ -169,6 +175,14 @@ class _OnePageBodyState extends State<_OnePageBody> {
   Widget build(BuildContext context) {
     final state = BaseResumeForm.of(context)!;
 
+    // Initialize ATS flag controller if empty (default OFF)
+    if (state.controllerFor('ats_friendly').text.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        state.controllerFor('ats_friendly').text = 'false';
+      });
+    }
+    final isAts = state.controllerFor('ats_friendly').text == 'true';
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: true,
@@ -190,30 +204,28 @@ class _OnePageBodyState extends State<_OnePageBody> {
             ),
 
             _section('Contact Information'),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ProfilePhotoPicker(
-                  size: 90,
-                  initialBase64:
-                      state.controllerFor('profilePhotoBase64').text.isEmpty
-                      ? null
-                      : state.controllerFor('profilePhotoBase64').text,
-                  onChanged: (b64) {
-                    state.controllerFor('profilePhotoBase64').text = b64 ?? '';
-                  },
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    children: [
-                      state.buildTextField('name', 'Full Name', required: true),
-                      state.buildTextField('title', 'Professional Title'),
-                    ],
-                  ),
-                ),
-              ],
+            Center(
+              child: ProfilePhotoPicker(
+                size: 90,
+                initialBase64:
+                    state.controllerFor('profilePhotoBase64').text.isEmpty
+                    ? null
+                    : state.controllerFor('profilePhotoBase64').text,
+                onChanged: (b64) {
+                  state.controllerFor('profilePhotoBase64').text = b64 ?? '';
+                },
+              ),
             ),
+            const SizedBox(height: 12),
+            // Place Name and Summary right below the Change Photo button for better visibility
+            state.buildTextField('name', 'Full Name', required: true),
+            state.buildTextField(
+              'summary',
+              '2–3 line Professional Summary',
+              required: true,
+              maxLines: 4,
+            ),
+            state.buildTextField('title', 'Professional Title'),
             state.buildTextField(
               'phone',
               'Phone Number',
@@ -249,18 +261,33 @@ class _OnePageBodyState extends State<_OnePageBody> {
                 state.controllers['summary']?.text = summary;
               },
             ),
-            state.buildTextField(
-              'summary',
-              '2–3 line Professional Summary',
-              required: true,
-              maxLines: 4,
-            ),
 
+            // Summary field moved below photo for better visibility
             _divider(),
             _section('Key Skills'),
             SkillsPickerField(
               controller: state.controllerFor('coreSkills'),
               label: '6–10 Relevant Skills',
+            ),
+            // Hidden validator to enforce at least one skill
+            FormField<String>(
+              validator: (v) {
+                final hasSkills = state
+                    .controllerFor('coreSkills')
+                    .text
+                    .trim()
+                    .isNotEmpty;
+                return hasSkills ? null : 'Please add at least one skill';
+              },
+              builder: (field) => field.hasError
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        field.errorText!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
 
             _divider(),
@@ -276,6 +303,7 @@ class _OnePageBodyState extends State<_OnePageBody> {
                 });
               },
               accentColor: _accentColor,
+              atsFriendly: isAts,
             ),
 
             _divider(),
@@ -291,6 +319,7 @@ class _OnePageBodyState extends State<_OnePageBody> {
                 });
               },
               accentColor: _accentColor,
+              atsFriendly: isAts,
             ),
 
             _divider(),
@@ -335,6 +364,19 @@ class _OnePageBodyState extends State<_OnePageBody> {
               content: _getResumeContent(state.controllers),
               jobDescription:
                   '', // Can be enhanced to accept job description input
+            ),
+
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              value: isAts,
+              onChanged: (v) {
+                state.controllerFor('ats_friendly').text = v ? 'true' : 'false';
+                setState(() {});
+              },
+              title: const Text('ATS-friendly formatting'),
+              subtitle: const Text(
+                'Simplifies layout and headings for better ATS parsing.',
+              ),
             ),
 
             const SizedBox(height: 24),

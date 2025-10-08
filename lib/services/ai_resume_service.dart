@@ -56,6 +56,84 @@ Format as a JSON array of strings.
     }
   }
 
+  /// Generic, section-aware text generation from a seed text.
+  ///
+  /// Uses the current text in the edit box (seed) and optional context
+  /// (for example: name, role, skills, etc.) to produce improved content
+  /// tailored to the target resume section.
+  static Future<String> generateFromSeed({
+    required String section,
+    required String seed,
+    String? extraContext,
+  }) async {
+    if (!PremiumService.hasAIFeatures) {
+      throw Exception('AI features require Premium subscription');
+    }
+
+    // Normalize inputs
+    final sec = section.toLowerCase();
+    final seedText = seed.trim();
+    final contextText = (extraContext ?? '').trim();
+
+    // When seed is empty, still try to generate something useful but concise.
+    try {
+      final prompt =
+          '''
+You are an expert resume writer. Improve and generate content for the following resume section.
+
+Section: $section
+Seed Content (can be empty):
+"""
+$seedText
+"""
+
+Additional Context (optional):
+"""
+$contextText
+"""
+
+Strict requirements:
+- Use a professional, concise tone.
+- If the section is a summary (name contains "summary"), return 2-3 sentences.
+- If the section is experience or responsibilities (name contains "experience" or "responsibil"), return 3-5 bullet points starting with action verbs.
+- If the section is skills (name contains "skill"), return a single comma-separated list of skills only.
+- For other sections, return a short paragraph (2-4 sentences) or short bullet list when appropriate.
+- Keep it ATS-friendly and avoid special characters that may not render.
+- Return only the generated text, with no extra explanations.
+''';
+
+      final response = await _makeOpenAIRequest(
+        prompt,
+        temperature: 0.8,
+        seed: DateTime.now().millisecondsSinceEpoch % 1000,
+      );
+      return response.trim();
+    } catch (e) {
+      // Fallback: lightweight transformation
+      if (seedText.isNotEmpty) {
+        // Ensure first character uppercase and tidy whitespace
+        final cleaned = seedText
+            .split('\n')
+            .map((l) => l.trim())
+            .where((l) => l.isNotEmpty)
+            .join('\n');
+        return cleaned;
+      }
+
+      // No seed; produce a generic but safe stub based on section
+      if (sec.contains('summary')) {
+        return _generateFallbackSummary('Candidate', 'Professional', const []);
+      } else if (sec.contains('skill')) {
+        return 'Communication, Team Leadership, Problem Solving';
+      } else if (sec.contains('experience')) {
+        return '- Led cross-functional initiatives to deliver measurable results\n'
+            '- Optimized processes to improve efficiency and quality\n'
+            '- Collaborated with stakeholders to achieve business goals';
+      }
+      return 'Results-driven professional with a focus on delivering high-quality outcomes.';
+    }
+  }
+
   /// Generate professional summary based on user background
   static Future<String> generateSummary({
     required String name,

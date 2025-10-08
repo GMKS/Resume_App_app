@@ -32,6 +32,14 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Performance: Target only modern 64-bit devices for smaller APK and faster startup
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a"))
+        }
+        
+        // Optimize resources
+        resourceConfigurations.addAll(listOf("en", "xxhdpi"))
     }
 
     buildTypes {
@@ -47,6 +55,12 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
+            isDebuggable = false
+            
+            // Performance optimizations
+            isPseudoLocalesEnabled = false
+            isCrunchPngs = true
+            
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

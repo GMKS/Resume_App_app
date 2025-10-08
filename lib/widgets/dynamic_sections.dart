@@ -124,6 +124,36 @@ class DynamicWorkExperienceSection extends StatefulWidget {
 
 class _DynamicWorkExperienceSectionState
     extends State<DynamicWorkExperienceSection> {
+  bool _overlaps(DateTime? s1, DateTime? e1, DateTime? s2, DateTime? e2) {
+    if (s1 == null || s2 == null) return false; // can't compare without starts
+    final end1 = e1 ?? DateTime(9999, 12, 31);
+    final end2 = e2 ?? DateTime(9999, 12, 31);
+    int ym(DateTime d) => d.year * 12 + d.month;
+    final s1m = ym(DateTime(s1.year, s1.month));
+    final e1m = ym(DateTime(end1.year, end1.month));
+    final s2m = ym(DateTime(s2.year, s2.month));
+    final e2m = ym(DateTime(end2.year, end2.month));
+    return s1m <= e2m && s2m <= e1m;
+  }
+
+  List<String> _findOverlaps() {
+    final msgs = <String>[];
+    final list = widget.workExperiences;
+    for (var i = 0; i < list.length; i++) {
+      for (var j = i + 1; j < list.length; j++) {
+        if (_overlaps(
+          list[i].startDate,
+          list[i].endDate,
+          list[j].startDate,
+          list[j].endDate,
+        )) {
+          msgs.add('Experience ${i + 1} overlaps with Experience ${j + 1}');
+        }
+      }
+    }
+    return msgs;
+  }
+
   void _addWorkExperience() {
     final newExperience = WorkExperience(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -165,6 +195,7 @@ class _DynamicWorkExperienceSectionState
     final accentColor = widget.atsFriendly
         ? (widget.accentColor ?? Colors.black87)
         : (widget.accentColor ?? Colors.blue);
+    final overlaps = _findOverlaps();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,6 +236,45 @@ class _DynamicWorkExperienceSectionState
             ),
           ],
         ),
+        if (overlaps.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              border: Border.all(color: Colors.red.shade200),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.warning_amber, color: Colors.red),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Overlapping work experience dates detected',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ...overlaps.map(
+                  (m) => Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(m, style: const TextStyle(color: Colors.red)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         if (widget.workExperiences.isEmpty)
           Card(
@@ -411,6 +481,36 @@ class DynamicEducationSection extends StatefulWidget {
 }
 
 class _DynamicEducationSectionState extends State<DynamicEducationSection> {
+  bool _overlaps(DateTime? s1, DateTime? e1, DateTime? s2, DateTime? e2) {
+    if (s1 == null || s2 == null) return false;
+    final end1 = e1 ?? DateTime(9999, 12, 31);
+    final end2 = e2 ?? DateTime(9999, 12, 31);
+    int ym(DateTime d) => d.year * 12 + d.month;
+    final s1m = ym(DateTime(s1.year, s1.month));
+    final e1m = ym(DateTime(end1.year, end1.month));
+    final s2m = ym(DateTime(s2.year, s2.month));
+    final e2m = ym(DateTime(end2.year, end2.month));
+    return s1m <= e2m && s2m <= e1m;
+  }
+
+  List<String> _findOverlaps() {
+    final msgs = <String>[];
+    final list = widget.educations;
+    for (var i = 0; i < list.length; i++) {
+      for (var j = i + 1; j < list.length; j++) {
+        if (_overlaps(
+          list[i].startDate,
+          list[i].endDate,
+          list[j].startDate,
+          list[j].endDate,
+        )) {
+          msgs.add('Education ${i + 1} overlaps with Education ${j + 1}');
+        }
+      }
+    }
+    return msgs;
+  }
+
   void _addEducation() {
     final newEducation = Education(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -450,6 +550,7 @@ class _DynamicEducationSectionState extends State<DynamicEducationSection> {
     final accentColor = widget.atsFriendly
         ? (widget.accentColor ?? Colors.black87)
         : (widget.accentColor ?? Colors.teal);
+    final overlaps = _findOverlaps();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -490,6 +591,45 @@ class _DynamicEducationSectionState extends State<DynamicEducationSection> {
             ),
           ],
         ),
+        if (overlaps.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              border: Border.all(color: Colors.red.shade200),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.warning_amber, color: Colors.red),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Overlapping education dates detected',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ...overlaps.map(
+                  (m) => Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(m, style: const TextStyle(color: Colors.red)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         if (widget.educations.isEmpty)
           Card(

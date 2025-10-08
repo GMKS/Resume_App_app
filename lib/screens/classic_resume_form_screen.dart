@@ -264,7 +264,7 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
 
       switch (format) {
         case 'PDF':
-          await ShareExportService.instance.exportAndOpenPdf(resume);
+          await ShareExportService(context).exportAndOpenPdf(resume);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -276,15 +276,17 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
           );
           break;
         case 'DOCX':
-          final file = await ShareExportService.instance.exportDoc(resume);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('DOCX exported to: ${file.path}')),
+            const SnackBar(
+              content: Text('DOCX export is not available in this version.'),
+            ),
           );
           break;
         case 'TXT':
-          final file = await ShareExportService.instance.exportTxt(resume);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('TXT exported to: ${file.path}')),
+            const SnackBar(
+              content: Text('TXT export is not available in this version.'),
+            ),
           );
           break;
       }
@@ -377,26 +379,18 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
               'experience': SectionItem(
                 keyId: 'experience',
                 title: 'Work Experience',
-                build: () => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sectionTitle('Work Experience'),
-                    DynamicWorkExperienceSection(
-                      workExperiences: _workExperiences,
-                      onWorkExperiencesChanged: (experiences) {
-                        setState(() {
-                          _workExperiences = experiences;
-                          // Update JSON in hidden controller for BaseResumeForm
-                          state
-                              .controllerFor('workExperiences')
-                              .text = jsonEncode(
-                            experiences.map((e) => e.toJson()).toList(),
-                          );
-                        });
-                      },
-                      atsFriendly: _atsFriendly,
-                    ),
-                  ],
+                build: () => DynamicWorkExperienceSection(
+                  workExperiences: _workExperiences,
+                  onWorkExperiencesChanged: (experiences) {
+                    setState(() {
+                      _workExperiences = experiences;
+                      // Update JSON in hidden controller for BaseResumeForm
+                      state.controllerFor('workExperiences').text = jsonEncode(
+                        experiences.map((e) => e.toJson()).toList(),
+                      );
+                    });
+                  },
+                  atsFriendly: _atsFriendly,
                 ),
               ),
             };
@@ -483,11 +477,11 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                         return;
                       }
                       if (choice == 'EMAIL') {
-                        await ShareExportService.instance.shareViaEmail(resume);
+                        await ShareExportService(context).shareViaEmail(resume);
                       } else if (choice == 'WHATSAPP') {
-                        await ShareExportService.instance.shareViaWhatsApp(
-                          resume,
-                        );
+                        await ShareExportService(
+                          context,
+                        ).shareViaWhatsApp(resume);
                       }
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -570,7 +564,6 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                       },
                     ),
 
-                  _sectionTitle('Education'),
                   DynamicEducationSection(
                     educations: _educations,
                     onEducationsChanged: (educations) {

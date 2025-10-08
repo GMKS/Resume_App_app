@@ -84,6 +84,16 @@ class PremiumService {
     return availableExportFormats.contains(format);
   }
 
+  static Future<bool> isPremiumWithDialog(
+    BuildContext context, {
+    String feature = 'This feature',
+  }) async {
+    if (isPremium) return true;
+
+    showUpgradeDialog(context, feature);
+    return false;
+  }
+
   // Premium Upgrade Prompt
   static void showUpgradeDialog(BuildContext context, String feature) {
     showDialog(

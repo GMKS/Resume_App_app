@@ -27,6 +27,7 @@ class _ProfessionalResumeFormScreenState
   final List<WorkExperience> _workExperiences = [];
   final List<Education> _educations = [];
   BrandingTheme _currentBranding = BrandingTheme.professional;
+  bool _atsFriendly = false;
 
   // Color theme for Professional template
   static const Color _accentColor = Color(0xFF2E3A47);
@@ -49,6 +50,11 @@ class _ProfessionalResumeFormScreenState
         _currentBranding = BrandingTheme.professional;
       }
     }
+    // Load ATS flag if present
+    try {
+      final atsv = (widget.existing?.data['ats_friendly'] ?? '').toString();
+      _atsFriendly = atsv == 'true';
+    } catch (_) {}
   }
 
   Future<void> _openCustomization() async {
@@ -178,21 +184,23 @@ class _ProfessionalResumeFormScreenState
 
       switch (format) {
         case 'PDF':
-          await ShareExportService.instance.exportAndOpenPdf(resume);
+          await ShareExportService(context).exportAndOpenPdf(resume);
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('PDF export completed')));
           break;
         case 'DOCX':
-          final file = await ShareExportService.instance.exportDoc(resume);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('DOCX exported to: ${file.path}')),
+            const SnackBar(
+              content: Text('DOCX export is not available in this version.'),
+            ),
           );
           break;
         case 'TXT':
-          final file = await ShareExportService.instance.exportTxt(resume);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('TXT exported to: ${file.path}')),
+            const SnackBar(
+              content: Text('TXT export is not available in this version.'),
+            ),
           );
           break;
       }
@@ -222,6 +230,7 @@ class _ProfessionalResumeFormScreenState
         'workExperiences',
         'educations',
         'branding',
+        'ats_friendly',
       ],
       child: Builder(
         builder: (ctx) {
@@ -243,6 +252,12 @@ class _ProfessionalResumeFormScreenState
               state.controllerFor('branding').text = jsonEncode(
                 _currentBranding.toJson(),
               );
+            }
+            // Initialize ATS flag controller
+            if (state.controllerFor('ats_friendly').text.isEmpty) {
+              state.controllerFor('ats_friendly').text = _atsFriendly
+                  ? 'true'
+                  : 'false';
             }
           });
 
@@ -314,11 +329,11 @@ class _ProfessionalResumeFormScreenState
                     );
                     try {
                       if (choice == 'EMAIL') {
-                        await ShareExportService.instance.shareViaEmail(resume);
+                        await ShareExportService(context).shareViaEmail(resume);
                       } else if (choice == 'WHATSAPP') {
-                        await ShareExportService.instance.shareViaWhatsApp(
-                          resume,
-                        );
+                        await ShareExportService(
+                          context,
+                        ).shareViaWhatsApp(resume);
                       }
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -412,20 +427,41 @@ class _ProfessionalResumeFormScreenState
 
                   // (Share menu handled in the top AppBar)
                   _section('Experience'),
-                  AIBulletPointGenerator(
-                    jobTitle: 'Creative Professional',
-                    company: '',
-                    description: '',
-                    onGenerated: (bulletPoints) {
-                      state.controllers['experience']?.text = bulletPoints.join(
-                        '\n• ',
-                      );
+                  // Use shared dynamic section to get overlap warnings and JSON wiring
+                  DynamicWorkExperienceSection(
+                    workExperiences: _workExperiences,
+                    onWorkExperiencesChanged: (experiences) {
+                      setState(() {
+                        _workExperiences
+                          ..clear()
+                          ..addAll(experiences);
+                        state
+                            .controllerFor('workExperiences')
+                            .text = jsonEncode(
+                          experiences.map((e) => e.toJson()).toList(),
+                        );
+                      });
                     },
+                    accentColor: _accentColor,
+                    atsFriendly: _atsFriendly,
                   ),
-                  state.buildTextField('experience', 'Experience', maxLines: 4),
 
                   _section('Education'),
-                  state.buildTextField('education', 'Education', maxLines: 3),
+                  DynamicEducationSection(
+                    educations: _educations,
+                    onEducationsChanged: (educations) {
+                      setState(() {
+                        _educations
+                          ..clear()
+                          ..addAll(educations);
+                        state.controllerFor('educations').text = jsonEncode(
+                          educations.map((e) => e.toJson()).toList(),
+                        );
+                      });
+                    },
+                    accentColor: _accentColor,
+                    atsFriendly: _atsFriendly,
+                  ),
 
                   _section('Projects'),
                   state.buildTextField('projects', 'Projects', maxLines: 3),
@@ -454,6 +490,22 @@ class _ProfessionalResumeFormScreenState
                         '', // Can be enhanced to accept job description input
                   ),
 
+                  const SizedBox(height: 8),
+                  // ATS-friendly mode toggle (Premium template)
+                  SwitchListTile.adaptive(
+                    value: _atsFriendly,
+                    onChanged: (v) {
+                      setState(() => _atsFriendly = v);
+                      state.controllerFor('ats_friendly').text = v
+                          ? 'true'
+                          : 'false';
+                    },
+                    title: const Text('ATS-friendly formatting'),
+                    subtitle: const Text(
+                      'Simplifies layout and headings for better ATS parsing.',
+                    ),
+                  ),
+
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
@@ -462,7 +514,7 @@ class _ProfessionalResumeFormScreenState
                       onPressed: () {
                         state.saveResume();
                       },
-                      label: const Text('Save Creative Resume'),
+                      label: const Text('Save Professional Resume'),
                     ),
                   ),
                 ],

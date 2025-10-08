@@ -7,19 +7,36 @@ import 'services/resume_storage_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await CurrencyService.initialize();
-  } catch (_) {}
-  try {
-    await PremiumService.initialize();
-  } catch (_) {}
-  try {
-    await ApiService.init();
-  } catch (_) {}
-  try {
-    await ResumeStorageService.instance.initialize();
-  } catch (_) {}
+
+  // Start app immediately for faster startup
   runApp(const MyApp());
+
+  // Initialize services asynchronously in parallel after app starts
+  _initializeServicesAsync();
+}
+
+/// Initialize all services in parallel to avoid blocking startup
+void _initializeServicesAsync() {
+  Future.wait([
+        CurrencyService.initialize().catchError((e) {
+          debugPrint('CurrencyService initialization failed: $e');
+        }),
+        PremiumService.initialize().catchError((e) {
+          debugPrint('PremiumService initialization failed: $e');
+        }),
+        ApiService.init().catchError((e) {
+          debugPrint('ApiService initialization failed: $e');
+        }),
+        ResumeStorageService.instance.initialize().catchError((e) {
+          debugPrint('ResumeStorageService initialization failed: $e');
+        }),
+      ])
+      .then((_) {
+        debugPrint('All services initialized successfully');
+      })
+      .catchError((e) {
+        debugPrint('Service initialization error: $e');
+      });
 }
 
 class MyApp extends StatelessWidget {

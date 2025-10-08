@@ -132,6 +132,9 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
       final Map<String, dynamic> data = {
         for (final e in state.controllers.entries) e.key: e.value.text,
       };
+      // Include ATS flag if present
+      final ats = state.controllers['ats_friendly']?.text ?? '';
+      if (ats.isNotEmpty) data['ats_friendly'] = ats;
 
       final resume = SavedResume(
         id:
@@ -146,13 +149,21 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
 
       switch (format) {
         case 'pdf':
-          await ShareExportService.instance.exportAndOpenPdf(resume);
+          await ShareExportService(context).exportAndOpenPdf(resume);
           break;
         case 'docx':
-          await ShareExportService.instance.exportDoc(resume);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('DOCX export is not available in this version.'),
+            ),
+          );
           break;
         case 'txt':
-          await ShareExportService.instance.exportTxt(resume);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('TXT export is not available in this version.'),
+            ),
+          );
           break;
       }
       if (mounted) {
@@ -245,6 +256,7 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
         'workExperiences',
         'educations',
         'branding',
+        'ats_friendly',
       ],
       child: Builder(
         builder: (ctx) {
@@ -299,11 +311,11 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                     );
                     try {
                       if (choice == 'EMAIL') {
-                        await ShareExportService.instance.shareViaEmail(resume);
+                        await ShareExportService(context).shareViaEmail(resume);
                       } else if (choice == 'WHATSAPP') {
-                        await ShareExportService.instance.shareViaWhatsApp(
-                          resume,
-                        );
+                        await ShareExportService(
+                          context,
+                        ).shareViaWhatsApp(resume);
                       }
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -433,6 +445,7 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                               '${exp.jobTitle} at ${exp.company}: ${exp.description}',
                         )
                         .toList(),
+                    seed: state.controllers['creativeSummary']?.text,
                     onGenerated: (summary) {
                       state.controllers['creativeSummary']?.text = summary;
                     },
@@ -516,6 +529,21 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                     content: _getResumeContent(state.controllers),
                     jobDescription:
                         '', // Can be enhanced to accept job description input
+                  ),
+
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    value: (state.controllerFor('ats_friendly').text == 'true'),
+                    onChanged: (v) {
+                      state.controllerFor('ats_friendly').text = v
+                          ? 'true'
+                          : 'false';
+                      setState(() {});
+                    },
+                    title: const Text('ATS-friendly formatting'),
+                    subtitle: const Text(
+                      'Simplifies layout and headings for better ATS parsing.',
+                    ),
                   ),
 
                   const SizedBox(height: 28),

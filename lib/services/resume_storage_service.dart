@@ -18,6 +18,37 @@ class ResumeStorageService {
   // Map local resume ids -> remote (backend) ids
   final Map<String, String> _remoteIdMap = {};
 
+  // --- Local persistence helpers ---
+  Future<File> _localFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/resumes_local.json');
+  }
+
+  Future<void> _persistLocal() async {
+    try {
+      final f = await _localFile();
+      final listJson = resumes.value.map((r) => r.toJson()).toList();
+      await f.writeAsString(jsonEncode(listJson));
+    } catch (_) {}
+  }
+
+  Future<List<SavedResume>> _loadFromLocal() async {
+    try {
+      final f = await _localFile();
+      if (!await f.exists()) return [];
+      final raw = await f.readAsString();
+      final arr = jsonDecode(raw);
+      if (arr is List) {
+        return arr
+            .whereType<Map>()
+            .map((m) => m.cast<String, dynamic>())
+            .map(SavedResume.fromJson)
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
   // Initialize with cloud data
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -36,13 +67,22 @@ class ResumeStorageService {
       }
     } catch (_) {}
 
+    // Load local resumes first so user sees saved content even offline
+    try {
+      final local = await _loadFromLocal();
+      if (local.isNotEmpty) {
+        resumes.value = local;
+      }
+    } catch (_) {}
+
     // If premium and authenticated, pull latest resumes from backend
     if (PremiumService.hasCloudSync && ApiService.isAuthenticated) {
       try {
         final result = await ApiService.getResumes(page: 1, limit: 100);
         if (result['success'] == true && result['data'] is List) {
           final List data = result['data'] as List;
-          final list = <SavedResume>[];
+          // Merge remote into local by id
+          final byId = {for (final r in resumes.value) r.id: r};
           for (final item in data) {
             if (item is Map) {
               final map = item.cast<String, dynamic>();
@@ -72,12 +112,13 @@ class ResumeStorageService {
                     ...Map<String, dynamic>.from(map['data']),
                 },
               );
-              list.add(r);
+              byId[id] = r;
               _remoteIdMap[id] = id; // direct mapping when pulling from cloud
             }
           }
-          resumes.value = list;
+          resumes.value = byId.values.toList();
           await _persistRemoteIdMap();
+          await _persistLocal();
         }
       } catch (_) {}
     }
@@ -98,6 +139,7 @@ class ResumeStorageService {
       list.add(resume);
     }
     resumes.value = list;
+    await _persistLocal();
 
     // Cloud sync via Node API for premium users
     if (PremiumService.hasCloudSync && ApiService.isAuthenticated) {
@@ -114,6 +156,8 @@ class ResumeStorageService {
               .map((s) => {'label': s, 'rating': 0})
               .toList(),
           'updatedAt': resume.updatedAt.toIso8601String(),
+          // Persist full data blob for template-specific fields
+          'data': resume.data,
         };
 
         final remoteId = _remoteIdMap[resume.id];
@@ -135,6 +179,7 @@ class ResumeStorageService {
               skills: resume.skills
                   .map((s) => {'label': s, 'rating': 0})
                   .toList(),
+              extraData: resume.data,
             );
             final newId = _extractId(createRes['data']);
             if (newId != null) {
@@ -154,6 +199,7 @@ class ResumeStorageService {
             skills: resume.skills
                 .map((s) => {'label': s, 'rating': 0})
                 .toList(),
+            extraData: resume.data,
           );
           final newId = _extractId(createRes['data']);
           if (newId != null) {
@@ -215,6 +261,7 @@ class ResumeStorageService {
     final updated = old.copyWith(title: newTitle, updatedAt: DateTime.now());
     list[idx] = updated;
     resumes.value = list;
+    await _persistLocal();
 
     // Cloud sync rename
     if (PremiumService.hasCloudSync && ApiService.isAuthenticated) {
@@ -238,6 +285,7 @@ class ResumeStorageService {
     final list = [...resumes.value];
     list.removeWhere((r) => r.id == id);
     resumes.value = list;
+    await _persistLocal();
 
     // Cloud delete
     if (PremiumService.hasCloudSync) {
@@ -301,6 +349,7 @@ class ResumeStorageService {
         }
         resumes.value = list;
         await _persistRemoteIdMap();
+        await _persistLocal();
       }
     } catch (_) {}
   }

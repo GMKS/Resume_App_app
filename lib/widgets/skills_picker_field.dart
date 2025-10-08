@@ -21,6 +21,7 @@ class _SkillsPickerFieldState extends State<SkillsPickerField> {
   List<String> _catalog = [];
   List<String> _selected = [];
   String? _pendingSelection;
+  String? _error;
   late final VoidCallback _controllerListener;
   TextEditingController?
   _searchFieldCtrl; // controller of the autocomplete field
@@ -81,7 +82,14 @@ class _SkillsPickerFieldState extends State<SkillsPickerField> {
   void _addSkill(String s) {
     final skill = s.trim();
     if (skill.isEmpty) return;
-    if (_selected.contains(skill)) return;
+    if (_selected.contains(skill)) {
+      setState(() => _error = 'Skill "$skill" is already added');
+      // Clear the warning after a short delay
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _error = null);
+      });
+      return;
+    }
     setState(() {
       _selected.add(skill);
       _commitToController();
@@ -142,6 +150,10 @@ class _SkillsPickerFieldState extends State<SkillsPickerField> {
             );
           },
         ),
+        if (_error != null) ...[
+          const SizedBox(height: 6),
+          Text(_error!, style: const TextStyle(color: Colors.red)),
+        ],
         const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerRight,
