@@ -220,6 +220,34 @@ class SmartAssistResult {
     required this.coreSkills,
     required this.sectionsRaw,
   });
+
+  @override
+  String toString() {
+    final buffer = StringBuffer();
+    buffer.writeln('=== SMART ASSIST ANALYSIS ===');
+    buffer.writeln('Name: $name');
+    buffer.writeln('Role: $role');
+
+    if (email?.isNotEmpty == true) buffer.writeln('Email: $email');
+    if (phone?.isNotEmpty == true) buffer.writeln('Phone: $phone');
+
+    buffer.writeln('\nSUMMARY:');
+    buffer.writeln(suggestedSummary);
+
+    if (coreSkills.isNotEmpty) {
+      buffer.writeln('\nCORE SKILLS:');
+      buffer.writeln(coreSkills.join(', '));
+    }
+
+    if (enhancedBullets.isNotEmpty) {
+      buffer.writeln('\nENHANCED EXPERIENCE:');
+      for (final bullet in enhancedBullets) {
+        buffer.writeln('• $bullet');
+      }
+    }
+
+    return buffer.toString();
+  }
 }
 
 /// Analyze resume content and return structured insights + improved content.
@@ -830,380 +858,293 @@ List<String> _wrapByChars(String text, int maxChars) {
   return lines;
 }
 
+// Normalize some unicode characters that default PDF fonts may not support.
+String _normalizeForPdf(String input) {
+  return input
+      .replaceAll('\u2013', '-') // en dash
+      .replaceAll('\u2014', '-') // em dash
+      .replaceAll('\u2019', "'") // right single quote
+      .replaceAll('\u2018', "'") // left single quote
+      .replaceAll('\u2022', '•'); // bullet
+}
+
 Future<List<int>> _buildStyledPdfBytes(SmartAssistResult res) async {
-  final doc = pw.Document();
-  final blue = PdfColor.fromHex('#1E4F8A');
-  final blueLight = PdfColor.fromHex('#A8C5E6');
+  try {
+    print('DEBUG: Starting PDF generation for ${res.name}');
+    final doc = pw.Document();
+    final blue = PdfColor.fromHex('#1E4F8A');
+    final blueLight = PdfColor.fromHex('#A8C5E6');
 
-  // Build contact row parts
-  final contacts = <String>[];
-  if ((res.phone ?? '').isNotEmpty) contacts.add(res.phone!);
-  if ((res.email ?? '').isNotEmpty) contacts.add(res.email!);
-  if ((res.location ?? '').isNotEmpty) contacts.add(res.location!);
-  if ((res.website ?? '').isNotEmpty) contacts.add(res.website!);
-  if ((res.linkedIn ?? '').isNotEmpty) contacts.add(res.linkedIn!);
-  if ((res.twitter ?? '').isNotEmpty) contacts.add(res.twitter!);
+    // Build contact row parts
+    final contacts = <String>[];
+    if ((res.phone ?? '').isNotEmpty) contacts.add(res.phone!);
+    if ((res.email ?? '').isNotEmpty) contacts.add(res.email!);
+    if ((res.location ?? '').isNotEmpty) contacts.add(res.location!);
+    if ((res.website ?? '').isNotEmpty) contacts.add(res.website!);
+    if ((res.linkedIn ?? '').isNotEmpty) contacts.add(res.linkedIn!);
+    if ((res.twitter ?? '').isNotEmpty) contacts.add(res.twitter!);
 
-  // Experience bullets - limit to prevent page overflow
-  final bullets = res.enhancedBullets.isNotEmpty
-      ? res.enhancedBullets
-            .take(10)
-            .toList() // Limit to 10 bullets
-      : _extractBullets(res.sectionsRaw['experience'] ?? '').take(10).toList();
+    // Include ALL experience bullets - no limits
+    final bullets = res.enhancedBullets.isNotEmpty
+        ? res.enhancedBullets
+        : _extractBullets(res.sectionsRaw['experience'] ?? '');
 
-  // Limit summary text to prevent overflow
-  final summary = res.suggestedSummary.length > 300
-      ? '${res.suggestedSummary.substring(0, 300)}...'
-      : res.suggestedSummary;
+    // Include full summary text - no truncation
+    final summary = res.suggestedSummary.isNotEmpty
+        ? res.suggestedSummary
+        : 'Professional seeking new opportunities.';
 
-  // Limit education text
-  final education =
-      (res.sectionsRaw['education'] ?? 'Add your education details.');
-  final limitedEducation = education.length > 200
-      ? '${education.substring(0, 200)}...'
-      : education;
+    // Include full education text - no limits
+    final education = (res.sectionsRaw['education'] ?? '').isNotEmpty
+        ? res.sectionsRaw['education']!
+        : 'Add your education details.';
 
-  pw.Widget sectionHeader(String title) => pw.Container(
-    width: double.infinity,
-    padding: const pw.EdgeInsets.only(bottom: 4, top: 12),
-    decoration: pw.BoxDecoration(
-      border: pw.Border(bottom: pw.BorderSide(color: blueLight, width: 2)),
-    ),
-    child: pw.Text(
-      title,
-      style: pw.TextStyle(
-        color: blue,
-        fontWeight: pw.FontWeight.bold,
-        letterSpacing: 0.5,
+    print(
+      'DEBUG: Data prepared - contacts: ${contacts.length}, bullets: ${bullets.length}',
+    );
+
+    pw.Widget sectionHeader(String title) => pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.only(bottom: 4, top: 12),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(bottom: pw.BorderSide(color: blueLight, width: 2)),
       ),
-    ),
-  );
+      child: pw.Text(
+        title,
+        style: pw.TextStyle(
+          color: blue,
+          fontWeight: pw.FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
 
-  doc.addPage(
-    pw.MultiPage(
-      margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 36),
-      pageFormat: PdfPageFormat.a4,
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      build: (ctx) => [
-        // Header
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.center,
-          children: [
-            pw.Text(
-              res.name,
-              textAlign: pw.TextAlign.center,
-              style: pw.TextStyle(
-                fontSize: 22,
-                fontWeight: pw.FontWeight.bold,
-                color: blue,
-              ),
-            ),
-            pw.SizedBox(height: 2),
-            pw.Text(
-              res.role,
-              textAlign: pw.TextAlign.center,
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-                letterSpacing: 0.3,
-              ),
-            ),
-            pw.SizedBox(height: 8),
-            if (contacts.isNotEmpty)
-              pw.Center(
-                child: pw.Wrap(
-                  alignment: pw.WrapAlignment.center,
-                  spacing: 10,
-                  runSpacing: 6,
-                  children: contacts
-                      .map(
-                        (c) => pw.Container(
-                          padding: const pw.EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: pw.BoxDecoration(
-                            color: PdfColor.fromHex('#EAF2FB'),
-                            borderRadius: pw.BorderRadius.circular(12),
-                            border: pw.Border.all(color: blueLight),
-                          ),
-                          child: pw.Text(
-                            c,
-                            style: const pw.TextStyle(fontSize: 10),
-                          ),
-                        ),
-                      )
-                      .toList(),
+    doc.addPage(
+      pw.MultiPage(
+        margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 36),
+        pageFormat: PdfPageFormat.a4,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        build: (ctx) => [
+          // Header
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(
+                res.name,
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontSize: 22,
+                  fontWeight: pw.FontWeight.bold,
+                  color: blue,
                 ),
               ),
-          ],
-        ),
-
-        pw.SizedBox(height: 12),
-        pw.Text(summary, style: pw.TextStyle(fontStyle: pw.FontStyle.italic)),
-
-        // Experience
-        sectionHeader('PROFESSIONAL EXPERIENCE'),
-        pw.SizedBox(height: 6),
-        if (bullets.isNotEmpty)
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: bullets
-                .map(
-                  (b) => pw.Padding(
-                    padding: const pw.EdgeInsets.only(bottom: 4),
-                    child: pw.Bullet(
-                      text: b.length > 120 ? '${b.substring(0, 120)}...' : b,
-                    ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                res.role,
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontSize: 12,
+                  fontWeight: pw.FontWeight.bold,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              if (contacts.isNotEmpty)
+                pw.Center(
+                  child: pw.Wrap(
+                    alignment: pw.WrapAlignment.center,
+                    spacing: 10,
+                    runSpacing: 6,
+                    children: contacts
+                        .map(
+                          (c) => pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColor.fromHex('#EAF2FB'),
+                              borderRadius: pw.BorderRadius.circular(12),
+                              border: pw.Border.all(color: blueLight),
+                            ),
+                            child: pw.Text(
+                              c,
+                              style: const pw.TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
-                )
-                .toList(),
-          )
-        else
-          pw.Text(res.sectionsRaw['experience'] ?? ''),
+                ),
+            ],
+          ),
 
-        // Education
-        sectionHeader('EDUCATION'),
-        pw.SizedBox(height: 6),
-        pw.Text(limitedEducation),
+          pw.SizedBox(height: 12),
+          pw.Paragraph(
+            text: _normalizeForPdf(summary),
+            style: pw.TextStyle(fontStyle: pw.FontStyle.italic),
+          ),
 
-        // Skills
-        sectionHeader('SKILLS'),
-        pw.SizedBox(height: 6),
-        if (res.coreSkills.isNotEmpty)
-          pw.Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: res.coreSkills
-                .take(15) // Limit skills to prevent overflow
-                .map(
-                  (s) => pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+          // Experience - include ALL bullets with full text
+          sectionHeader('PROFESSIONAL EXPERIENCE'),
+          pw.SizedBox(height: 6),
+          if (bullets.isNotEmpty)
+            ...bullets.map(
+              (b) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 4),
+                child: pw.Bullet(
+                  text: _normalizeForPdf(b),
+                ), // Full bullet text, no truncation
+              ),
+            )
+          else
+            pw.Paragraph(
+              text: _normalizeForPdf(res.sectionsRaw['experience'] ?? ''),
+            ),
+
+          // Education - full content
+          sectionHeader('EDUCATION'),
+          pw.SizedBox(height: 6),
+          pw.Paragraph(text: _normalizeForPdf(education)),
+
+          // Skills
+          sectionHeader('SKILLS'),
+          pw.SizedBox(height: 6),
+          if (res.coreSkills.isNotEmpty)
+            pw.Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: res
+                  .coreSkills // Include ALL skills
+                  .map(
+                    (s) => pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: blueLight),
+                        borderRadius: pw.BorderRadius.circular(10),
+                        color: PdfColor.fromHex('#F4F8FD'),
+                      ),
+                      child: pw.Text(
+                        s,
+                        style: const pw.TextStyle(fontSize: 10),
+                      ),
                     ),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(color: blueLight),
-                      borderRadius: pw.BorderRadius.circular(10),
-                      color: PdfColor.fromHex('#F4F8FD'),
-                    ),
-                    child: pw.Text(s, style: const pw.TextStyle(fontSize: 10)),
-                  ),
-                )
-                .toList(),
-          )
-        else
-          pw.Text('List your core skills to showcase strengths.'),
-      ],
-    ),
-  );
+                  )
+                  .toList(),
+            )
+          else
+            pw.Text('List your core skills to showcase strengths.'),
+        ],
+      ),
+    );
 
-  return doc.save();
+    print('DEBUG: PDF generation completed successfully');
+    return doc.save();
+  } catch (e, stackTrace) {
+    print('DEBUG: PDF generation failed with error: $e');
+    print('DEBUG: Stack trace: $stackTrace');
+    rethrow;
+  }
 }
 
 // ===================== Share helpers =====================
 
-Future<void> shareSmartAssistViaEmail(
-  String content, {
-  String fileName = 'resume_improved',
-}) async {
-  final exported = await exportSmartAssistPdf(content, fileName: fileName);
-  final shareFile = await _copyToShareCache(exported);
-  try {
-    await Share.shareXFiles(
-      [
-        XFile(
-          shareFile.path,
-          mimeType: 'application/pdf',
-          name: p.basename(shareFile.path),
-        ),
-      ],
-      subject: 'Resume - Improved',
-      text: 'Please find my improved resume attached.',
-    );
-  } catch (_) {
-    // Fallback: open mail client without attachment
-    final uri = Uri(
-      scheme: 'mailto',
-      queryParameters: const {
-        'subject': 'Resume - Improved',
-        'body': 'Please find my improved resume attached.',
-      },
-    );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-}
+/// Share the styled PDF via email
+Future<void> shareSmartAssistStyledViaEmail(SmartAssistResult result) async {
+  final pdfFile = await exportSmartAssistStyledPdfFromResult(result);
+  final subject = 'Smart Assist Resume Analysis: ${result.name}';
+  final pdfBytes = await pdfFile.readAsBytes();
+  final fileName =
+      '${result.name.replaceAll(' ', '_')}_analysis_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
-Future<void> shareSmartAssistViaWhatsApp(
-  String content, {
-  String fileName = 'resume_improved',
-}) async {
-  final exported = await exportSmartAssistPdf(content, fileName: fileName);
-  final shareFile = await _copyToShareCache(exported);
   try {
-    await Share.shareXFiles([
-      XFile(
-        shareFile.path,
-        mimeType: 'application/pdf',
-        name: p.basename(shareFile.path),
-      ),
-    ], text: 'Sharing my improved resume');
-  } catch (_) {
-    final text = Uri.encodeComponent('Sharing my improved resume');
-    final whatsapp = Uri.parse('whatsapp://send?text=$text');
-    if (await canLaunchUrl(whatsapp)) {
-      await launchUrl(whatsapp, mode: LaunchMode.externalApplication);
-    } else {
-      final web = Uri.parse('https://wa.me/?text=$text');
-      if (await canLaunchUrl(web)) {
-        await launchUrl(web, mode: LaunchMode.externalApplication);
-      }
-    }
-  }
-}
-
-Future<void> shareSmartAssistStyledViaEmail(
-  SmartAssistResult res, {
-  String fileName = 'resume_improved',
-}) async {
-  print('DEBUG: shareSmartAssistStyledViaEmail called');
-  try {
-    final exported = await exportSmartAssistStyledPdfFromResult(
-      res,
-      fileName: fileName,
+    final xFile = XFile.fromData(
+      pdfBytes,
+      mimeType: 'application/pdf',
+      name: fileName,
     );
-    print('DEBUG: PDF exported to: ${exported.path}');
-    final shareFile = await _copyToShareCache(exported);
-    print('DEBUG: Share file cached at: ${shareFile.path}');
-    try {
-      print('DEBUG: Attempting Share.shareXFiles for email');
-      await Share.shareXFiles(
-        [
-          XFile(
-            shareFile.path,
-            mimeType: 'application/pdf',
-            name: p.basename(shareFile.path),
-          ),
-        ],
-        subject: 'Resume - Improved',
-        text: 'Please find my improved resume attached.',
-      );
-      print('DEBUG: Share.shareXFiles completed successfully');
-    } catch (e) {
-      print('DEBUG: Share.shareXFiles failed: $e, trying fallback');
-      final uri = Uri(
-        scheme: 'mailto',
-        queryParameters: const {
-          'subject': 'Resume - Improved',
-          'body': 'Please find my improved resume attached.',
-        },
-      );
-      if (await canLaunchUrl(uri)) {
-        print('DEBUG: Launching mailto fallback');
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        print('DEBUG: Mailto fallback not available');
-      }
+
+    final params = ShareParams(
+      files: [xFile],
+      subject: subject,
+      text: 'Please find the attached resume analysis.',
+      fileNameOverrides: [fileName],
+    );
+
+    final shareResult = await SharePlus.instance.share(params);
+
+    if (shareResult.status != ShareResultStatus.success) {
+      await _launchEmailFallback(subject);
     }
   } catch (e) {
-    print('DEBUG: PDF generation failed: $e');
-    // If PDF generation fails, try text-only email
-    final uri = Uri(
-      scheme: 'mailto',
-      queryParameters: {
-        'subject': 'Resume - Improved',
-        'body':
-            'PDF generation failed. Here\'s my resume analysis:\n\n${res.toString()}',
-      },
-    );
-    if (await canLaunchUrl(uri)) {
-      print('DEBUG: Launching text-only mailto fallback');
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      print('DEBUG: All email options failed');
-      rethrow;
-    }
+    await _launchEmailFallback(subject);
   }
 }
 
-Future<void> shareSmartAssistStyledViaWhatsApp(
-  SmartAssistResult res, {
-  String fileName = 'resume_improved',
-}) async {
-  print('DEBUG: shareSmartAssistStyledViaWhatsApp called');
+Future<void> _launchEmailFallback(String subject) async {
+  final Uri emailLaunchUri = Uri(
+    scheme: 'mailto',
+    query:
+        'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent('Please find the attached resume analysis.')}',
+  );
+
+  if (await canLaunchUrl(emailLaunchUri)) {
+    await launchUrl(emailLaunchUri);
+  } else {
+    // Cannot show dialog without context, so just print
+    print('Error: Could not open email app.');
+  }
+}
+
+/// Share the styled PDF via WhatsApp
+Future<void> shareSmartAssistStyledViaWhatsApp(SmartAssistResult result) async {
+  final pdfFile = await exportSmartAssistStyledPdfFromResult(result);
+  final pdfBytes = await pdfFile.readAsBytes();
+  final fileName =
+      '${result.name.replaceAll(' ', '_')}_analysis_${DateTime.now().millisecondsSinceEpoch}.pdf';
+
   try {
-    final exported = await exportSmartAssistStyledPdfFromResult(
-      res,
-      fileName: fileName,
+    final xFile = XFile.fromData(
+      pdfBytes,
+      mimeType: 'application/pdf',
+      name: fileName,
     );
-    print('DEBUG: PDF exported to: ${exported.path}');
-    final shareFile = await _copyToShareCache(exported);
-    print('DEBUG: Share file cached at: ${shareFile.path}');
-    try {
-      print('DEBUG: Attempting Share.shareXFiles for WhatsApp');
-      await Share.shareXFiles([
-        XFile(
-          shareFile.path,
-          mimeType: 'application/pdf',
-          name: p.basename(shareFile.path),
-        ),
-      ], text: 'Sharing my improved resume');
-      print('DEBUG: Share.shareXFiles completed successfully');
-    } catch (e) {
-      print('DEBUG: Share.shareXFiles failed: $e, trying fallbacks');
-      final text = Uri.encodeComponent('Sharing my improved resume');
-      final whatsapp = Uri.parse('whatsapp://send?text=$text');
-      if (await canLaunchUrl(whatsapp)) {
-        print('DEBUG: Launching WhatsApp app');
-        await launchUrl(whatsapp, mode: LaunchMode.externalApplication);
-      } else {
-        print('DEBUG: WhatsApp app not available, trying web');
-        final web = Uri.parse('https://wa.me/?text=$text');
-        if (await canLaunchUrl(web)) {
-          print('DEBUG: Launching WhatsApp web');
-          await launchUrl(web, mode: LaunchMode.externalApplication);
-        } else {
-          print('DEBUG: No WhatsApp options available');
-        }
-      }
+
+    final params = ShareParams(
+      files: [xFile],
+      text: 'Here is the resume analysis.',
+      fileNameOverrides: [fileName],
+    );
+
+    final shareResult = await SharePlus.instance.share(params);
+
+    if (shareResult.status != ShareResultStatus.success) {
+      await _launchWhatsAppFallback();
     }
   } catch (e) {
-    print('DEBUG: PDF generation failed: $e');
-    // If PDF generation fails, try text-only WhatsApp
-    final text = Uri.encodeComponent(
-      'My resume analysis (PDF failed): ${res.toString().substring(0, 100)}...',
-    );
-    final whatsapp = Uri.parse('whatsapp://send?text=$text');
-    if (await canLaunchUrl(whatsapp)) {
-      print('DEBUG: Launching text-only WhatsApp app');
-      await launchUrl(whatsapp, mode: LaunchMode.externalApplication);
-    } else {
-      final web = Uri.parse('https://wa.me/?text=$text');
-      if (await canLaunchUrl(web)) {
-        print('DEBUG: Launching text-only WhatsApp web');
-        await launchUrl(web, mode: LaunchMode.externalApplication);
-      } else {
-        print('DEBUG: All WhatsApp options failed');
-        rethrow;
-      }
-    }
+    await _launchWhatsAppFallback();
   }
 }
 
-/// Copy the exported file into a cache location suitable for FileProvider URIs
-Future<File> _copyToShareCache(File file) async {
-  final cache = await getTemporaryDirectory();
-  final shareDir = Directory(p.join(cache.path, 'share-cache'));
-  if (!await shareDir.exists()) {
-    await shareDir.create(recursive: true);
+Future<void> _launchWhatsAppFallback() async {
+  const message = 'Here is the resume analysis.';
+  final whatsappUrl = "https://wa.me/?text=${Uri.encodeComponent(message)}";
+
+  try {
+    if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
+      await launchUrl(
+        Uri.parse(whatsappUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } else {
+      print('Error: Could not open WhatsApp.');
+    }
+  } catch (e) {
+    print('Error: Failed to open WhatsApp.');
   }
-  final dest = File(p.join(shareDir.path, p.basename(file.path)));
-  if (await dest.exists()) {
-    await dest.delete();
-  }
-  return file.copy(dest.path);
 }
 
 // ---------------- WordprocessingML (DOCX) payloads ----------------

@@ -70,6 +70,7 @@ class _AIEnhancedTextFieldState extends State<AIEnhancedTextField> {
   bool _isAnalyzing = false;
   bool _showFeedback = false;
   String? _error;
+  bool _isGenerating = false;
 
   @override
   void initState() {
@@ -125,6 +126,38 @@ class _AIEnhancedTextFieldState extends State<AIEnhancedTextField> {
     }
   }
 
+  Future<void> _generateIntoField() async {
+    if (!mounted || !widget.enableAI) return;
+    setState(() {
+      _isGenerating = true;
+      _error = null;
+    });
+    try {
+      final seed = widget.controller.text;
+      final generated = await AIResumeService.generateFromSeed(
+        section: widget.section,
+        seed: seed,
+        extraContext: '',
+      );
+      if (!mounted) return;
+      setState(() {
+        widget.controller.text = generated;
+        _isGenerating = false;
+      });
+      try {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Generated content inserted')),
+        );
+      } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isGenerating = false;
+        _error = e.toString();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -155,6 +188,22 @@ class _AIEnhancedTextFieldState extends State<AIEnhancedTextField> {
           decoration: InputDecoration(
             hintText: widget.hintText,
             border: const OutlineInputBorder(),
+            suffixIcon: widget.enableAI
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: IconButton(
+                      tooltip: 'Generate',
+                      icon: _isGenerating
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.auto_awesome),
+                      onPressed: _isGenerating ? null : _generateIntoField,
+                    ),
+                  )
+                : null,
           ),
         ),
         if (_isAnalyzing) ...[
@@ -627,6 +676,7 @@ class AISummaryGenerator extends StatefulWidget {
   final List<String> skills;
   final List<String> experience;
   final Function(String) onGenerated;
+  final String? seed; // optional seed text from current summary field
 
   const AISummaryGenerator({
     super.key,
@@ -635,6 +685,7 @@ class AISummaryGenerator extends StatefulWidget {
     required this.skills,
     required this.experience,
     required this.onGenerated,
+    this.seed,
   });
 
   @override
@@ -653,12 +704,29 @@ class _AISummaryGeneratorState extends State<AISummaryGenerator> {
     });
 
     try {
-      final summary = await AIResumeService.generateSummary(
-        name: widget.name,
-        targetRole: widget.targetRole,
-        skills: widget.skills,
-        experience: widget.experience,
-      );
+      String summary;
+      final seed = (widget.seed ?? '').trim();
+      if (seed.isNotEmpty) {
+        // Use section-aware generation seeded by user input
+        final extra = StringBuffer()
+          ..writeln('Name: ${widget.name}')
+          ..writeln('Target Role: ${widget.targetRole}')
+          ..writeln('Skills: ${widget.skills.join(', ')}')
+          ..writeln('Experience: ${widget.experience.join('; ')}');
+        summary = await AIResumeService.generateFromSeed(
+          section: 'summary',
+          seed: seed,
+          extraContext: extra.toString(),
+        );
+      } else {
+        // Fallback to structured summary generation
+        summary = await AIResumeService.generateSummary(
+          name: widget.name,
+          targetRole: widget.targetRole,
+          skills: widget.skills,
+          experience: widget.experience,
+        );
+      }
 
       setState(() {
         _generatedSummary = summary;

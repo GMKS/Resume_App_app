@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
 import '../services/premium_service.dart';
+import '../services/ai_resume_service.dart';
 // drag_drop_service removed; built-in flutter drag-drop used
 
 /// Reusable base form wrapper for resume templates.
@@ -273,6 +274,38 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
   }) {
     final controller = controllerFor(key);
 
+    Future<void> generateForThisField() async {
+      // Build a minimal context from other fields for better results
+      final name = controllers['name']?.text ?? '';
+      final summary = controllers['summary']?.text ?? '';
+      final skills = controllers['skills']?.text ?? '';
+      final seed = controller.text;
+      try {
+        final result = await AIResumeService.generateFromSeed(
+          section: key,
+          seed: seed,
+          extraContext: [
+            if (name.isNotEmpty) 'Name: $name',
+            if (summary.isNotEmpty) 'Summary: $summary',
+            if (skills.isNotEmpty) 'Skills: $skills',
+          ].join('\n'),
+        );
+        controller.text = result;
+        _notifyDataChanged();
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Generated ${label.toLowerCase()}')),
+          );
+        } catch (_) {}
+      } catch (e) {
+        try {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('AI generate failed: $e')));
+        } catch (_) {}
+      }
+    }
+
     Widget textField = TextFormField(
       controller: controller,
       maxLines: maxLines,
@@ -327,9 +360,25 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
                       ],
                     ),
                   ),
+                  if (PremiumService.hasAIFeatures)
+                    const PopupMenuItem(
+                      value: 'generate',
+                      child: Row(
+                        children: [
+                          Icon(Icons.auto_awesome, size: 18),
+                          SizedBox(width: 8),
+                          Text('Generate'),
+                        ],
+                      ),
+                    ),
                 ],
-                onSelected: (value) =>
-                    _handleTextFieldAction(controller, value),
+                onSelected: (value) async {
+                  if (value == 'generate') {
+                    await generateForThisField();
+                  } else {
+                    await _handleTextFieldAction(controller, value);
+                  }
+                },
               )
             : null,
       ),

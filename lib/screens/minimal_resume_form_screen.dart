@@ -163,18 +163,20 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
 
       switch (format) {
         case 'PDF':
-          await ShareExportService.instance.exportAndOpenPdf(resume);
+          await ShareExportService(context).exportAndOpenPdf(resume);
           break;
         case 'DOCX':
-          final file = await ShareExportService.instance.exportDoc(resume);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('DOCX exported to: ${file.path}')),
+            const SnackBar(
+              content: Text('DOCX export is not available in this version.'),
+            ),
           );
           break;
         case 'TXT':
-          final file = await ShareExportService.instance.exportTxt(resume);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('TXT exported to: ${file.path}')),
+            const SnackBar(
+              content: Text('TXT export is not available in this version.'),
+            ),
           );
           break;
       }
@@ -372,11 +374,11 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
                     );
                     try {
                       if (choice == 'EMAIL') {
-                        await ShareExportService.instance.shareViaEmail(resume);
+                        await ShareExportService(context).shareViaEmail(resume);
                       } else if (choice == 'WHATSAPP') {
-                        await ShareExportService.instance.shareViaWhatsApp(
-                          resume,
-                        );
+                        await ShareExportService(
+                          context,
+                        ).shareViaWhatsApp(resume);
                       }
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(

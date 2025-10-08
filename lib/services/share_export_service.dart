@@ -1,733 +1,1122 @@
 import 'dart:io';
 import 'dart:convert';
-import '../models/saved_resume.dart';
-import '../services/premium_service.dart';
-import 'dart:typed_data';
-import 'package:share_plus/share_plus.dart';
-import 'modern_pdf_exporter.dart';
-import 'one_page_pdf_exporter.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as p;
-import 'package:archive/archive.dart' as ar;
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Export service that generates simple ATS-friendly outputs.
-/// PDF generation is implemented with a minimal, dependency-free PDF writer
-/// that produces a valid single-page PDF using Helvetica.
+import '../models/saved_resume.dart';
+import 'one_page_pdf_exporter.dart';
+import 'premium_service.dart';
+import 'ai_service.dart';
+
 class ShareExportService {
-  ShareExportService._();
-  static final ShareExportService instance = ShareExportService._();
+  final BuildContext context;
+  ShareExportService(this.context);
 
-  /// Generate an ATS-friendly PDF file and return it. The PDF uses a
-  /// single-page, single-font (Helvetica) layout with plain text headings
-  /// and bullets for maximal ATS compatibility.
-  Future<File> exportAndOpenPdf(SavedResume resume) async {
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final outDir = await _getExportBaseDir();
-    final file = File(
-      p.join(outDir.path, '${_sanitize(resume.title)}_$ts.pdf'),
-    );
-
-    // If explicitly marked ATS-friendly, use minimal writer; otherwise use styled exporter for all templates
-    final atsFriendly =
-        (resume.data['ats_friendly'] ?? '').toString() == 'true';
-    if (!atsFriendly) {
-      // Route One Page to its dedicated exporter to match UI preview
-      final lower = resume.template.toLowerCase();
-      final bytes = lower == 'one page'
-          ? await OnePagePdfExporter.build(resume)
-          : await ModernPdfExporter.build(resume);
-      await file.writeAsBytes(bytes, flush: true);
-    } else {
-      final lines = _buildAtsLines(resume);
-      final pdfBytes = _buildMinimalPdf(lines);
-      await file.writeAsBytes(pdfBytes, flush: true);
-    }
-    return file;
-  }
-
-  /// Create a valid DOCX (WordprocessingML) that mirrors the ATS-friendly content.
-  Future<File> exportDoc(SavedResume resume) async {
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final outDir = await _getExportBaseDir();
-    final file = File(
-      p.join(outDir.path, '${_sanitize(resume.title)}_$ts.docx'),
-    );
-    final lines = _buildAtsLines(resume);
-    final bytes = _buildDocxFromLines(lines);
-    await file.writeAsBytes(bytes, flush: true);
-    return file;
-  }
-
-  /// Create a TXT export with plain-text representation.
-  Future<File> exportTxt(SavedResume resume) async {
-    final ts = DateTime.now().millisecondsSinceEpoch;
-    final outDir = await _getExportBaseDir();
-    final file = File(
-      p.join(outDir.path, '${_sanitize(resume.title)}_$ts.txt'),
-    );
-    final content = _buildAtsLines(resume).join('\n');
-    await file.writeAsString(content);
-    return file;
-  }
-
-  // --- Premium-only Share Helpers ---
   Future<void> shareViaEmail(SavedResume resume) async {
-    print(
-      'DEBUG: shareViaEmail called. Premium status: ${PremiumService.isPremium}',
+    await _shareResume(
+      resume,
+      (file, subject, resumeData) =>
+          _shareViaEmailInternal(file, subject, resumeData),
     );
-    if (!PremiumService.isPremium) {
-      print('DEBUG: Premium check failed, throwing exception');
-      throw Exception('Email sharing is a Premium feature.');
-    }
-    print('DEBUG: Starting PDF export for email share');
-    final file = await exportAndOpenPdf(resume);
-    print('DEBUG: PDF exported to: ${file.path}');
-    final shareFile = await _copyToShareCache(file);
-    print('DEBUG: Share file copied to cache: ${shareFile.path}');
-    final subject = 'Resume - ${resume.title}';
-    const text = 'Please find my resume attached.';
-    try {
-      print('DEBUG: Attempting share via Share.shareXFiles');
-      await Share.shareXFiles(
-        [
-          XFile(
-            shareFile.path,
-            mimeType: 'application/pdf',
-            name: shareFile.uri.pathSegments.last,
-          ),
-        ],
-        subject: subject,
-        text: text,
-      );
-      print('DEBUG: Share.shareXFiles completed successfully');
-    } catch (e) {
-      print('DEBUG: Share.shareXFiles failed: $e');
-      final uri = Uri(
-        scheme: 'mailto',
-        queryParameters: {'subject': subject, 'body': text},
-      );
-      print('DEBUG: Attempting fallback mailto: $uri');
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        print('DEBUG: Mailto fallback launched');
-      } else {
-        print('DEBUG: Mailto fallback not available');
-      }
-    }
   }
 
   Future<void> shareViaWhatsApp(SavedResume resume) async {
-    print(
-      'DEBUG: shareViaWhatsApp called. Premium status: ${PremiumService.isPremium}',
+    await _shareResume(
+      resume,
+      (file, subject, resumeData) =>
+          _shareViaWhatsAppInternal(file, subject, resumeData),
     );
-    if (!PremiumService.isPremium) {
-      print('DEBUG: Premium check failed, throwing exception');
-      throw Exception('WhatsApp sharing is a Premium feature.');
+  }
+
+  Future<void> _shareResume(
+    SavedResume resume,
+    Future<void> Function(File, String, Map<String, dynamic>) shareFunction,
+  ) async {
+    // Ensure a name is available for the fallback "Curriculum Vitae" PDF
+    if (resume.template != 'One Page') {
+      final ok = await _ensureFullNameIfMissing(resume);
+      if (!ok) return; // user cancelled
     }
-    print('DEBUG: Starting PDF export for WhatsApp share');
-    final file = await exportAndOpenPdf(resume);
-    print('DEBUG: PDF exported to: ${file.path}');
-    final shareFile = await _copyToShareCache(file);
-    print('DEBUG: Share file copied to cache: ${shareFile.path}');
-    // share_plus will open the system share sheet, allowing WhatsApp selection
+
+    File? pdfFile;
     try {
-      print('DEBUG: Attempting share via Share.shareXFiles');
-      await Share.shareXFiles([
-        XFile(
-          shareFile.path,
-          mimeType: 'application/pdf',
-          name: shareFile.uri.pathSegments.last,
+      pdfFile = await _generatePdf(resume);
+    } catch (e, s) {
+      print('DEBUG: Exception during PDF generation: $e\n$s');
+      await _showErrorDialog('Failed to generate PDF for sharing.');
+      return;
+    }
+
+    if (pdfFile == null) {
+      print('DEBUG: PDF generation returned null.');
+      await _showErrorDialog('Failed to generate PDF for sharing.');
+      return;
+    }
+
+    final subject = 'Resume: ${resume.data['full_name'] ?? 'Details'}';
+    // Let the inner share function manage its own fallbacks and dialogs.
+    await shareFunction(pdfFile, subject, resume.data);
+  }
+
+  Future<File?> _generatePdf(SavedResume resume) async {
+    if (resume.template == 'One Page') {
+      try {
+        print('DEBUG: Building One Page PDF…');
+        final pdf = await OnePagePdfExporter.build(resume);
+        final output = await getTemporaryDirectory();
+        final file = File("${output.path}/one_page_resume.pdf");
+        await file.writeAsBytes(pdf);
+        return file;
+      } catch (e, s) {
+        // Fallback to generic PDF if styled exporter fails for any reason
+        print('DEBUG: OnePagePdfExporter failed: $e\n$s');
+        try {
+          return await _generateFallbackPdf(resume);
+        } catch (ee, ss) {
+          print(
+            'DEBUG: Fallback PDF generation after One Page failure also failed: $ee\n$ss',
+          );
+          try {
+            return await _generateMinimalPdf(resume);
+          } catch (eee, sss) {
+            print('DEBUG: Minimal PDF generation failed too: $eee\n$sss');
+            return null;
+          }
+        }
+      }
+    }
+
+    // Fallback for other templates
+    print(
+      'DEBUG: Using fallback PDF generator for template "${resume.template}".',
+    );
+    try {
+      return await _generateFallbackPdf(resume);
+    } catch (e, s) {
+      print('DEBUG: Generic fallback PDF failed: $e\n$s');
+      try {
+        return await _generateMinimalPdf(resume);
+      } catch (ee, ss) {
+        print('DEBUG: Minimal PDF generation also failed: $ee\n$ss');
+        return null;
+      }
+    }
+  }
+
+  Future<File> _generateFallbackPdf(SavedResume resume) async {
+    // Load readable, modern fonts to better match UI preview
+    final baseFont = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+    final italicFont = await PdfGoogleFonts.robotoItalic();
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: baseFont,
+        bold: boldFont,
+        italic: italicFont,
+      ),
+    );
+    // Some devices may carry unexpected value types; copy defensively.
+    final Map<String, dynamic> data = {
+      for (final entry in resume.data.entries)
+        entry.key.toString(): entry.value,
+    };
+    final accent = PdfColors.indigo;
+
+    // Reduce unnecessary prompt: derive full_name from 'name' if present
+    if ((data['full_name'] == null ||
+            data['full_name'].toString().trim().isEmpty) &&
+        (data['name'] != null && data['name'].toString().trim().isNotEmpty)) {
+      data['full_name'] = data['name'];
+    }
+
+    // Specialized formatting for Creative template; mirror preview layout and include photo
+    if (resume.template.toLowerCase() == 'creative') {
+      final work = _parseJsonArray(data['workExperiences']);
+      final edus = _parseJsonArray(data['educations']);
+      final skillsCsv = (data['skills'] ?? '').toString();
+      final tools = (data['tools'] ?? '').toString();
+      final projects = (data['projects'] ?? '').toString();
+      final languages = (data['languages'] ?? '').toString();
+      final hobbies = (data['hobbies'] ?? '').toString();
+      final references = (data['references'] ?? '').toString();
+      final photoB64 = (data['profilePhotoBase64'] ?? '').toString();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) {
+            // Header: optional photo + name + contact lines
+            pw.Widget? photoWidget;
+            if (photoB64.isNotEmpty) {
+              try {
+                print('DEBUG: Processing photo - length: ${photoB64.length}');
+                final idx = photoB64.indexOf(',');
+                final raw = idx > 0 ? photoB64.substring(idx + 1) : photoB64;
+                print('DEBUG: Base64 data after comma: ${raw.length} chars');
+                final bytes = base64Decode(raw);
+                print('DEBUG: Decoded bytes: ${bytes.length}');
+                photoWidget = pw.ClipOval(
+                  child: pw.Container(
+                    width: 72,
+                    height: 72,
+                    child: pw.Image(
+                      pw.MemoryImage(bytes),
+                      fit: pw.BoxFit.cover,
+                    ),
+                  ),
+                );
+                print('DEBUG: Photo widget created successfully');
+              } catch (e, stackTrace) {
+                print('DEBUG: Photo decode failed: $e');
+                print('DEBUG: Stack trace: $stackTrace');
+                print(
+                  'DEBUG: PhotoB64 starts with: ${photoB64.substring(0, photoB64.length > 50 ? 50 : photoB64.length)}',
+                );
+                photoWidget = null;
+              }
+            }
+
+            final name = (data['full_name'] ?? resume.title).toString();
+            final email = (data['email'] ?? '').toString();
+            final phone = (data['phone'] ?? '').toString();
+            final portfolio = (data['portfolio'] ?? '').toString();
+            final social = (data['socialLinks'] ?? '').toString();
+
+            final leftCol = <pw.Widget>[];
+            final summary = (data['creativeSummary'] ?? '').toString();
+            if (summary.isNotEmpty) {
+              leftCol.addAll([
+                _sectionTitle('Creative Summary', color: accent),
+                pw.Text(summary),
+                pw.SizedBox(height: 12),
+              ]);
+            }
+            leftCol.add(_sectionTitle('Work Experience', color: accent));
+            leftCol.addAll(work.map((w) => _workBlock(w)));
+            leftCol.add(pw.SizedBox(height: 10));
+            if (projects.isNotEmpty) {
+              leftCol.addAll([
+                _sectionTitle('Projects', color: accent),
+                _bulletsFromCsv(projects, bulletColor: accent),
+              ]);
+            }
+
+            final rightCol = <pw.Widget>[];
+            rightCol.add(_sectionTitle('Education', color: accent));
+            rightCol.addAll(edus.map((e) => _eduBlock(e)));
+            if (skillsCsv.isNotEmpty) {
+              rightCol.addAll([
+                pw.SizedBox(height: 10),
+                _sectionTitle('Skills', color: accent),
+                _bulletsFromCsv(skillsCsv, bulletColor: accent),
+              ]);
+            }
+            if (tools.isNotEmpty) {
+              rightCol.addAll([
+                pw.SizedBox(height: 10),
+                _sectionTitle('Tools & Software', color: accent),
+                _bulletsFromCsv(tools, bulletColor: accent),
+              ]);
+            }
+            if (languages.isNotEmpty) {
+              rightCol.addAll([
+                pw.SizedBox(height: 10),
+                _sectionTitle('Languages', color: accent),
+                _bulletsFromCsv(languages, bulletColor: accent),
+              ]);
+            }
+            if (hobbies.isNotEmpty) {
+              rightCol.addAll([
+                pw.SizedBox(height: 10),
+                _sectionTitle('Hobbies', color: accent),
+                _bulletsFromCsv(hobbies, bulletColor: accent),
+              ]);
+            }
+            if (references.isNotEmpty) {
+              rightCol.addAll([
+                pw.SizedBox(height: 10),
+                _sectionTitle('References', color: accent),
+                pw.Text(references),
+              ]);
+            }
+
+            return [
+              // Header
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  if (photoWidget != null) ...[
+                    photoWidget,
+                    pw.SizedBox(width: 12),
+                  ],
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          name,
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: 26,
+                            color: PdfColors.indigo700,
+                          ),
+                        ),
+                        pw.SizedBox(height: 6),
+                        if (email.isNotEmpty)
+                          pw.Row(
+                            children: [
+                              pw.Container(
+                                width: 4,
+                                height: 4,
+                                margin: const pw.EdgeInsets.only(
+                                  top: 6,
+                                  right: 6,
+                                ),
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColors.indigo,
+                                  borderRadius: pw.BorderRadius.circular(2),
+                                ),
+                              ),
+                              pw.Text(
+                                email,
+                                style: pw.TextStyle(color: PdfColors.grey800),
+                              ),
+                            ],
+                          ),
+                        if (phone.isNotEmpty)
+                          pw.Row(
+                            children: [
+                              pw.Container(
+                                width: 4,
+                                height: 4,
+                                margin: const pw.EdgeInsets.only(
+                                  top: 6,
+                                  right: 6,
+                                ),
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColors.indigo,
+                                  borderRadius: pw.BorderRadius.circular(2),
+                                ),
+                              ),
+                              pw.Text(
+                                phone,
+                                style: pw.TextStyle(color: PdfColors.grey800),
+                              ),
+                            ],
+                          ),
+                        if (portfolio.isNotEmpty)
+                          pw.Row(
+                            children: [
+                              pw.Container(
+                                width: 4,
+                                height: 4,
+                                margin: const pw.EdgeInsets.only(
+                                  top: 6,
+                                  right: 6,
+                                ),
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColors.indigo,
+                                  borderRadius: pw.BorderRadius.circular(2),
+                                ),
+                              ),
+                              pw.Text(
+                                portfolio,
+                                style: pw.TextStyle(color: PdfColors.indigo),
+                              ),
+                            ],
+                          ),
+                        if (social.isNotEmpty)
+                          pw.Row(
+                            children: [
+                              pw.Container(
+                                width: 4,
+                                height: 4,
+                                margin: const pw.EdgeInsets.only(
+                                  top: 6,
+                                  right: 6,
+                                ),
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColors.indigo,
+                                  borderRadius: pw.BorderRadius.circular(2),
+                                ),
+                              ),
+                              pw.Text(
+                                social,
+                                style: pw.TextStyle(color: PdfColors.indigo),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 14),
+              // Two-column content: left 2/3, right 1/3
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(flex: 2, child: pw.Column(children: leftCol)),
+                  pw.SizedBox(width: 20),
+                  pw.Expanded(flex: 1, child: pw.Column(children: rightCol)),
+                ],
+              ),
+            ];
+          },
         ),
-      ], text: 'Sharing my resume: ${resume.title}');
-      print('DEBUG: Share.shareXFiles completed successfully');
-    } catch (e) {
-      print('DEBUG: Share.shareXFiles failed: $e');
-      final text = Uri.encodeComponent('Sharing my resume: ${resume.title}');
-      final uri = Uri.parse('whatsapp://send?text=$text');
-      print('DEBUG: Attempting WhatsApp fallback: $uri');
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        print('DEBUG: WhatsApp fallback launched');
-      } else {
-        print('DEBUG: WhatsApp not available, trying web fallback');
-        final web = Uri.parse('https://wa.me/?text=$text');
-        if (await canLaunchUrl(web)) {
-          await launchUrl(web, mode: LaunchMode.externalApplication);
-          print('DEBUG: Web fallback launched');
-        } else {
-          print('DEBUG: No WhatsApp fallback available');
-        }
-      }
+      );
+    } else {
+      // Generic fallback: simple key/value listing
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) => [
+            _cvHeader(data['full_name'] ?? resume.title),
+            pw.SizedBox(height: 20),
+            ...data.entries.map((entry) {
+              final v = entry.value?.toString() ?? '';
+              if (v.isEmpty) return pw.SizedBox.shrink();
+              // Skip bulky raw JSON payloads in generic rendering
+              if (_looksLikeJsonArray(v)) return pw.SizedBox.shrink();
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    _formatKey(entry.key),
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(v),
+                  pw.SizedBox(height: 12),
+                ],
+              );
+            }).toList(),
+          ],
+        ),
+      );
+    }
+
+    try {
+      final output = await getTemporaryDirectory();
+      final file = File("${output.path}/fallback_resume.pdf");
+      await file.writeAsBytes(await pdf.save());
+      return file;
+    } catch (e, s) {
+      print('DEBUG: Writing fallback PDF failed: $e\n$s');
+      rethrow;
     }
   }
 
-  // --- Minimal PDF generator (single page, Helvetica, ASCII only) ---
-  // This writer constructs a tiny valid PDF by hand. It renders the provided
-  // lines using a fixed 12pt font, wrapping long lines approximately.
-  List<int> _buildMinimalPdf(List<String> lines) {
-    // PDF page size A4 in points (72 dpi): 595 x 842
-    const pageWidth = 595;
-    const pageHeight = 842;
-    const marginLeft = 50;
-    const marginTop = 50;
-    const fontSize = 12;
-    const leading = 16; // line height
-
-    // Wrap lines to a rough character width to avoid overflow.
-    // This is an approximation; Helvetica ~ 0.5 width factor per char at 12pt.
-    // With margins, usable width ~ 495. At 12pt, ~ 95 chars max. Use 90.
-    final wrapped = <String>[];
-    for (final l in lines) {
-      final ascii = _toAscii(l);
-      if (ascii.length <= 90) {
-        wrapped.add(ascii);
-      } else {
-        wrapped.addAll(_wrapByChars(ascii, 90));
-      }
-    }
-
-    // Build content stream (text drawing commands)
-    final buffer = StringBuffer();
-    buffer.writeln('BT');
-    buffer.writeln('/F1 $fontSize Tf');
-    buffer.writeln('$leading TL');
-    // Start at (marginLeft, pageHeight - marginTop)
-    buffer.writeln('1 0 0 1 $marginLeft ${pageHeight - marginTop} Tm');
-    for (var i = 0; i < wrapped.length; i++) {
-      final txt = _pdfEscape(wrapped[i]);
-      if (i == 0) {
-        buffer.writeln('($txt) Tj');
-      } else {
-        buffer.writeln('T*'); // move down by leading
-        buffer.writeln('($txt) Tj');
-      }
-    }
-    buffer.writeln('ET');
-    final content = buffer.toString();
-    final contentBytes = utf8.encode(content);
-
-    // Build PDF objects, track byte offsets
-    final out = BytesBuilder();
-    final offsets = <int>[];
-
-    void write(String s) => out.add(utf8.encode(s));
-
-    write('%PDF-1.4\n');
-
-    // 1: Catalog
-    offsets.add(out.length);
-    write('1 0 obj\n');
-    write('<< /Type /Catalog /Pages 2 0 R >>\n');
-    write('endobj\n');
-
-    // 2: Pages
-    offsets.add(out.length);
-    write('2 0 obj\n');
-    write('<< /Type /Pages /Kids [3 0 R] /Count 1 >>\n');
-    write('endobj\n');
-
-    // 3: Page
-    offsets.add(out.length);
-    write('3 0 obj\n');
-    write('<< /Type /Page /Parent 2 0 R ');
-    write('/MediaBox [0 0 $pageWidth $pageHeight] ');
-    write('/Resources << /Font << /F1 4 0 R >> >> ');
-    write('/Contents 5 0 R >>\n');
-    write('endobj\n');
-
-    // 4: Font (Helvetica)
-    offsets.add(out.length);
-    write('4 0 obj\n');
-    write('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\n');
-    write('endobj\n');
-
-    // 5: Contents stream
-    offsets.add(out.length);
-    write('5 0 obj\n');
-    write('<< /Length ${contentBytes.length} >>\n');
-    write('stream\n');
-    out.add(contentBytes);
-    write('\nendstream\n');
-    write('endobj\n');
-
-    // xref
-    final xrefStart = out.length;
-    write('xref\n');
-    write('0 6\n');
-    write('0000000000 65535 f \n');
-    for (final off in offsets) {
-      final line = off.toString().padLeft(10, '0');
-      write('$line 00000 n \n');
-    }
-
-    // trailer
-    write('trailer\n');
-    write('<< /Size 6 /Root 1 0 R >>\n');
-    write('startxref\n');
-    write('$xrefStart\n');
-    write('%%EOF');
-
-    return out.takeBytes();
+  // Minimal last-resort PDF generator that writes plain text lines only
+  Future<File> _generateMinimalPdf(SavedResume resume) async {
+    print('DEBUG: Generating minimal PDF…');
+    final baseFont = await PdfGoogleFonts.robotoRegular();
+    final pdf = pw.Document(theme: pw.ThemeData.withFont(base: baseFont));
+    final safe = (String s) => _sanitizeForPdfText(s);
+    final content = _buildPlainTextForDoc(resume);
+    final lines = content.split(RegExp(r'\r?\n'));
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (_) => [
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [for (final l in lines) pw.Text(safe(l))],
+          ),
+        ],
+      ),
+    );
+    final dir = await getTemporaryDirectory();
+    final file = File(p.join(dir.path, 'resume_minimal.pdf'));
+    await file.writeAsBytes(await pdf.save());
+    return file;
   }
 
-  // Build ATS-friendly content lines from resume data
-  List<String> _buildAtsLines(SavedResume resume) {
-    final d = resume.data;
-    final lines = <String>[];
-
-    // Personal info: support both flat and nested structures
-    final info = (d['personalInfo'] is Map)
-        ? Map<String, dynamic>.from(d['personalInfo'])
-        : <String, dynamic>{};
-    String name = (info['name'] ?? d['name'] ?? '').toString().trim();
-    String email = (info['email'] ?? d['email'] ?? '').toString().trim();
-    String phone = (info['phone'] ?? d['phone'] ?? '').toString().trim();
-    // Accept both linkedIn and linkedin keys
-    String linkedIn =
-        (info['linkedin'] ??
-                info['linkedIn'] ??
-                d['linkedIn'] ??
-                d['linkedin'] ??
-                '')
-            .toString()
-            .trim();
-    String portfolio = (d['portfolio'] ?? info['portfolio'] ?? '')
-        .toString()
-        .trim();
-    String summary = (d['summary'] ?? '').toString().trim();
-
-    if (name.isNotEmpty) lines.add(_asciiSafe(name.toUpperCase()));
-    final contact = [
-      if (email.isNotEmpty) 'Email: $email',
-      if (phone.isNotEmpty) 'Phone: $phone',
-      if (linkedIn.isNotEmpty) 'LinkedIn: $linkedIn',
-      if (portfolio.isNotEmpty) 'Portfolio: $portfolio',
-    ].where((e) => e.isNotEmpty).join(' | ');
-    if (contact.isNotEmpty) lines.add(_asciiSafe(contact));
-    if (lines.isNotEmpty) lines.add('');
-
-    if (summary.isNotEmpty) {
-      lines.add('PROFESSIONAL SUMMARY');
-      lines.addAll(_wrapByChars(_asciiSafe(summary), 90));
-      lines.add('');
-    }
-
-    // Skills: list, list of maps, or csv fallback; for One Page prefer coreSkills
-    final skillsList = _extractSkills(d);
-    if (skillsList.isNotEmpty) {
-      lines.add('SKILLS');
-      for (final s in skillsList) {
-        lines.add('- ${_asciiSafe(s)}');
-      }
-      lines.add('');
-    }
-
-    // Work Experience: prefer modern array, fallback to classic JSON string
-    List<Map<String, dynamic>> work = (d['workExperience'] is List)
-        ? List<Map<String, dynamic>>.from(d['workExperience'])
-        : <Map<String, dynamic>>[];
-    // One Page stores JSON in workExperiencesJson
-    if (work.isEmpty &&
-        (d['workExperiencesJson'] ?? '').toString().isNotEmpty) {
-      try {
-        final list = jsonDecode(d['workExperiencesJson']) as List<dynamic>;
-        work = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      } catch (_) {}
-    }
-    if (work.isNotEmpty) {
-      lines.add('WORK EXPERIENCE');
-      for (final w in work) {
-        final role = (w['jobTitle'] ?? w['role'] ?? '').toString().trim();
-        final company = (w['company'] ?? '').toString().trim();
-        final start = (w['startDate'] ?? w['start'] ?? '').toString();
-        final end = (w['endDate'] ?? w['end'] ?? '').toString();
-        final dr = _dateRange(start, end);
-        final heading = [
-          role,
-          if (company.isNotEmpty) 'at $company',
-          if (dr.isNotEmpty) '($dr)',
-        ].where((e) => e.isNotEmpty).join(' ');
-        if (heading.isNotEmpty) lines.add('- ${_asciiSafe(heading)}');
-        final desc = (w['description'] ?? '').toString().trim();
-        if (desc.isNotEmpty) {
-          for (final w in _wrapByChars(_asciiSafe(desc), 86)) {
-            lines.add('  $w');
-          }
-        }
-      }
-      lines.add('');
-    } else if ((d['workExperiences'] ?? '').toString().isNotEmpty) {
-      try {
-        final list = jsonDecode(d['workExperiences']) as List<dynamic>;
-        if (list.isNotEmpty) {
-          lines.add('WORK EXPERIENCE');
-          for (final item in list) {
-            final m = Map<String, dynamic>.from(item as Map);
-            final title = (m['jobTitle'] ?? '').toString().trim();
-            final company = (m['company'] ?? '').toString().trim();
-            final desc = (m['description'] ?? '').toString().trim();
-            final heading = [
-              title,
-              if (company.isNotEmpty) 'at $company',
-            ].where((e) => e.isNotEmpty).join(' ');
-            if (heading.isNotEmpty) lines.add('- ${_asciiSafe(heading)}');
-            if (desc.isNotEmpty) {
-              for (final w in _wrapByChars(_asciiSafe(desc), 86)) {
-                lines.add('  $w');
-              }
-            }
-          }
-          lines.add('');
-        }
-      } catch (_) {}
-    }
-
-    // Education: prefer modern array, fallback to classic JSON string
-    List<Map<String, dynamic>> edu = (d['education'] is List)
-        ? List<Map<String, dynamic>>.from(d['education'])
-        : <Map<String, dynamic>>[];
-    if (edu.isEmpty && (d['educationsJson'] ?? '').toString().isNotEmpty) {
-      try {
-        final list = jsonDecode(d['educationsJson']) as List<dynamic>;
-        edu = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      } catch (_) {}
-    }
-    if (edu.isNotEmpty) {
-      lines.add('EDUCATION');
-      for (final e in edu) {
-        final degree = (e['degree'] ?? '').toString().trim();
-        final school =
-            (e['school'] ?? e['institution'] ?? e['university'] ?? '')
-                .toString()
-                .trim();
-        final dr = _dateRange(
-          (e['startDate'] ?? e['start'] ?? '').toString(),
-          (e['endDate'] ?? e['end'] ?? '').toString(),
-        );
-        final heading = [
-          degree,
-          if (school.isNotEmpty) 'at $school',
-          if (dr.isNotEmpty) '($dr)',
-        ].where((x) => x.isNotEmpty).join(' ');
-        if (heading.isNotEmpty) lines.add('- ${_asciiSafe(heading)}');
-      }
-      lines.add('');
-    } else if ((d['educations'] ?? '').toString().isNotEmpty) {
-      try {
-        final list = jsonDecode(d['educations']) as List<dynamic>;
-        if (list.isNotEmpty) {
-          lines.add('EDUCATION');
-          for (final item in list) {
-            final m = Map<String, dynamic>.from(item as Map);
-            final degree = (m['degree'] ?? '').toString().trim();
-            final inst = (m['institution'] ?? '').toString().trim();
-            final desc = (m['description'] ?? '').toString().trim();
-            final heading = [
-              degree,
-              if (inst.isNotEmpty) 'at $inst',
-            ].where((e) => e.isNotEmpty).join(' ');
-            if (heading.isNotEmpty) lines.add('- ${_asciiSafe(heading)}');
-            if (desc.isNotEmpty) {
-              for (final w in _wrapByChars(_asciiSafe(desc), 86)) {
-                lines.add('  $w');
-              }
-            }
-          }
-          lines.add('');
-        }
-      } catch (_) {}
-    }
-
-    final certs = (d['certifications'] ?? '').toString().trim();
-    if (certs.isNotEmpty) {
-      lines.add('CERTIFICATIONS');
-      for (final w in _wrapByChars(_asciiSafe(certs), 90)) {
-        lines.add('- $w');
-      }
-      lines.add('');
-    }
-
-    final projects = (d['projects'] ?? '').toString().trim();
-    if (projects.isNotEmpty) {
-      lines.add('PROJECTS');
-      for (final w in _wrapByChars(_asciiSafe(projects), 90)) {
-        lines.add('- $w');
-      }
-      lines.add('');
-    }
-
-    final hobbies = (d['hobbies'] ?? '').toString().trim();
-    if (hobbies.isNotEmpty) {
-      lines.add('HOBBIES');
-      for (final w in _wrapByChars(_asciiSafe(hobbies), 90)) {
-        lines.add('- $w');
-      }
-      lines.add('');
-    }
-
-    final achievements = (d['achievements'] ?? '').toString().trim();
-    if (achievements.isNotEmpty) {
-      lines.add('ACHIEVEMENTS');
-      for (final w in _wrapByChars(_asciiSafe(achievements), 90)) {
-        lines.add('- $w');
-      }
-      lines.add('');
-    }
-
-    // One Page extras
-    final awards = (d['awards'] ?? '').toString().trim();
-    if (awards.isNotEmpty) {
-      lines.add('AWARDS');
-      for (final a
-          in awards
-              .split(',')
-              .map((e) => e.trim())
-              .where((e) => e.isNotEmpty)) {
-        lines.add('- ${_asciiSafe(a)}');
-      }
-      lines.add('');
-    }
-
-    final languages = (d['languages'] ?? '').toString().trim();
-    if (languages.isNotEmpty) {
-      lines.add('LANGUAGES');
-      for (final w in _wrapByChars(_asciiSafe(languages), 90)) {
-        lines.add('- $w');
-      }
-      lines.add('');
-    }
-
-    // Optional watermark for free tier
-    if (PremiumService.hasWatermark) {
-      lines.add('');
-      lines.add('Generated with Resume Builder (Free tier)');
-    }
-
-    return lines;
+  // Remove characters that the built-in font can't render to avoid runtime errors
+  String _sanitizeForPdfText(String input) {
+    final allowed = input.runes.where((c) {
+      // keep common ASCII and basic Latin-1 Supplement
+      return (c >= 0x20 && c <= 0x7E) || (c >= 0xA0 && c <= 0xFF);
+    });
+    return String.fromCharCodes(allowed);
   }
 
-  // Helper: accept skills in multiple shapes
-  List<String> _extractSkills(Map<String, dynamic> data) {
-    final v = data['skills'];
-    if (v is List) {
-      if (v.isEmpty) return _skillsFromCsv(data);
-      if (v.first is String) {
-        return v.cast<String>();
-      }
-      if (v.first is Map) {
-        return v
-            .map((e) => (e['label'] ?? e['name'] ?? e.toString()).toString())
-            .cast<String>()
-            .toList();
-      }
-      return v.map((e) => e.toString()).cast<String>().toList();
-    }
-    return _skillsFromCsv(data);
-  }
+  pw.Widget _cvHeader(String title) => pw.Header(
+    level: 0,
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Text(
+          'Curriculum Vitae',
+          style: pw.TextStyle(
+            fontWeight: pw.FontWeight.bold,
+            fontSize: 28,
+            color: PdfColors.blueGrey800,
+          ),
+        ),
+        pw.SizedBox(height: 8),
+        pw.Text(
+          title,
+          style: pw.TextStyle(
+            fontWeight: pw.FontWeight.bold,
+            fontSize: 22,
+            color: PdfColors.indigo,
+          ),
+        ),
+      ],
+    ),
+  );
 
-  List<String> _skillsFromCsv(Map<String, dynamic> data) {
-    // Prefer One Page key 'coreSkills', fallback to generic 'skillsCsv'
-    final csv = ((data['coreSkills'] ?? data['skillsCsv']) ?? '').toString();
-    if (csv.isEmpty) return const [];
-    return csv
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-  }
+  pw.Widget _sectionTitle(String title, {PdfColor color = PdfColors.black}) =>
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 6),
+        child: pw.Text(
+          title,
+          style: pw.TextStyle(
+            fontWeight: pw.FontWeight.bold,
+            decoration: pw.TextDecoration.underline,
+            color: color,
+          ),
+        ),
+      );
 
-  // Compact date range from ISO strings (YYYY-MM)
-  String _dateRange(String startIso, String endIso) {
-    String fmt(String iso) {
-      if (iso.isEmpty) return '';
-      try {
+  pw.Widget _workBlock(Map<String, dynamic> w) {
+    String val(String k) => (w[k] ?? '').toString();
+    String range() {
+      String fmt(String iso) {
+        if (iso.isEmpty) return '';
         final dt = DateTime.tryParse(iso);
         if (dt == null) return '';
         final m = dt.month.toString().padLeft(2, '0');
         return '${dt.year}-$m';
-      } catch (_) {
-        return '';
       }
+
+      final s = fmt(val('startDate'));
+      final e = fmt(val('endDate'));
+      if (s.isEmpty && e.isEmpty) return '';
+      return e.isEmpty ? '$s - Present' : '$s - $e';
     }
 
-    final s = fmt(startIso);
-    final e = fmt(endIso);
-    if (s.isEmpty && e.isEmpty) return '';
-    return e.isEmpty ? '$s - Present' : '$s - $e';
+    final bullets = <pw.Widget>[];
+    final desc = val('description');
+    if (desc.isNotEmpty) bullets.add(pw.Text(desc));
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            val('jobTitle'),
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          if (val('company').isNotEmpty) pw.Text(val('company')),
+          pw.Row(
+            children: [
+              if (range().isNotEmpty) pw.Text(range()),
+              if (val('location').isNotEmpty) ...[
+                pw.SizedBox(width: 12),
+                pw.Text(val('location')),
+              ],
+            ],
+          ),
+          if (bullets.isNotEmpty) ...[pw.SizedBox(height: 4), ...bullets],
+        ],
+      ),
+    );
   }
 
-  // --- Helpers ---
-  // --- Export directory helper (user-visible Resumes folder) ---
-  Future<Directory> _getExportBaseDir() async {
-    Directory base;
-    if (Platform.isAndroid) {
-      base =
-          (await getExternalStorageDirectory()) ??
-          await getTemporaryDirectory();
+  pw.Widget _eduBlock(Map<String, dynamic> e) {
+    String val(String k) => (e[k] ?? '').toString();
+    String range() {
+      String fmt(String iso) {
+        if (iso.isEmpty) return '';
+        final dt = DateTime.tryParse(iso);
+        if (dt == null) return '';
+        final m = dt.month.toString().padLeft(2, '0');
+        return '${dt.year}-$m';
+      }
+
+      final s = fmt(val('startDate'));
+      final ee = fmt(val('endDate'));
+      if (s.isEmpty && ee.isEmpty) return '';
+      return ee.isEmpty ? '$s - Present' : '$s - $ee';
+    }
+
+    final lines = <pw.Widget>[];
+    if (val('degree').isNotEmpty) {
+      lines.add(
+        pw.Text(
+          val('degree'),
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ),
+      );
+    }
+    if (val('institution').isNotEmpty) lines.add(pw.Text(val('institution')));
+    final r = range();
+    final row = <pw.Widget>[];
+    if (r.isNotEmpty) row.add(pw.Text(r));
+    if (val('location').isNotEmpty) {
+      if (row.isNotEmpty) row.add(pw.SizedBox(width: 12));
+      row.add(pw.Text(val('location')));
+    }
+    if (row.isNotEmpty) lines.add(pw.Row(children: row));
+    if (val('description').isNotEmpty) lines.add(pw.Text(val('description')));
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: lines,
+      ),
+    );
+  }
+
+  pw.Widget _bulletsFromCsv(
+    String csv, {
+    PdfColor bulletColor = PdfColors.black,
+  }) {
+    final parts = csv
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [for (final s in parts) _bulletLine(s, color: bulletColor)],
+    );
+  }
+
+  pw.Widget _bulletLine(String text, {PdfColor color = PdfColors.black}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            width: 4,
+            height: 4,
+            margin: const pw.EdgeInsets.only(top: 4, right: 6),
+            decoration: pw.BoxDecoration(
+              color: color,
+              borderRadius: pw.BorderRadius.all(pw.Radius.circular(2)),
+            ),
+          ),
+          pw.Expanded(child: pw.Text(text)),
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _parseJsonArray(dynamic raw) {
+    try {
+      if (raw == null) return const [];
+      if (raw is List) return List<Map<String, dynamic>>.from(raw);
+      final s = raw.toString();
+      if (s.trim().isEmpty) return const [];
+      final arr = jsonDecode(s) as List<dynamic>;
+      return List<Map<String, dynamic>>.from(arr);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  bool _looksLikeJsonArray(String v) {
+    final t = v.trim();
+    return t.startsWith('[') && t.endsWith(']');
+  }
+
+  String _formatKey(String key) {
+    return key
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((word) {
+          if (word.isEmpty) return '';
+          return word[0].toUpperCase() + word.substring(1);
+        })
+        .join(' ');
+  }
+
+  Future<void> _shareViaEmailInternal(
+    File pdfFile,
+    String subject,
+    Map<String, dynamic> resumeData,
+  ) async {
+    final fileName =
+        '${(resumeData['full_name'] ?? 'resume').replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+
+    print(
+      'DEBUG: Attempting to share PDF via Email. Path: ${pdfFile.path}. FileName: $fileName',
+    );
+
+    try {
+      final xFile = XFile(
+        pdfFile.path,
+        name: fileName,
+        mimeType: 'application/pdf',
+      );
+
+      // Use path-based sharing for broader Android compatibility
+      final result = await Share.shareXFiles(
+        [xFile],
+        subject: subject,
+        text: 'Please find the attached resume.',
+      );
+
+      if (result.status == ShareResultStatus.success) {
+        print('DEBUG: Email share successful.');
+      } else {
+        print('DEBUG: Email share dismissed or failed. Raw: ${result.raw}');
+        await _launchEmailFallback(subject);
+      }
+    } catch (e, s) {
+      print('DEBUG: Error sharing via Email with attachment: $e\n$s');
+      await _launchEmailFallback(subject);
+    }
+  }
+
+  Future<void> _launchEmailFallback(String subject) async {
+    print('DEBUG: Falling back to mailto: URL launcher for email.');
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      query:
+          'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent('Please find the attached resume.')}',
+    );
+
+    if (await canLaunchUrl(emailLaunchUri)) {
+      await launchUrl(emailLaunchUri);
     } else {
-      base = await getApplicationDocumentsDirectory();
+      await _showErrorDialog('Could not open email app.');
     }
-    final out = Directory(p.join(base.path, 'Resumes'));
-    if (!await out.exists()) {
-      await out.create(recursive: true);
-    }
-    return out;
   }
 
-  String _sanitize(String input) {
-    return input.replaceAll(RegExp(r'[^a-zA-Z0-9_\- ]'), '_').trim();
-  }
+  Future<void> _shareViaWhatsAppInternal(
+    File pdfFile,
+    String subject,
+    Map<String, dynamic> resumeData,
+  ) async {
+    final fileName =
+        '${(resumeData['full_name'] ?? 'resume').replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
-  // Ensure ASCII to keep PDF content simple and widely compatible.
-  String _toAscii(String input) {
-    final sb = StringBuffer();
-    for (final codeUnit in input.codeUnits) {
-      if (codeUnit >= 32 && codeUnit <= 126) {
-        sb.writeCharCode(codeUnit);
+    print(
+      'DEBUG: Attempting to share PDF via WhatsApp. Path: ${pdfFile.path}. FileName: $fileName',
+    );
+
+    try {
+      final xFile = XFile(
+        pdfFile.path,
+        name: fileName,
+        mimeType: 'application/pdf',
+      );
+
+      // Note: share_plus cannot force WhatsApp; it shows the share sheet.
+      // Users can pick WhatsApp and the attachment will be preserved.
+      final result = await Share.shareXFiles([
+        xFile,
+      ], text: 'Here is the resume.');
+
+      if (result.status == ShareResultStatus.success) {
+        print('DEBUG: WhatsApp share successful.');
       } else {
-        sb.write('?');
+        print('DEBUG: WhatsApp share dismissed or failed. Raw: ${result.raw}');
+        await _launchWhatsAppFallback();
+      }
+    } catch (e, s) {
+      print('DEBUG: Error sharing via WhatsApp with attachment: $e\n$s');
+      await _launchWhatsAppFallback();
+    }
+  }
+
+  Future<void> _launchWhatsAppFallback() async {
+    print('DEBUG: Falling back to whatsapp:// URL launcher.');
+    const message = 'Here is the resume.';
+    // Using the new recommended format for WhatsApp links
+    final whatsappUrl = "https://wa.me/?text=${Uri.encodeComponent(message)}";
+
+    try {
+      if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
+        await launchUrl(
+          Uri.parse(whatsappUrl),
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        await _showErrorDialog('Could not open WhatsApp.');
+      }
+    } catch (e) {
+      await _showErrorDialog('Failed to open WhatsApp.');
+    }
+  }
+
+  Future<void> printResume(SavedResume resume) async {
+    if (await PremiumService.isPremiumWithDialog(context)) {
+      if (resume.template != 'One Page') {
+        final ok = await _ensureFullNameIfMissing(resume);
+        if (!ok) return;
+      }
+      final pdfFile = await _generatePdf(resume);
+      if (pdfFile != null) {
+        await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) => pdfFile.readAsBytes(),
+        );
+      } else {
+        _showErrorDialog('Failed to generate PDF for printing.');
       }
     }
-    return sb.toString();
   }
 
-  String _asciiSafe(String input) => _toAscii(input).replaceAll('\u2022', '-');
+  Future<void> exportAndOpenPdf(SavedResume resume) async {
+    if (await PremiumService.isPremiumWithDialog(context)) {
+      if (resume.template != 'One Page') {
+        final ok = await _ensureFullNameIfMissing(resume);
+        if (!ok) return;
+      }
+      File? pdfFile;
+      try {
+        pdfFile = await _generatePdf(resume);
+      } catch (e, s) {
+        print('DEBUG: Exception during PDF generation for export: $e\n$s');
+        await _showErrorDialog('Failed to generate PDF for export.');
+        return;
+      }
+      if (pdfFile != null) {
+        final outputDir = await _getExportBaseDir();
+        if (outputDir != null) {
+          final sanitizedName = _sanitize(resume.data['full_name'] ?? 'resume');
+          final finalPath = p.join(
+            outputDir.path,
+            '${sanitizedName}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+          );
+          final finalFile = await pdfFile.copy(finalPath);
 
-  // Escape parentheses and backslashes for PDF string literals.
-  String _pdfEscape(String text) {
-    return text
-        .replaceAll('\\', r'\\')
-        .replaceAll('(', r'\(')
-        .replaceAll(')', r'\)');
-  }
-
-  List<String> _wrapByChars(String text, int maxChars) {
-    final words = text.split(RegExp(r'\s+'));
-    final lines = <String>[];
-    var current = StringBuffer();
-    for (final w in words) {
-      if (current.isEmpty) {
-        current.write(w);
-      } else if ((current.length + 1 + w.length) <= maxChars) {
-        current.write(' ');
-        current.write(w);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('PDF saved to ${finalFile.path}'),
+              action: SnackBarAction(
+                label: 'Open',
+                onPressed: () {
+                  OpenFile.open(finalFile.path);
+                },
+              ),
+            ),
+          );
+        } else {
+          await _showErrorDialog('Could not access storage directory.');
+        }
       } else {
-        lines.add(current.toString());
-        current = StringBuffer(w);
+        _showErrorDialog('Failed to generate PDF for export.');
       }
     }
-    if (current.isNotEmpty) lines.add(current.toString());
-    return lines;
   }
 
-  /// Copy file into a cache directory for sharing to ensure FileProvider-accessible URI
-  Future<File> _copyToShareCache(File file) async {
-    final cache = await getTemporaryDirectory();
-    final shareDir = Directory(p.join(cache.path, 'share-cache'));
-    if (!await shareDir.exists()) {
-      await shareDir.create(recursive: true);
+  Future<void> exportAndOpenDocx(SavedResume resume) async {
+    if (await PremiumService.isPremiumWithDialog(context)) {
+      if (resume.template != 'One Page') {
+        final ok = await _ensureFullNameIfMissing(resume);
+        if (!ok) return;
+      }
+
+      final outputDir = await _getExportBaseDir();
+      if (outputDir == null) {
+        await _showErrorDialog('Could not access storage directory.');
+        return;
+      }
+
+      final sanitizedName = _sanitize(resume.data['full_name'] ?? 'resume');
+      final filePath = p.join(
+        outputDir.path,
+        '${sanitizedName}_${DateTime.now().millisecondsSinceEpoch}.docx',
+      );
+
+      try {
+        final content = _buildPlainTextForDoc(resume);
+        final bytes = buildDocxBytesFromPlainText(content);
+        final file = File(filePath);
+        await file.writeAsBytes(bytes, flush: true);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('DOCX saved to ${file.path}'),
+            action: SnackBarAction(
+              label: 'Open',
+              onPressed: () {
+                OpenFile.open(file.path);
+              },
+            ),
+          ),
+        );
+      } catch (e) {
+        await _showErrorDialog('Failed to export DOCX: $e');
+      }
     }
-    final dest = File(p.join(shareDir.path, p.basename(file.path)));
-    if (await dest.exists()) {
-      await dest.delete();
+  }
+
+  String _buildPlainTextForDoc(SavedResume resume) {
+    final data = Map<String, dynamic>.from(resume.data);
+    final buffer = StringBuffer();
+    final fullName = (data['full_name'] ?? data['name'] ?? resume.title)
+        .toString()
+        .trim();
+    final email = (data['email'] ?? '').toString().trim();
+    final phone = (data['phone'] ?? '').toString().trim();
+    final portfolio = (data['portfolio'] ?? '').toString().trim();
+    final linkedin = (data['linkedin'] ?? data['linkedIn'] ?? '').toString();
+
+    // Header
+    buffer.writeln(fullName);
+    if (email.isNotEmpty ||
+        phone.isNotEmpty ||
+        portfolio.isNotEmpty ||
+        linkedin.isNotEmpty) {
+      final contacts = [
+        if (phone.isNotEmpty) phone,
+        if (email.isNotEmpty) email,
+        if (portfolio.isNotEmpty) portfolio,
+        if (linkedin.isNotEmpty) linkedin,
+      ].join(' • ');
+      buffer.writeln(contacts);
     }
-    return file.copy(dest.path);
+
+    void addSection(String title, List<String> lines) {
+      if (lines.isEmpty) return;
+      buffer.writeln('');
+      buffer.writeln(title.toUpperCase());
+      for (final l in lines) {
+        buffer.writeln(l);
+      }
+    }
+
+    // Summary (use template-specific key if available)
+    final summary =
+        (data['creativeSummary'] ??
+                data['executiveSummary'] ??
+                data['summary'] ??
+                '')
+            .toString()
+            .trim();
+    if (summary.isNotEmpty) {
+      addSection('Summary', [summary]);
+    }
+
+    // Skills
+    final skillsCsv =
+        (data['skills'] ?? data['skillsCsv'] ?? data['coreSkills'] ?? '')
+            .toString()
+            .trim();
+    if (skillsCsv.isNotEmpty) {
+      addSection('Skills', [skillsCsv]);
+    }
+
+    // Tools
+    final tools = (data['tools'] ?? '').toString().trim();
+    if (tools.isNotEmpty) {
+      addSection('Tools & Software', [tools]);
+    }
+
+    // Work Experience
+    List<Map<String, dynamic>> work = [];
+    if (data['workExperiences'] != null) {
+      work = _parseJsonArray(data['workExperiences']);
+    } else if (data['workExperiencesJson'] != null) {
+      work = _parseJsonArray(data['workExperiencesJson']);
+    }
+    if (work.isNotEmpty) {
+      final lines = <String>[];
+      for (final w in work) {
+        String val(String k) => (w[k] ?? '').toString();
+        String fmtDate(String iso) {
+          if (iso.isEmpty) return '';
+          final dt = DateTime.tryParse(iso);
+          if (dt == null) return '';
+          return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+        }
+
+        final start = fmtDate(val('startDate'));
+        final end = fmtDate(val('endDate'));
+        final range = start.isEmpty && end.isEmpty
+            ? ''
+            : end.isEmpty
+            ? '$start - Present'
+            : '$start - $end';
+        final title = val('jobTitle');
+        final company = val('company');
+        final line = [
+          if (title.isNotEmpty) title,
+          if (company.isNotEmpty) 'at $company',
+          if (range.isNotEmpty) '($range)',
+        ].join(' ');
+        if (line.isNotEmpty) lines.add(line);
+        final desc = val('description');
+        if (desc.isNotEmpty) {
+          for (final l in desc.split(RegExp(r'\r?\n+'))) {
+            final s = l.trim();
+            if (s.isEmpty) continue;
+            lines.add('- $s');
+          }
+        }
+      }
+      addSection('Professional Experience', lines);
+    }
+
+    // Education
+    List<Map<String, dynamic>> edus = [];
+    if (data['educations'] != null) {
+      edus = _parseJsonArray(data['educations']);
+    } else if (data['educationsJson'] != null) {
+      edus = _parseJsonArray(data['educationsJson']);
+    }
+    if (edus.isNotEmpty) {
+      final lines = <String>[];
+      for (final e in edus) {
+        String val(String k) => (e[k] ?? '').toString();
+        String fmtDate(String iso) {
+          if (iso.isEmpty) return '';
+          final dt = DateTime.tryParse(iso);
+          if (dt == null) return '';
+          return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+        }
+
+        final start = fmtDate(val('startDate'));
+        final end = fmtDate(val('endDate'));
+        final range = start.isEmpty && end.isEmpty
+            ? ''
+            : end.isEmpty
+            ? '$start - Present'
+            : '$start - $end';
+        final degree = val('degree');
+        final inst = val('institution');
+        final uni = val('university');
+        final school = inst.isNotEmpty ? inst : uni;
+        final line = [
+          if (degree.isNotEmpty) degree,
+          if (school.isNotEmpty) 'at $school',
+          if (range.isNotEmpty) '($range)',
+        ].join(' ');
+        if (line.isNotEmpty) lines.add(line);
+        final desc = val('description');
+        if (desc.isNotEmpty) lines.add(desc);
+      }
+      addSection('Education', lines);
+    }
+
+    // Other simple sections
+    for (final key in ['projects', 'languages', 'hobbies', 'references']) {
+      final v = (data[key] ?? '').toString().trim();
+      if (v.isNotEmpty) addSection(_formatKey(key), [v]);
+    }
+
+    return buffer.toString().trim();
   }
 
-  // ===================== DOCX helpers (WordprocessingML) =====================
+  Future<Directory?> _getExportBaseDir() async {
+    if (Platform.isAndroid) {
+      final dir = await getExternalStorageDirectory();
+      if (dir != null) return dir;
+      // Fallback so export still works even if external storage is unavailable
+      return await getTemporaryDirectory();
+    } else {
+      return getApplicationDocumentsDirectory();
+    }
+  }
 
-  Uint8List _buildDocxFromLines(List<String> lines) {
-    final zip = ar.Archive();
-    zip.addFile(ar.ArchiveFile.string('[Content_Types].xml', _contentTypesXml));
-    zip.addFile(ar.ArchiveFile.string('_rels/.rels', _relsXml));
-    zip.addFile(ar.ArchiveFile.string('docProps/app.xml', _appPropsXml));
-    zip.addFile(ar.ArchiveFile.string('docProps/core.xml', _corePropsXml));
-    zip.addFile(ar.ArchiveFile.string('word/styles.xml', _stylesXml));
-    zip.addFile(ar.ArchiveFile.string('word/settings.xml', _settingsXml));
-    zip.addFile(
-      ar.ArchiveFile.string('word/_rels/document.xml.rels', _wordRelsXml),
+  String _sanitize(String filename) {
+    return filename.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+  }
+
+  Future<void> _showErrorDialog(String message) async {
+    if (context.mounted) {
+      // Defer to next microtask to avoid colliding with PopupMenu route teardown
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      showDialog(
+        context: context,
+        useRootNavigator: true,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Okay'),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+              },
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  // Prompt for user's name when missing so it can appear under "Curriculum Vitae"
+  Future<bool> _ensureFullNameIfMissing(SavedResume resume) async {
+    final existing = (resume.data['full_name']?.toString() ?? '').trim();
+    if (existing.isNotEmpty) return true;
+
+    // Auto-fill from 'name' if available to avoid prompting
+    final fallbackName = (resume.data['name']?.toString() ?? '').trim();
+    if (fallbackName.isNotEmpty) {
+      resume.data['full_name'] = fallbackName;
+      return true;
+    }
+
+    final initial = (resume.title.toString()).trim();
+    final entered = await _promptForName(initial: initial);
+    if (entered == null || entered.trim().isEmpty) {
+      // user cancelled or left empty
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Name is required to continue. Tap Edit to add your name.',
+            ),
+          ),
+        );
+      }
+      return false;
+    }
+    resume.data['full_name'] = entered.trim();
+    return true;
+  }
+
+  Future<String?> _promptForName({String initial = ''}) async {
+    if (!context.mounted) return null;
+    final controller = TextEditingController(text: initial);
+    // Defer to allow any menus to close before showing the dialog, and use root navigator
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    return showDialog<String>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Enter your name'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Full name',
+            hintText: 'e.g., John Doe',
+          ),
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => Navigator.of(ctx).pop(controller.text.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
     );
-    zip.addFile(
-      ar.ArchiveFile.string('word/document.xml', _buildDocXmlFromLines(lines)),
-    );
-    final bytes = ar.ZipEncoder().encode(zip)!;
-    return Uint8List.fromList(bytes);
   }
-
-  String _buildDocXmlFromLines(List<String> lines) {
-    String esc(String s) => s
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;');
-    final parts = lines
-        .map((l) => l.trimRight())
-        .map(
-          (l) =>
-              '<w:p><w:r><w:rPr><w:noProof/></w:rPr><w:t>${esc(l)}</w:t></w:r></w:p>',
-        )
-        .join();
-    return '''<?xml version="1.0" encoding="UTF-8"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>
-    $parts
-  </w:body>
-</w:document>''';
-  }
-
-  // OOXML static parts
-  static const String _contentTypesXml =
-      '''<?xml version="1.0" encoding="UTF-8"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
-  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
-</Types>''';
-
-  static const String _relsXml = '''<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>''';
-
-  static const String _wordRelsXml = '''<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
-</Relationships>''';
-
-  static const String _stylesXml = '''<?xml version="1.0" encoding="UTF-8"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
-    <w:name w:val="Normal"/>
-    <w:qFormat/>
-  </w:style>
-  <w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont">
-    <w:name w:val="Default Paragraph Font"/>
-  </w:style>
-</w:styles>''';
-
-  static const String _settingsXml = '''<?xml version="1.0" encoding="UTF-8"?>
-<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:proofState w:spelling="clean" w:grammar="clean"/>
-</w:settings>''';
-
-  static const String _appPropsXml = '''<?xml version="1.0" encoding="UTF-8"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>Resume Builder</Application>
-  <DocSecurity>0</DocSecurity>
-  <ScaleCrop>false</ScaleCrop>
-  <Company></Company>
-</Properties>''';
-
-  static const String _corePropsXml = '''<?xml version="1.0" encoding="UTF-8"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>Resume</dc:title>
-  <dc:subject></dc:subject>
-  <dc:creator>Resume Builder</dc:creator>
-  <cp:keywords>resume</cp:keywords>
-  <cp:lastModifiedBy>Resume Builder</cp:lastModifiedBy>
-</cp:coreProperties>''';
 }

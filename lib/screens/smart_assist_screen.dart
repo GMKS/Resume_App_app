@@ -551,10 +551,12 @@ class _ContactPill extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: Colors.blue.shade800),
           const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(fontSize: 12),
-            overflow: TextOverflow.ellipsis,
+          Flexible(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

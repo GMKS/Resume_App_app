@@ -21,6 +21,8 @@ class ApiService {
   // static const String baseUrl = 'https://your-backend.herokuapp.com/api';
 
   static String? _token;
+  static String?
+  _lastOtpIdentifier; // Tracks the identifier used when sending OTP
 
   // Headers for authenticated requests
   static Map<String, String> get _headers => {
@@ -170,6 +172,7 @@ class ApiService {
       final normalized = trimmed.contains('@')
           ? trimmed.toLowerCase()
           : trimmed;
+      // First attempt with the provided/normalized identifier
       final response = await http
           .post(
             Uri.parse('$baseUrl/auth/send-otp'),
@@ -182,11 +185,48 @@ class ApiService {
           .timeout(requestTimeout);
 
       final data = _safeJsonDecode(response.body);
-      return {
-        'success': data['success'] ?? false,
-        'message': data['message'] ?? 'Failed to send OTP',
-        'data': data['data'],
-      };
+      bool success = data['success'] == true;
+      String message = (data['message'] ?? 'Failed to send OTP').toString();
+      Map<String, dynamic>? extra = data['data'] is Map<String, dynamic>
+          ? data['data']
+          : null;
+
+      // If user not found with full phone (e.g., +<cc><10digits>), retry with last 10 digits
+      if (!success && !normalized.contains('@')) {
+        final msgLower = message.toLowerCase();
+        if (msgLower.contains('not found')) {
+          final digitsOnly = normalized.replaceAll(RegExp(r'\D'), '');
+          // Try a common case: stored phone is last 10 digits only
+          if (digitsOnly.length > 10) {
+            final tail10 = digitsOnly.substring(digitsOnly.length - 10);
+            final response2 = await http
+                .post(
+                  Uri.parse('$baseUrl/auth/send-otp'),
+                  headers: const {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                  },
+                  body: jsonEncode({'identifier': tail10, 'type': type}),
+                )
+                .timeout(requestTimeout);
+            final data2 = _safeJsonDecode(response2.body);
+            if (data2['success'] == true) {
+              success = true;
+              message = (data2['message'] ?? message).toString();
+              extra = data2['data'] is Map<String, dynamic>
+                  ? data2['data']
+                  : extra;
+              _lastOtpIdentifier = tail10;
+              return {'success': true, 'message': message, 'data': extra};
+            }
+          }
+        }
+      }
+
+      if (success) {
+        _lastOtpIdentifier = normalized;
+      }
+      return {'success': success, 'message': message, 'data': extra};
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
     }
@@ -233,9 +273,12 @@ class ApiService {
   }) async {
     try {
       final trimmed = identifier.trim();
-      final normalized = trimmed.contains('@')
-          ? trimmed.toLowerCase()
-          : trimmed;
+      // Prefer the identifier we actually used when sending OTP (if available)
+      final preferred = _lastOtpIdentifier ?? trimmed;
+      final normalized = preferred.contains('@')
+          ? preferred.toLowerCase()
+          : preferred;
+      // First attempt
       final response = await http
           .post(
             Uri.parse('$baseUrl/verify-otp'),
@@ -253,10 +296,33 @@ class ApiService {
         await _saveToken(data['token']);
         return {'success': true, 'data': data};
       } else {
-        return {
-          'success': false,
-          'message': data['message'] ?? 'OTP verification failed',
-        };
+        String message = (data['message'] ?? 'OTP verification failed')
+            .toString();
+        // If user not found and we used a full phone, retry with last 10 digits
+        if (!normalized.contains('@') &&
+            message.toLowerCase().contains('not found')) {
+          final digitsOnly = normalized.replaceAll(RegExp(r'\D'), '');
+          if (digitsOnly.length > 10) {
+            final tail10 = digitsOnly.substring(digitsOnly.length - 10);
+            final response2 = await http
+                .post(
+                  Uri.parse('$baseUrl/verify-otp'),
+                  headers: const {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                  },
+                  body: jsonEncode({'identifier': tail10, 'otp': otp.trim()}),
+                )
+                .timeout(requestTimeout);
+            final data2 = _safeJsonDecode(response2.body);
+            if (response2.statusCode == 200) {
+              await _saveToken(data2['token']);
+              _lastOtpIdentifier = tail10;
+              return {'success': true, 'data': data2};
+            }
+          }
+        }
+        return {'success': false, 'message': message};
       }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};

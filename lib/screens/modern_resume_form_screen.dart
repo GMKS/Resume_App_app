@@ -519,9 +519,9 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
               );
               try {
                 if (choice == 'EMAIL') {
-                  await ShareExportService.instance.shareViaEmail(resume);
+                  await ShareExportService(context).shareViaEmail(resume);
                 } else if (choice == 'WHATSAPP') {
-                  await ShareExportService.instance.shareViaWhatsApp(resume);
+                  await ShareExportService(context).shareViaWhatsApp(resume);
                 }
               } catch (e) {
                 ScaffoldMessenger.of(
@@ -630,7 +630,7 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(18),
                   child: _modernContactRow(
-                    Icons.link,
+                    Icons.business,
                     _controllers['linkedin']!,
                     'LinkedIn URL',
                     focusNode: _focusNodes['linkedin'],

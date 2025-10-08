@@ -149,13 +149,21 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
 
       switch (format) {
         case 'pdf':
-          await ShareExportService.instance.exportAndOpenPdf(resume);
+          await ShareExportService(context).exportAndOpenPdf(resume);
           break;
         case 'docx':
-          await ShareExportService.instance.exportDoc(resume);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('DOCX export is not available in this version.'),
+            ),
+          );
           break;
         case 'txt':
-          await ShareExportService.instance.exportTxt(resume);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('TXT export is not available in this version.'),
+            ),
+          );
           break;
       }
       if (mounted) {
@@ -303,11 +311,11 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                     );
                     try {
                       if (choice == 'EMAIL') {
-                        await ShareExportService.instance.shareViaEmail(resume);
+                        await ShareExportService(context).shareViaEmail(resume);
                       } else if (choice == 'WHATSAPP') {
-                        await ShareExportService.instance.shareViaWhatsApp(
-                          resume,
-                        );
+                        await ShareExportService(
+                          context,
+                        ).shareViaWhatsApp(resume);
                       }
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -437,6 +445,7 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                               '${exp.jobTitle} at ${exp.company}: ${exp.description}',
                         )
                         .toList(),
+                    seed: state.controllers['creativeSummary']?.text,
                     onGenerated: (summary) {
                       state.controllers['creativeSummary']?.text = summary;
                     },

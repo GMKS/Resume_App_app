@@ -117,6 +117,37 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
                         fontSize: 16,
                       ),
                     ),
+                    const SizedBox(height: 24),
+
+                    // Skip Login Button for Demo
+                    Container(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _bypassLogin,
+                        icon: const Icon(Icons.skip_next),
+                        label: const Text('Skip Login (Demo Mode)'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 4,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+                    const Divider(color: Colors.white30),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Or use demo credentials below:',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -231,6 +262,56 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+
+              // Demo Credentials Helper
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Demo Credentials:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E88E5),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Email: demo@resumebuilder.com'),
+                              Text('Password: demo123'),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: _fillDemoCredentials,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                          child: const Text('Fill'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -731,9 +812,23 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
     setState(() => _isLoading = true);
 
     try {
+      // Check for demo credentials first
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+
+      if (email == 'demo@resumebuilder.com' && password == 'demo123') {
+        // Demo login - bypass API call
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const SimpleHomeScreen()),
+        );
+        return;
+      }
+
       final response = await ApiService.login(
-        identifier: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        identifier: email,
+        password: password,
       );
       if (!mounted) return;
 
@@ -907,5 +1002,19 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
         duration: const Duration(seconds: 4),
       ),
     );
+  }
+
+  /// Bypass login for demo/testing purposes
+  void _bypassLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const SimpleHomeScreen()),
+    );
+  }
+
+  /// Fill demo credentials for easy testing
+  void _fillDemoCredentials() {
+    _emailController.text = 'demo@resumebuilder.com';
+    _passwordController.text = 'demo123';
   }
 }

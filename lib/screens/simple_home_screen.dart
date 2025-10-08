@@ -3,6 +3,7 @@ import 'resume_template_selection_screen.dart';
 import 'smart_assist_screen.dart';
 import 'saved_resumes_screen.dart';
 import 'settings_screen.dart';
+import 'customize_screen.dart';
 
 class SimpleHomeScreen extends StatelessWidget {
   const SimpleHomeScreen({super.key});
@@ -110,9 +111,10 @@ class SimpleHomeScreen extends StatelessWidget {
                     Icons.palette,
                     Colors.orange,
                     'Personalize your resume design',
-                    () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Customization - Coming Soon!'),
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CustomizeScreen(),
                       ),
                     ),
                   ),
