@@ -8,11 +8,11 @@ class ExportOptionsTab extends StatefulWidget {
   final Function(CustomizeSettings) onSettingsChanged;
 
   const ExportOptionsTab({
-    Key? key,
+    super.key,
     required this.settings,
     required this.resumeData,
     required this.onSettingsChanged,
-  }) : super(key: key);
+  });
 
   @override
   _ExportOptionsTabState createState() => _ExportOptionsTabState();
@@ -179,7 +179,7 @@ class _ExportOptionsTabState extends State<ExportOptionsTab> {
                 },
                 activeColor: Colors.indigo,
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -370,7 +370,7 @@ class _ExportOptionsTabState extends State<ExportOptionsTab> {
                   widget.settings.copyWith(shareLink: value),
                 );
               },
-              activeColor: Colors.indigo,
+              activeThumbColor: Colors.indigo,
               contentPadding: EdgeInsets.zero,
             ),
             if (widget.settings.shareLink)
@@ -442,7 +442,7 @@ class _ExportOptionsTabState extends State<ExportOptionsTab> {
                   widget.settings.copyWith(qrCode: value),
                 );
               },
-              activeColor: Colors.indigo,
+              activeThumbColor: Colors.indigo,
               contentPadding: EdgeInsets.zero,
             ),
             const Divider(),
@@ -457,7 +457,7 @@ class _ExportOptionsTabState extends State<ExportOptionsTab> {
                 onChanged: (value) {
                   // TODO: Implement auto-save toggle
                 },
-                activeColor: Colors.indigo,
+                activeThumbColor: Colors.indigo,
               ),
               contentPadding: EdgeInsets.zero,
             ),

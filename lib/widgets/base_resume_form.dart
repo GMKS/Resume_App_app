@@ -271,6 +271,7 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
     int maxLines = 1,
     TextInputType? keyboard,
     bool enableDragDrop = false,
+    VoidCallback? onChanged,
   }) {
     final controller = controllerFor(key);
 
@@ -310,6 +311,10 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboard,
+      onChanged: (value) {
+        _notifyDataChanged();
+        onChanged?.call();
+      },
       decoration: InputDecoration(
         labelText: required ? '$label *' : label,
         isDense: true,
@@ -360,24 +365,9 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
                       ],
                     ),
                   ),
-                  if (PremiumService.hasAIFeatures)
-                    const PopupMenuItem(
-                      value: 'generate',
-                      child: Row(
-                        children: [
-                          Icon(Icons.auto_awesome, size: 18),
-                          SizedBox(width: 8),
-                          Text('Generate'),
-                        ],
-                      ),
-                    ),
                 ],
                 onSelected: (value) async {
-                  if (value == 'generate') {
-                    await generateForThisField();
-                  } else {
-                    await _handleTextFieldAction(controller, value);
-                  }
+                  await _handleTextFieldAction(controller, value);
                 },
               )
             : null,

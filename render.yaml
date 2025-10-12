@@ -7,6 +7,8 @@ services:
     startCommand: npm start
     autoDeploy: true
     envVars:
+      - key: MONGODB_URI
+        sync: false
       - key: JWT_SECRET
         sync: false
       - key: EXPOSE_OTP

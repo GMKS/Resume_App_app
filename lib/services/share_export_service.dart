@@ -9,9 +9,14 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:archive/archive.dart' as ar;
 
 import '../models/saved_resume.dart';
+import '../services/ai_service.dart';
 import 'one_page_pdf_exporter.dart';
+import 'colorful_minimal_pdf_exporter.dart';
+import 'classic_pdf_exporter.dart';
+import 'professional_pdf_exporter.dart';
 import 'premium_service.dart';
 import 'ai_service.dart';
 
@@ -66,6 +71,29 @@ class ShareExportService {
   }
 
   Future<File?> _generatePdf(SavedResume resume) async {
+    // Handle colorful minimal templates
+    if (resume.template.startsWith('Minimal-')) {
+      try {
+        print(
+          'DEBUG: Building Colorful Minimal PDF for template "${resume.template}"…',
+        );
+        final pdf = await ColorfulMinimalPdfExporter.build(resume);
+        final output = await getTemporaryDirectory();
+        final file = File("${output.path}/colorful_minimal_resume.pdf");
+        await file.writeAsBytes(pdf);
+        return file;
+      } catch (e, s) {
+        print('DEBUG: ColorfulMinimalPdfExporter failed: $e\n$s');
+        // Fallback to regular minimal PDF
+        try {
+          return await _generateMinimalPdf(resume);
+        } catch (ee, ss) {
+          print('DEBUG: Fallback minimal PDF failed: $ee\n$ss');
+          return null;
+        }
+      }
+    }
+
     if (resume.template == 'One Page') {
       try {
         print('DEBUG: Building One Page PDF…');
@@ -89,6 +117,45 @@ class ShareExportService {
             print('DEBUG: Minimal PDF generation failed too: $eee\n$sss');
             return null;
           }
+        }
+      }
+    }
+
+    if (resume.template == 'Classic') {
+      try {
+        final pdf = await ClassicPdfExporter.build(resume);
+        final output = await getTemporaryDirectory();
+        final file = File(p.join(output.path, 'classic_resume.pdf'));
+        await file.writeAsBytes(pdf);
+        return file;
+      } catch (e, s) {
+        print('DEBUG: ClassicPdfExporter failed: $e\n$s');
+        // Fallback to generic PDF
+        try {
+          return await _generateFallbackPdf(resume);
+        } catch (ee, ss) {
+          print('DEBUG: Fallback after Classic failed: $ee\n$ss');
+          return null;
+        }
+      }
+    }
+
+    if (resume.template == 'Professional') {
+      try {
+        print('DEBUG: Building Professional PDF…');
+        final pdf = await ProfessionalPdfExporter.build(resume);
+        final output = await getTemporaryDirectory();
+        final file = File(p.join(output.path, 'professional_resume.pdf'));
+        await file.writeAsBytes(pdf);
+        return file;
+      } catch (e, s) {
+        print('DEBUG: ProfessionalPdfExporter failed: $e\n$s');
+        // Fallback to generic PDF
+        try {
+          return await _generateFallbackPdf(resume);
+        } catch (ee, ss) {
+          print('DEBUG: Fallback after Professional failed: $ee\n$ss');
+          return null;
         }
       }
     }
@@ -127,7 +194,7 @@ class ShareExportService {
       for (final entry in resume.data.entries)
         entry.key.toString(): entry.value,
     };
-    final accent = PdfColors.indigo;
+    const accent = PdfColors.indigo;
 
     // Reduce unnecessary prompt: derive full_name from 'name' if present
     if ((data['full_name'] == null ||
@@ -287,7 +354,9 @@ class ShareExportService {
                               ),
                               pw.Text(
                                 email,
-                                style: pw.TextStyle(color: PdfColors.grey800),
+                                style: const pw.TextStyle(
+                                  color: PdfColors.grey800,
+                                ),
                               ),
                             ],
                           ),
@@ -308,7 +377,9 @@ class ShareExportService {
                               ),
                               pw.Text(
                                 phone,
-                                style: pw.TextStyle(color: PdfColors.grey800),
+                                style: const pw.TextStyle(
+                                  color: PdfColors.grey800,
+                                ),
                               ),
                             ],
                           ),
@@ -329,7 +400,9 @@ class ShareExportService {
                               ),
                               pw.Text(
                                 portfolio,
-                                style: pw.TextStyle(color: PdfColors.indigo),
+                                style: const pw.TextStyle(
+                                  color: PdfColors.indigo,
+                                ),
                               ),
                             ],
                           ),
@@ -350,7 +423,9 @@ class ShareExportService {
                               ),
                               pw.Text(
                                 social,
-                                style: pw.TextStyle(color: PdfColors.indigo),
+                                style: const pw.TextStyle(
+                                  color: PdfColors.indigo,
+                                ),
                               ),
                             ],
                           ),
@@ -402,7 +477,7 @@ class ShareExportService {
                   pw.SizedBox(height: 12),
                 ],
               );
-            }).toList(),
+            }),
           ],
         ),
       );
@@ -424,7 +499,7 @@ class ShareExportService {
     print('DEBUG: Generating minimal PDF…');
     final baseFont = await PdfGoogleFonts.robotoRegular();
     final pdf = pw.Document(theme: pw.ThemeData.withFont(base: baseFont));
-    final safe = (String s) => _sanitizeForPdfText(s);
+    String safe(String s) => _sanitizeForPdfText(s);
     final content = _buildPlainTextForDoc(resume);
     final lines = content.split(RegExp(r'\r?\n'));
     pdf.addPage(
@@ -609,7 +684,7 @@ class ShareExportService {
             margin: const pw.EdgeInsets.only(top: 4, right: 6),
             decoration: pw.BoxDecoration(
               color: color,
-              borderRadius: pw.BorderRadius.all(pw.Radius.circular(2)),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
             ),
           ),
           pw.Expanded(child: pw.Text(text)),
@@ -838,8 +913,16 @@ class ShareExportService {
       );
 
       try {
-        final content = _buildPlainTextForDoc(resume);
-        final bytes = buildDocxBytesFromPlainText(content);
+        List<int> bytes;
+        if (resume.template.toLowerCase() == 'professional') {
+          // Use improved DOCX export for Professional template
+          bytes = _buildProfessionalDocx(resume);
+        } else {
+          // Fallback to simple text export for other templates
+          final content = _buildPlainTextForDoc(resume);
+          bytes = buildDocxBytesFromPlainText(content);
+        }
+
         final file = File(filePath);
         await file.writeAsBytes(bytes, flush: true);
         if (!context.mounted) return;
@@ -859,6 +942,450 @@ class ShareExportService {
       }
     }
   }
+
+  List<int> _buildProfessionalDocx(SavedResume resume) {
+    final zip = ar.Archive();
+
+    // Add basic DOCX structure files
+    zip.addFile(
+      ar.ArchiveFile.string('[Content_Types].xml', _docxContentTypesXml),
+    );
+    zip.addFile(ar.ArchiveFile.string('_rels/.rels', _docxRelsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/app.xml', _docxAppPropsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/core.xml', _docxCorePropsXml));
+    zip.addFile(ar.ArchiveFile.string('word/styles.xml', _docxStylesXml));
+    zip.addFile(
+      ar.ArchiveFile.string('word/_rels/document.xml.rels', _docxWordRelsXml),
+    );
+
+    // Create the main document content
+    final documentXml = _buildProfessionalDocumentXml(resume);
+    zip.addFile(ar.ArchiveFile.string('word/document.xml', documentXml));
+
+    return ar.ZipEncoder().encode(zip)!;
+  }
+
+  String _buildProfessionalDocumentXml(SavedResume resume) {
+    final data = Map<String, dynamic>.from(resume.data);
+    final buffer = StringBuffer();
+
+    // Extract basic info
+    final name = (data['name'] ?? '').toString().trim();
+    final title = (data['title'] ?? data['professionalTitle'] ?? '')
+        .toString()
+        .trim();
+    final email = (data['email'] ?? '').toString().trim();
+    final phone = (data['phone'] ?? '').toString().trim();
+    final location = (data['location'] ?? '').toString().trim();
+    final website = (data['website'] ?? data['portfolio'] ?? '')
+        .toString()
+        .trim();
+    final summary = (data['executiveSummary'] ?? data['summary'] ?? '')
+        .toString()
+        .trim();
+
+    // Start document
+    buffer.write('''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>''');
+
+    // Name as main header
+    if (name.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="32"/>
+          <w:color w:val="2E3A47"/>
+        </w:rPr>
+        <w:t>${_escapeXml(name)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Job title
+    if (title.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="20"/>
+          <w:color w:val="1976D2"/>
+        </w:rPr>
+        <w:t>${_escapeXml(title)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Contact information
+    final contacts = [
+      if (email.isNotEmpty) email,
+      if (phone.isNotEmpty) phone,
+      if (location.isNotEmpty) location,
+      if (website.isNotEmpty) website,
+    ];
+
+    if (contacts.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:after="360"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+        </w:rPr>
+        <w:t>${_escapeXml(contacts.join(' • '))}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Professional Summary
+    if (summary.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="20"/>
+          <w:color w:val="2E3A47"/>
+        </w:rPr>
+        <w:t>PROFESSIONAL SUMMARY</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+        </w:rPr>
+        <w:t>${_escapeXml(summary)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Work Experience
+    try {
+      final workData = data['workExperiences'] ?? data['workExperiencesJson'];
+      if (workData != null && workData.toString().isNotEmpty) {
+        final List<dynamic> workList = jsonDecode(workData.toString());
+        if (workList.isNotEmpty) {
+          buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="20"/>
+          <w:color w:val="2E3A47"/>
+        </w:rPr>
+        <w:t>PROFESSIONAL EXPERIENCE</w:t>
+      </w:r>
+    </w:p>''');
+
+          for (final work in workList) {
+            final jobTitle = (work['jobTitle'] ?? '').toString();
+            final company = (work['company'] ?? '').toString();
+            final location = (work['location'] ?? '').toString();
+            final startDate = (work['startDate'] ?? '').toString();
+            final endDate = (work['endDate'] ?? '').toString();
+            final description = (work['description'] ?? '').toString();
+
+            if (jobTitle.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="18"/>
+          <w:color w:val="1976D2"/>
+        </w:rPr>
+        <w:t>${_escapeXml(jobTitle)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (company.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(company)}${location.isNotEmpty ? ' • ' + location : ''}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (startDate.isNotEmpty || endDate.isNotEmpty) {
+              final dateRange = _formatDocxDateRange(startDate, endDate);
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="14"/>
+          <w:color w:val="666666"/>
+        </w:rPr>
+        <w:t>${_escapeXml(dateRange)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (description.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(description)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Error processing work experience for DOCX: $e');
+    }
+
+    // Education
+    try {
+      final eduData = data['educations'] ?? data['educationsJson'];
+      if (eduData != null && eduData.toString().isNotEmpty) {
+        final List<dynamic> eduList = jsonDecode(eduData.toString());
+        if (eduList.isNotEmpty) {
+          buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="20"/>
+          <w:color w:val="2E3A47"/>
+        </w:rPr>
+        <w:t>EDUCATION</w:t>
+      </w:r>
+    </w:p>''');
+
+          for (final edu in eduList) {
+            final degree = (edu['degree'] ?? '').toString();
+            final institution =
+                (edu['institution'] ?? edu['university'] ?? edu['school'] ?? '')
+                    .toString();
+            final location = (edu['location'] ?? '').toString();
+            final startDate = (edu['startDate'] ?? '').toString();
+            final endDate = (edu['endDate'] ?? '').toString();
+
+            if (degree.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="16"/>
+          <w:color w:val="1976D2"/>
+        </w:rPr>
+        <w:t>${_escapeXml(degree)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (institution.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(institution)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (startDate.isNotEmpty || endDate.isNotEmpty) {
+              final dateRange = _formatDocxDateRange(startDate, endDate);
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="14"/>
+          <w:color w:val="666666"/>
+        </w:rPr>
+        <w:t>${_escapeXml(dateRange)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Error processing education for DOCX: $e');
+    }
+
+    // Skills
+    final skillsText = (data['keySkills'] ?? data['skills'] ?? '').toString();
+    if (skillsText.isNotEmpty) {
+      final skills = skillsText
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (skills.isNotEmpty) {
+        buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="20"/>
+          <w:color w:val="2E3A47"/>
+        </w:rPr>
+        <w:t>CORE SKILLS</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(skills.join(' • '))}</w:t>
+      </w:r>
+    </w:p>''');
+      }
+    }
+
+    // End document
+    buffer.write('''
+  </w:body>
+</w:document>''');
+
+    return buffer.toString();
+  }
+
+  String _escapeXml(String text) {
+    return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+  }
+
+  String _formatDocxDateRange(String startDate, String endDate) {
+    if (startDate.isEmpty && endDate.isEmpty) return '';
+    if (startDate.isEmpty) return endDate;
+    if (endDate.isEmpty || endDate.toLowerCase() == 'present') {
+      return '$startDate – Present';
+    }
+    return '$startDate – $endDate';
+  }
+
+  // DOCX XML templates
+  String get _docxContentTypesXml =>
+      '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+</Types>''';
+
+  String get _docxRelsXml =>
+      '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+</Relationships>''';
+
+  String get _docxAppPropsXml =>
+      '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>Resume Builder App</Application>
+  <DocSecurity>0</DocSecurity>
+  <Lines>1</Lines>
+  <Paragraphs>1</Paragraphs>
+  <ScaleCrop>false</ScaleCrop>
+  <SharedDoc>false</SharedDoc>
+  <LinksUpToDate>false</LinksUpToDate>
+</Properties>''';
+
+  String get _docxCorePropsXml =>
+      '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>Professional Resume</dc:title>
+  <dc:creator>Resume Builder App</dc:creator>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${DateTime.now().toIso8601String()}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${DateTime.now().toIso8601String()}</dcterms:modified>
+</cp:coreProperties>''';
+
+  String get _docxStylesXml =>
+      '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+        <w:sz w:val="22"/>
+      </w:rPr>
+    </w:rPrDefault>
+  </w:docDefaults>
+</w:styles>''';
+
+  String get _docxWordRelsXml =>
+      '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>''';
 
   String _buildPlainTextForDoc(SavedResume resume) {
     final data = Map<String, dynamic>.from(resume.data);

@@ -2,12 +2,59 @@ import 'package:flutter/material.dart';
 import 'classic_resume_form_screen.dart';
 import 'modern_resume_form_screen.dart';
 import 'minimal_resume_form_screen.dart';
-import 'professional_resume_form_screen.dart';
 import 'creative_resume_form_screen.dart';
 import 'one_page_resume_form_screen.dart';
+import '../widgets/new_resume_title_dialog.dart';
+import 'professional_setup_wizard.dart';
 
 class ResumeTemplateSelectionScreen extends StatelessWidget {
   const ResumeTemplateSelectionScreen({super.key});
+
+  /// Helper method to navigate to the appropriate form screen based on template
+  void _navigateToTemplateFormScreen(
+    BuildContext context,
+    String templateName,
+  ) {
+    Widget screen;
+    switch (templateName) {
+      case 'Classic':
+        screen = const ClassicResumeFormScreen();
+        break;
+      case 'Modern':
+        screen = const ModernResumeFormScreen();
+        break;
+      case 'Minimal':
+        screen = const MinimalResumeFormScreen();
+        break;
+      case 'Professional':
+        _createProfessionalFlow(context);
+        return;
+      case 'Creative':
+        screen = const CreativeResumeFormScreen();
+        break;
+      case 'One Page':
+        screen = const OnePageResumeFormScreen();
+        break;
+      default:
+        screen = const ClassicResumeFormScreen();
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
+  Future<void> _createProfessionalFlow(BuildContext context) async {
+    final title = await showDialog<String>(
+      context: context,
+      builder: (_) => const NewResumeTitleDialog(),
+    );
+    if (title == null || title.trim().isEmpty) return;
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfessionalSetupWizard(title: title.trim()),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,30 +141,7 @@ class ResumeTemplateSelectionScreen extends StatelessWidget {
       child: InkWell(
         onTap: () {
           FocusScope.of(context).unfocus();
-          Widget screen;
-          switch (title) {
-            case 'Classic':
-              screen = const ClassicResumeFormScreen();
-              break;
-            case 'Modern':
-              screen = const ModernResumeFormScreen();
-              break;
-            case 'Minimal':
-              screen = const MinimalResumeFormScreen();
-              break;
-            case 'Professional':
-              screen = const ProfessionalResumeFormScreen();
-              break;
-            case 'Creative':
-              screen = const CreativeResumeFormScreen();
-              break;
-            case 'One Page':
-              screen = const OnePageResumeFormScreen();
-              break;
-            default:
-              screen = const ClassicResumeFormScreen();
-          }
-          Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+          _navigateToTemplateFormScreen(context, title);
         },
         child: Padding(
           padding: const EdgeInsets.all(16),

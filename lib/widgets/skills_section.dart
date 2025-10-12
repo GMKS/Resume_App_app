@@ -6,10 +6,10 @@ class SkillsSection extends StatefulWidget {
   final Function(List<Skill>) onSkillsChanged;
 
   const SkillsSection({
-    Key? key,
+    super.key,
     required this.skills,
     required this.onSkillsChanged,
-  }) : super(key: key);
+  });
 
   @override
   _SkillsSectionState createState() => _SkillsSectionState();
@@ -79,11 +79,11 @@ class _SkillsSectionState extends State<SkillsSection> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
-                    const Icon(Icons.add_circle_outline, color: Colors.indigo),
-                    const SizedBox(width: 8),
-                    const Text(
+                    Icon(Icons.add_circle_outline, color: Colors.indigo),
+                    SizedBox(width: 8),
+                    Text(
                       'Add New Skill',
                       style: TextStyle(
                         fontSize: 16,
@@ -304,12 +304,12 @@ class _SkillsSectionState extends State<SkillsSection> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),
             );
-          }).toList(),
+          }),
 
         const SizedBox(height: 16),
 

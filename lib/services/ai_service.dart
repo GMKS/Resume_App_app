@@ -1253,7 +1253,7 @@ List<String> _buildStructuredLines(SmartAssistResult res) {
         final s = l.trim();
         if (s.isEmpty) continue;
         if (s.startsWith(RegExp(r'[•\-*]\s*'))) {
-          lines.add('- ' + s.replaceFirst(RegExp(r'^[•\-*]\s*'), ''));
+          lines.add('- ${s.replaceFirst(RegExp(r'^[•\-*]\s*'), '')}');
         } else {
           lines.add(s);
         }

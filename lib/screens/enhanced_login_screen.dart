@@ -120,7 +120,7 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
                     const SizedBox(height: 24),
 
                     // Skip Login Button for Demo
-                    Container(
+                    SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: _bypassLogin,

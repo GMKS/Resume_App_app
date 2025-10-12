@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
-import '../widgets/requirements_banner.dart';
 import '../widgets/dynamic_sections.dart';
 import '../widgets/skills_picker_field.dart';
 import '../services/share_export_service.dart';
 import '../services/premium_service.dart';
 import '../widgets/ai_widgets.dart';
-import '../widgets/reorderable_sections.dart';
 // Removed skills keyword suggestions; adding summary keyword chips inline.
 
 class ClassicResumeFormScreen extends StatefulWidget {
@@ -24,6 +22,16 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
   List<WorkExperience> _workExperiences = [];
   List<Education> _educations = [];
   bool _atsFriendly = true;
+
+  // Collapsible section states
+  Map<String, bool> _sectionExpanded = {
+    'contact': false,
+    'summary': false,
+    'skills': false,
+    'experience': false,
+    'education': false,
+    'certifications': false,
+  };
 
   @override
   void initState() {
@@ -119,30 +127,24 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
     return buffer.toString();
   }
 
-  Widget _sectionTitle(String text) => Padding(
-    padding: const EdgeInsets.only(top: 24, bottom: 8),
-    child: Text(
-      text,
-      style: const TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 18,
-        fontFamily: 'Calibri',
-      ),
-    ),
-  );
-
-  // Consistent section card wrapper for cleaner visual grouping
+  // Collapsible section card wrapper for cleaner visual grouping
   Widget _sectionCard({
     required String title,
     IconData? icon,
     required Widget child,
+    String? sectionKey,
   }) {
+    final isExpanded = sectionKey != null
+        ? (_sectionExpanded[sectionKey] ?? false)
+        : true;
+
     final border = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(8),
       side: _atsFriendly
           ? BorderSide(color: Colors.grey.shade300)
           : BorderSide(color: Colors.transparent),
     );
+
     return Card(
       elevation: _atsFriendly ? 0 : 1,
       shape: border,
@@ -152,25 +154,39 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                if (!_atsFriendly && icon != null) ...[
-                  Icon(icon, size: 20, color: Colors.black87),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
+            InkWell(
+              onTap: sectionKey != null
+                  ? () {
+                      setState(() {
+                        _sectionExpanded[sectionKey] = !isExpanded;
+                      });
+                    }
+                  : null,
+              child: Row(
+                children: [
+                  if (!_atsFriendly && icon != null) ...[
+                    Icon(icon, size: 20, color: Colors.black87),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  if (sectionKey != null)
+                    Icon(
+                      isExpanded ? Icons.remove : Icons.add,
+                      size: 20,
+                      color: Colors.grey.shade600,
+                    ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            child,
+            if (isExpanded) ...[const SizedBox(height: 12), child],
           ],
         ),
       ),
@@ -329,79 +345,6 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
             }
           });
 
-          // Determine initial order for draggable sections
-          List<String> order = ['summary', 'skills', 'experience'];
-          try {
-            final raw = state.controllerFor('sectionOrder').text;
-            if (raw.isNotEmpty) {
-              final parsed = jsonDecode(raw);
-              if (parsed is List) {
-                order = parsed.map((e) => e.toString()).toList();
-              }
-            }
-          } catch (_) {}
-
-          // Build SectionItem map
-          Map<String, SectionItem> sectionBuilders() {
-            return {
-              'summary': SectionItem(
-                keyId: 'summary',
-                title: 'Professional Summary',
-                build: () => _sectionCard(
-                  title: 'Professional Summary',
-                  icon: Icons.badge,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      state.buildTextField(
-                        'summary',
-                        'Professional Summary',
-                        maxLines: 3,
-                        required: true,
-                      ),
-                      _buildSummarySuggestions(state.controllerFor('summary')),
-                    ],
-                  ),
-                ),
-              ),
-              'skills': SectionItem(
-                keyId: 'skills',
-                title: 'Skills',
-                build: () => _sectionCard(
-                  title: 'Skills',
-                  icon: Icons.handyman,
-                  child: SkillsPickerField(
-                    controller: state.controllerFor('skills'),
-                    label: 'Skills',
-                  ),
-                ),
-              ),
-              'experience': SectionItem(
-                keyId: 'experience',
-                title: 'Work Experience',
-                build: () => DynamicWorkExperienceSection(
-                  workExperiences: _workExperiences,
-                  onWorkExperiencesChanged: (experiences) {
-                    setState(() {
-                      _workExperiences = experiences;
-                      // Update JSON in hidden controller for BaseResumeForm
-                      state.controllerFor('workExperiences').text = jsonEncode(
-                        experiences.map((e) => e.toJson()).toList(),
-                      );
-                    });
-                  },
-                  atsFriendly: _atsFriendly,
-                ),
-              ),
-            };
-          }
-
-          final all = sectionBuilders();
-          final sections = order
-              .where(all.containsKey)
-              .map((k) => all[k]!)
-              .toList(growable: false);
-
           return Scaffold(
             appBar: AppBar(
               title: const Text(
@@ -516,18 +459,10 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const RequirementsBanner(
-                    requiredFieldLabels: {
-                      'name': 'Full Name',
-                      'phone': 'Mobile Number',
-                      'email': 'Email Address',
-                      'summary': 'Professional Summary',
-                      'skills': 'Skills',
-                    },
-                  ),
                   _sectionCard(
                     title: 'Contact Info',
                     icon: Icons.contact_page,
+                    sectionKey: 'contact',
                     child: Column(
                       children: [
                         state.buildTextField(
@@ -552,35 +487,84 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                       ],
                     ),
                   ),
-                  // Draggable sections: Summary, Skills, Experience (Premium)
-                  if (PremiumService.hasDragDropFeature)
-                    ReorderableResumeSections(
-                      sections: sections,
-                      onOrderChanged: (newOrder) {
-                        // Persist order as JSON string in hidden controller
-                        state.controllerFor('sectionOrder').text = jsonEncode(
-                          newOrder,
-                        );
-                      },
-                    ),
 
-                  DynamicEducationSection(
-                    educations: _educations,
-                    onEducationsChanged: (educations) {
-                      setState(() {
-                        _educations = educations;
-                        // Update JSON in hidden controller for BaseResumeForm
-                        state.controllerFor('educations').text = jsonEncode(
-                          educations.map((e) => e.toJson()).toList(),
-                        );
-                      });
-                    },
-                    atsFriendly: _atsFriendly,
+                  // Professional Summary
+                  _sectionCard(
+                    title: 'Professional Summary',
+                    icon: Icons.badge,
+                    sectionKey: 'summary',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        state.buildTextField(
+                          'summary',
+                          'Professional Summary',
+                          maxLines: 3,
+                          required: true,
+                        ),
+                        _buildSummarySuggestions(
+                          state.controllerFor('summary'),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Skills
+                  _sectionCard(
+                    title: 'Skills',
+                    icon: Icons.handyman,
+                    sectionKey: 'skills',
+                    child: SkillsPickerField(
+                      controller: state.controllerFor('skills'),
+                      label: 'Skills',
+                    ),
+                  ),
+
+                  // Work Experience
+                  _sectionCard(
+                    title: 'Work Experience',
+                    icon: Icons.work,
+                    sectionKey: 'experience',
+                    child: DynamicWorkExperienceSection(
+                      workExperiences: _workExperiences,
+                      onWorkExperiencesChanged: (experiences) {
+                        setState(() {
+                          _workExperiences = experiences;
+                          // Update JSON in hidden controller for BaseResumeForm
+                          state
+                              .controllerFor('workExperiences')
+                              .text = jsonEncode(
+                            experiences.map((e) => e.toJson()).toList(),
+                          );
+                        });
+                      },
+                      atsFriendly: _atsFriendly,
+                    ),
+                  ),
+
+                  _sectionCard(
+                    title: 'Education',
+                    icon: Icons.school,
+                    sectionKey: 'education',
+                    child: DynamicEducationSection(
+                      educations: _educations,
+                      onEducationsChanged: (educations) {
+                        setState(() {
+                          _educations = educations;
+                          // Update JSON in hidden controller for BaseResumeForm
+                          state.controllerFor('educations').text = jsonEncode(
+                            educations.map((e) => e.toJson()).toList(),
+                          );
+                        });
+                      },
+                      atsFriendly: _atsFriendly,
+                    ),
                   ),
 
                   _sectionCard(
                     title: 'Certifications',
                     icon: Icons.workspace_premium,
+                    sectionKey: 'certifications',
                     child: state.buildTextField(
                       'certifications',
                       'Certifications',

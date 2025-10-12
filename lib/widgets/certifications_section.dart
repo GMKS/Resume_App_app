@@ -6,10 +6,10 @@ class CertificationsSection extends StatefulWidget {
   final Function(List<Certification>) onCertificationsChanged;
 
   const CertificationsSection({
-    Key? key,
+    super.key,
     required this.certifications,
     required this.onCertificationsChanged,
-  }) : super(key: key);
+  });
 
   @override
   _CertificationsSectionState createState() => _CertificationsSectionState();
@@ -17,7 +17,7 @@ class CertificationsSection extends StatefulWidget {
 
 class _CertificationsSectionState extends State<CertificationsSection> {
   void _addCertification() {
-    final newCertification = Certification(name: '', issuer: '');
+    const newCertification = Certification(name: '', issuer: '');
 
     final updatedCertifications = List<Certification>.from(
       widget.certifications,
@@ -264,7 +264,7 @@ class _CertificationsSectionState extends State<CertificationsSection> {
               ),
             ),
           );
-        }).toList(),
+        }),
 
         const SizedBox(height: 16),
 

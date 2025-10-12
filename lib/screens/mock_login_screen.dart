@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/mock_auth_service.dart';
 import '../main_no_firebase.dart';
-import 'mock_home_screen.dart';
+import 'simple_home_screen.dart';
 
 class MockLoginScreen extends StatefulWidget {
   const MockLoginScreen({super.key});
@@ -64,7 +64,7 @@ class _MockLoginScreenState extends State<MockLoginScreen> {
       // Navigate to home screen
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MockHomeScreen()),
+          MaterialPageRoute(builder: (_) => const SimpleHomeScreen()),
         );
       }
     } else {
@@ -145,7 +145,7 @@ class _MockLoginScreenState extends State<MockLoginScreen> {
 
         if (mounted) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MockHomeScreen()),
+            MaterialPageRoute(builder: (_) => const SimpleHomeScreen()),
           );
         }
       }
@@ -183,7 +183,7 @@ class _MockLoginScreenState extends State<MockLoginScreen> {
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MockHomeScreen()),
+          MaterialPageRoute(builder: (_) => const SimpleHomeScreen()),
         );
       }
     } else {

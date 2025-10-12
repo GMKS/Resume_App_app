@@ -6,11 +6,13 @@ import '../services/skills_service.dart';
 class SkillsPickerField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
+  final VoidCallback? onChanged;
 
   const SkillsPickerField({
     super.key,
     required this.controller,
     this.label = 'Skills',
+    this.onChanged,
   });
 
   @override
@@ -77,6 +79,7 @@ class _SkillsPickerFieldState extends State<SkillsPickerField> {
 
   void _commitToController() {
     widget.controller.text = _selected.join(', ');
+    widget.onChanged?.call();
   }
 
   void _addSkill(String s) {

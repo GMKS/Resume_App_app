@@ -6,10 +6,10 @@ class ExperienceSection extends StatefulWidget {
   final Function(List<Experience>) onExperiencesChanged;
 
   const ExperienceSection({
-    Key? key,
+    super.key,
     required this.experiences,
     required this.onExperiencesChanged,
-  }) : super(key: key);
+  });
 
   @override
   _ExperienceSectionState createState() => _ExperienceSectionState();
@@ -17,7 +17,7 @@ class ExperienceSection extends StatefulWidget {
 
 class _ExperienceSectionState extends State<ExperienceSection> {
   void _addExperience() {
-    final newExperience = Experience(jobTitle: '', companyName: '');
+    const newExperience = Experience(jobTitle: '', companyName: '');
 
     final updatedExperiences = List<Experience>.from(widget.experiences)
       ..add(newExperience);
@@ -292,7 +292,7 @@ class _ExperienceSectionState extends State<ExperienceSection> {
               ),
             ),
           );
-        }).toList(),
+        }),
 
         const SizedBox(height: 16),
 

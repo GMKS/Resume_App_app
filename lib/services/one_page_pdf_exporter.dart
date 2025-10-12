@@ -8,28 +8,26 @@ class OnePagePdfExporter {
   static Future<Uint8List> build(SavedResume resume) async {
     final data = resume.data;
 
-    String _t(String k) => (data[k] ?? '').toString();
+    String t(String k) => (data[k] ?? '').toString();
 
     // Contact
-    final name = _t('name');
-    final title = _t('title');
-    final email = _t('email');
-    final phone = _t('phone');
-    final linkedIn = _t('linkedIn').isNotEmpty
-        ? _t('linkedIn')
-        : _t('linkedin');
+    final name = t('name');
+    final title = t('title');
+    final email = t('email');
+    final phone = t('phone');
+    final linkedIn = t('linkedIn').isNotEmpty ? t('linkedIn') : t('linkedin');
 
     // Profile
-    final summary = _t('summary');
+    final summary = t('summary');
 
     // Sidebar sections
-    final skillsCsv = _t('coreSkills');
-    final awards = _t('awards');
-    final languages = _t('languages');
+    final skillsCsv = t('coreSkills');
+    final awards = t('awards');
+    final languages = t('languages');
 
     // Decode image if present
-    pw.Widget _photo() {
-      final b64 = _t('profilePhotoBase64');
+    pw.Widget photo() {
+      final b64 = t('profilePhotoBase64');
       if (b64.isEmpty) return pw.SizedBox();
       try {
         final bytes = base64Decode(b64);
@@ -44,12 +42,12 @@ class OnePagePdfExporter {
       }
     }
 
-    List<Map<String, dynamic>> _decodeListPrefer(
+    List<Map<String, dynamic>> decodeListPrefer(
       String primary,
       String fallbackJson,
       String fallbackList,
     ) {
-      final primaryStr = _t(primary);
+      final primaryStr = t(primary);
       if (primaryStr.isNotEmpty) {
         try {
           return (jsonDecode(primaryStr) as List)
@@ -58,7 +56,7 @@ class OnePagePdfExporter {
               .toList();
         } catch (_) {}
       }
-      final fb = _t(fallbackJson);
+      final fb = t(fallbackJson);
       if (fb.isNotEmpty) {
         try {
           return (jsonDecode(fb) as List)
@@ -78,7 +76,7 @@ class OnePagePdfExporter {
     }
 
     // Date range helper that supports multiple key variants used across the app
-    String _dateRange(Map e) {
+    String dateRange(Map e) {
       String pick(List<String> keys) {
         for (final k in keys) {
           final v = e[k];
@@ -103,19 +101,19 @@ class OnePagePdfExporter {
       return '$s – $ed';
     }
 
-    final work = _decodeListPrefer(
+    final work = decodeListPrefer(
       'workExperiencesJson',
       'workExperiences',
       'workExperience',
     );
-    final edu = _decodeListPrefer('educationsJson', 'educations', 'education');
+    final edu = decodeListPrefer('educationsJson', 'educations', 'education');
 
-    List<String> _splitCsv(String val) =>
+    List<String> splitCsv(String val) =>
         val.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
-    final skills = _splitCsv(skillsCsv);
+    final skills = splitCsv(skillsCsv);
 
-    pw.Widget _h(String t) => pw.Padding(
+    pw.Widget h(String t) => pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 6),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -151,20 +149,20 @@ class OnePagePdfExporter {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    _photo(),
+                    photo(),
                     if (email.isNotEmpty ||
                         phone.isNotEmpty ||
                         linkedIn.isNotEmpty) ...[
                       pw.SizedBox(height: 12),
-                      _h('Contact'),
+                      h('Contact'),
                       if (phone.isNotEmpty)
                         pw.Text(phone, style: const pw.TextStyle(fontSize: 9)),
                       if (email.isNotEmpty)
                         pw.Text(email, style: const pw.TextStyle(fontSize: 9)),
                       // Add portfolio to match preview
-                      if (_t('portfolio').isNotEmpty)
+                      if (t('portfolio').isNotEmpty)
                         pw.Text(
-                          _t('portfolio'),
+                          t('portfolio'),
                           style: const pw.TextStyle(fontSize: 9),
                         ),
                       if (linkedIn.isNotEmpty)
@@ -174,7 +172,7 @@ class OnePagePdfExporter {
                               : 'https://$linkedIn',
                           child: pw.Text(
                             linkedIn,
-                            style: pw.TextStyle(
+                            style: const pw.TextStyle(
                               fontSize: 9,
                               color: PdfColors.blue,
                             ),
@@ -183,13 +181,13 @@ class OnePagePdfExporter {
                     ],
                     if (edu.isNotEmpty) ...[
                       pw.SizedBox(height: 14),
-                      _h('Education'),
+                      h('Education'),
                       ...edu.map((e) {
                         final degree = (e['degree'] ?? '').toString();
                         final institution =
                             (e['institution'] ?? e['university'] ?? '')
                                 .toString();
-                        final range = _dateRange(e);
+                        final range = dateRange(e);
                         return pw.Padding(
                           padding: const pw.EdgeInsets.only(bottom: 8),
                           child: pw.Column(
@@ -223,7 +221,7 @@ class OnePagePdfExporter {
                     ],
                     if (skills.isNotEmpty) ...[
                       pw.SizedBox(height: 14),
-                      _h('Skills'),
+                      h('Skills'),
                       ...skills.map(
                         (s) => pw.Bullet(
                           text: s,
@@ -233,7 +231,7 @@ class OnePagePdfExporter {
                     ],
                     if (awards.isNotEmpty) ...[
                       pw.SizedBox(height: 14),
-                      _h('Awards'),
+                      h('Awards'),
                       // Split comma-separated awards into bullets to mirror preview
                       ...awards
                           .split(',')
@@ -248,7 +246,7 @@ class OnePagePdfExporter {
                     ],
                     if (languages.isNotEmpty) ...[
                       pw.SizedBox(height: 14),
-                      _h('Languages'),
+                      h('Languages'),
                       pw.Text(
                         languages,
                         style: const pw.TextStyle(fontSize: 9),
@@ -294,7 +292,7 @@ class OnePagePdfExporter {
                           if (title.isNotEmpty)
                             pw.Text(
                               title,
-                              style: pw.TextStyle(
+                              style: const pw.TextStyle(
                                 fontSize: 11,
                                 color: PdfColors.grey700,
                                 letterSpacing: 1.2,
@@ -304,18 +302,18 @@ class OnePagePdfExporter {
                       ),
                     ),
                     if (summary.isNotEmpty) ...[
-                      _h('Profile'),
+                      h('Profile'),
                       pw.Text(summary, style: const pw.TextStyle(fontSize: 10)),
                       pw.SizedBox(height: 10),
                     ],
                     if (work.isNotEmpty) ...[
-                      _h('Professional Experience'),
+                      h('Professional Experience'),
                       ...work.map((w) {
                         final role = (w['jobTitle'] ?? w['role'] ?? '')
                             .toString();
                         final company = (w['company'] ?? '').toString();
                         final location = (w['location'] ?? '').toString();
-                        final range = _dateRange(w);
+                        final range = dateRange(w);
                         final desc = (w['description'] ?? '').toString();
                         final bullets = (w['achievements'] is List)
                             ? (w['achievements'] as List)
@@ -344,7 +342,7 @@ class OnePagePdfExporter {
                                     if (location.isNotEmpty) location,
                                     if (range.isNotEmpty) range,
                                   ].join(' • '),
-                                  style: pw.TextStyle(
+                                  style: const pw.TextStyle(
                                     fontSize: 9,
                                     color: PdfColors.grey700,
                                   ),

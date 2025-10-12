@@ -28,7 +28,7 @@ class CreativeResumePreview extends StatelessWidget {
     final work = _parseWork(data['workExperiences']);
     final edus = _parseEducation(data['educations']);
 
-    final accent = Colors.indigo;
+    const accent = Colors.indigo;
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(

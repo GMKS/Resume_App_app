@@ -8,10 +8,10 @@ class DesignSettingsTab extends StatefulWidget {
   final Function(CustomizeSettings) onSettingsChanged;
 
   const DesignSettingsTab({
-    Key? key,
+    super.key,
     required this.settings,
     required this.onSettingsChanged,
-  }) : super(key: key);
+  });
 
   @override
   _DesignSettingsTabState createState() => _DesignSettingsTabState();
@@ -204,7 +204,7 @@ class _DesignSettingsTabState extends State<DesignSettingsTab> {
                 activeColor: Colors.indigo,
                 contentPadding: EdgeInsets.zero,
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -259,7 +259,7 @@ class _DesignSettingsTabState extends State<DesignSettingsTab> {
                     child: Center(
                       child: Text(
                         theme.key,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
                           fontSize: 12,
@@ -435,7 +435,7 @@ class _DesignSettingsTabState extends State<DesignSettingsTab> {
                 activeColor: Colors.indigo,
                 contentPadding: EdgeInsets.zero,
               );
-            }).toList(),
+            }),
           ],
         ),
       ),

@@ -11,6 +11,7 @@ import '../services/share_export_service.dart';
 import '../widgets/skills_picker_field.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/ai_resume_service.dart';
+import 'modern_template_selection_screen.dart';
 
 class ModernResumeFormScreen extends StatefulWidget {
   final SavedResume? existingResume;
@@ -61,6 +62,20 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
   final _eduDegree = TextEditingController();
   DateTime? _eduStart, _eduEnd;
   bool _atsFriendly = false;
+
+  // Collapsible section states - all sections start collapsed
+  Map<String, bool> _sectionExpanded = {
+    'photo': false,
+    'contact': false,
+    'linkedin': false,
+    'summary': false,
+    'skills': false,
+    'work': false,
+    'education': false,
+    'certifications': false,
+    'achievements': false,
+    'hobbies': false,
+  };
 
   // --- Overlap detection helpers (month granularity) ---
   bool _datesOverlap(DateTime? s1, DateTime? e1, DateTime? s2, DateTime? e2) {
@@ -492,6 +507,94 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
     }
   }
 
+  void _navigateToColorfulTemplates() async {
+    // Commit any pending inputs before navigating
+    _commitPendingInputs();
+
+    // Save current resume data
+    final data = _collectResumeData();
+    final currentResume = SavedResume(
+      id:
+          widget.existingResume?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      title: _controllers['name']!.text.trim().isNotEmpty
+          ? '${_controllers['name']!.text.trim()} Resume'
+          : 'Modern Resume',
+      template: 'Modern',
+      createdAt: widget.existingResume?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+      data: data,
+    );
+
+    // Navigate to template selection
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            ModernTemplateSelectionScreen(resume: currentResume),
+      ),
+    );
+  }
+
+  // Collapsible card wrapper for Modern resume sections
+  Widget _modernCollapsibleCard({
+    required String title,
+    required String sectionKey,
+    required Widget child,
+    IconData? icon,
+    Color? accentColor,
+  }) {
+    const defaultAccent = Colors.purple;
+    final accent = accentColor ?? defaultAccent;
+    final isExpanded = _sectionExpanded[sectionKey] ?? false;
+
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: accent.withOpacity(0.25)),
+      ),
+      elevation: 8,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _sectionExpanded[sectionKey] = !isExpanded;
+                });
+              },
+              child: Row(
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, color: accent, size: 28),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    isExpanded ? Icons.remove : Icons.add,
+                    size: 24,
+                    color: Colors.grey.shade600,
+                  ),
+                ],
+              ),
+            ),
+            if (isExpanded) ...[const SizedBox(height: 16), child],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const accent = Colors.purple;
@@ -563,421 +666,357 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
             padding: const EdgeInsets.all(18),
             children: [
               // Photo box only
-              Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 8,
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Center(
-                    child: ProfilePhotoPicker(
-                      initialBase64: _profilePhotoB64,
-                      onChanged: _onPhotoChanged,
-                      size: 96,
-                      buttonBelow: true,
-                    ),
+              _modernCollapsibleCard(
+                title: 'Profile Photo',
+                sectionKey: 'photo',
+                icon: Icons.person,
+                child: Center(
+                  child: ProfilePhotoPicker(
+                    initialBase64: _profilePhotoB64,
+                    onChanged: _onPhotoChanged,
+                    size: 96,
+                    buttonBelow: true,
                   ),
                 ),
               ),
               const SizedBox(height: 18),
               // Contact box: Full Name, Email, Phone
-              Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 8,
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _modernContactRow(
-                        null,
-                        _controllers['name']!,
-                        'Full Name',
-                        focusNode: _focusNodes['name'],
-                        bold: true,
-                        autofillHints: const [AutofillHints.name],
-                      ),
-                      _modernContactRow(
-                        null,
-                        _controllers['email']!,
-                        'Email',
-                        focusNode: _focusNodes['email'],
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                      ),
-                      _modernContactRow(
-                        null,
-                        _controllers['phone']!,
-                        'Phone Number',
-                        focusNode: _focusNodes['phone'],
-                        keyboardType: TextInputType.phone,
-                        autofillHints: const [AutofillHints.telephoneNumber],
-                      ),
-                    ],
-                  ),
+              _modernCollapsibleCard(
+                title: 'Contact Information',
+                sectionKey: 'contact',
+                icon: Icons.contact_page,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _modernContactRow(
+                      null,
+                      _controllers['name']!,
+                      'Full Name',
+                      focusNode: _focusNodes['name'],
+                      bold: true,
+                      autofillHints: const [AutofillHints.name],
+                    ),
+                    _modernContactRow(
+                      null,
+                      _controllers['email']!,
+                      'Email',
+                      focusNode: _focusNodes['email'],
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email],
+                    ),
+                    _modernContactRow(
+                      null,
+                      _controllers['phone']!,
+                      'Phone Number',
+                      focusNode: _focusNodes['phone'],
+                      keyboardType: TextInputType.phone,
+                      autofillHints: const [AutofillHints.telephoneNumber],
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
               // LinkedIn box only
-              Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 8,
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: _modernContactRow(
-                    Icons.business,
-                    _controllers['linkedin']!,
-                    'LinkedIn URL',
-                    focusNode: _focusNodes['linkedin'],
-                    keyboardType: TextInputType.url,
-                    autofillHints: const [AutofillHints.url],
-                    suffixIcon: IconButton(
-                      tooltip: 'Open LinkedIn',
-                      icon: const Icon(Icons.open_in_new),
-                      color: Colors.purple,
-                      onPressed: () async {
-                        final raw = _controllers['linkedin']!.text.trim();
-                        if (raw.isEmpty) return;
-                        await _openUrl(raw);
-                      },
-                    ),
+              _modernCollapsibleCard(
+                title: 'LinkedIn Profile',
+                sectionKey: 'linkedin',
+                icon: Icons.business,
+                child: _modernContactRow(
+                  Icons.business,
+                  _controllers['linkedin']!,
+                  'LinkedIn URL',
+                  focusNode: _focusNodes['linkedin'],
+                  keyboardType: TextInputType.url,
+                  autofillHints: const [AutofillHints.url],
+                  suffixIcon: IconButton(
+                    tooltip: 'Open LinkedIn',
+                    icon: const Icon(Icons.open_in_new),
+                    color: Colors.purple,
+                    onPressed: () async {
+                      final raw = _controllers['linkedin']!.text.trim();
+                      if (raw.isEmpty) return;
+                      await _openUrl(raw);
+                    },
                   ),
                 ),
               ),
               const SizedBox(height: 18),
               // AI-Enhanced Summary Section
-              Card(
-                color: Colors.white, // Clear, high-contrast background
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: accent.withOpacity(0.25)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.info, color: Colors.purple, size: 28),
-                          SizedBox(width: 12),
-                          Text(
-                            'Professional Summary',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.purple,
-                            ),
-                          ),
-                          Spacer(),
-                          Icon(
-                            Icons.auto_awesome,
-                            color: Color.fromARGB(255, 157, 152, 202),
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      AIEnhancedTextField(
-                        controller: _controllers['summary']!,
-                        label: 'Summary',
-                        hintText: 'Write a compelling professional summary...',
-                        section: 'summary',
-                        maxLines: 4,
-                        enableAI: true,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.format_list_bulleted),
-                            label: const Text('Generate bullet ideas'),
-                            onPressed: _generateSummaryBullets,
-                          ),
-                          const SizedBox(width: 12),
-                          if (_summaryIdeas.isNotEmpty)
-                            Expanded(
-                              child: Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: _summaryIdeas
-                                    .map(
-                                      (idea) => ActionChip(
-                                        label: Text(
-                                          idea,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            final cur =
-                                                _controllers['summary']!.text;
-                                            _controllers['summary']!.text =
-                                                cur.isEmpty
-                                                ? idea
-                                                : '$cur\n• $idea';
-                                          });
-                                        },
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // AI Summary Generator
-                      if (_controllers['name']!.text.isNotEmpty)
-                        AISummaryGenerator(
-                          name: _controllers['name']!.text,
-                          targetRole: 'Professional', // Can be made dynamic
-                          skills: (_controllers['skills']?.text ?? '')
-                              .split(',')
-                              .map((s) => s.trim())
-                              .where((s) => s.isNotEmpty)
-                              .toList(),
-                          experience: _workTimeline
-                              .map((w) => (w['role'] ?? '').toString())
-                              .cast<String>()
-                              .toList(),
-                          onGenerated: (summary) {
-                            setState(() {
-                              _controllers['summary']!.text = summary;
-                            });
-                          },
+              _modernCollapsibleCard(
+                title: 'Professional Summary',
+                sectionKey: 'summary',
+                icon: Icons.info,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Spacer(),
+                        Icon(
+                          Icons.auto_awesome,
+                          color: Color.fromARGB(255, 157, 152, 202),
+                          size: 20,
                         ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    AIEnhancedTextField(
+                      controller: _controllers['summary']!,
+                      label: 'Summary',
+                      hintText: 'Write a compelling professional summary...',
+                      section: 'summary',
+                      maxLines: 4,
+                      enableAI: true,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.format_list_bulleted),
+                          label: const Text('Generate bullet ideas'),
+                          onPressed: _generateSummaryBullets,
+                        ),
+                        const SizedBox(width: 12),
+                        if (_summaryIdeas.isNotEmpty)
+                          Expanded(
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: _summaryIdeas
+                                  .map(
+                                    (idea) => ActionChip(
+                                      label: Text(
+                                        idea,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          final cur =
+                                              _controllers['summary']!.text;
+                                          _controllers['summary']!.text =
+                                              cur.isEmpty
+                                              ? idea
+                                              : '$cur\n• $idea';
+                                        });
+                                      },
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // AI Summary Generator
+                    if (_controllers['name']!.text.isNotEmpty)
+                      AISummaryGenerator(
+                        name: _controllers['name']!.text,
+                        targetRole: 'Professional', // Can be made dynamic
+                        skills: (_controllers['skills']?.text ?? '')
+                            .split(',')
+                            .map((s) => s.trim())
+                            .where((s) => s.isNotEmpty)
+                            .toList(),
+                        experience: _workTimeline
+                            .map((w) => (w['role'] ?? '').toString())
+                            .cast<String>()
+                            .toList(),
+                        onGenerated: (summary) {
+                          setState(() {
+                            _controllers['summary']!.text = summary;
+                          });
+                        },
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
               // Skills (no star ratings; searchable + manual input via shared widget)
-              Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.build, color: Colors.amber, size: 28),
-                          SizedBox(width: 8),
-                          Text(
-                            'Skills',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                              color: accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Shared picker field handles catalog + typed custom skills
-                      SkillsPickerField(
-                        controller: _controllers['skills']!,
-                        label: 'Skills',
-                      ),
-                    ],
-                  ),
+              _modernCollapsibleCard(
+                title: 'Skills',
+                sectionKey: 'skills',
+                icon: Icons.build,
+                accentColor: Colors.amber,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Shared picker field handles catalog + typed custom skills
+                    SkillsPickerField(
+                      controller: _controllers['skills']!,
+                      label: 'Skills',
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
               // Work Timeline
-              Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Text('🏢', style: TextStyle(fontSize: 24)),
-                          SizedBox(width: 8),
-                          Text(
-                            'Work Experience',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                              color: accent,
+              _modernCollapsibleCard(
+                title: 'Work Experience',
+                sectionKey: 'work',
+                icon: Icons.work,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Overlap warning for work items
+                    Builder(
+                      builder: (context) {
+                        final overlaps = _findOverlapsForTimeline(
+                          _workTimeline,
+                          label: 'Experience',
+                        );
+                        if (overlaps.isEmpty) return const SizedBox(height: 12);
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8, bottom: 4),
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              border: Border.all(color: Colors.red.shade200),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.warning_amber,
+                                      color: Colors.red,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Expanded(
+                                      child: Text(
+                                        'Overlapping work experience dates detected',
+                                        style: TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                ...overlaps
+                                    .map(
+                                      (m) => Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          m,
+                                          style: const TextStyle(
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ],
                             ),
                           ),
-                        ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    ..._workTimeline.map(
+                      (w) => _timelineTile(
+                        title: w['role'],
+                        subtitle: w['company'],
+                        start: w['start'],
+                        end: w['end'],
+                        color: Colors.purple,
                       ),
-                      // Overlap warning for work items
-                      Builder(
-                        builder: (context) {
-                          final overlaps = _findOverlapsForTimeline(
-                            _workTimeline,
-                            label: 'Experience',
-                          );
-                          if (overlaps.isEmpty)
-                            return const SizedBox(height: 12);
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8, bottom: 4),
-                            child: Container(
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade50,
-                                border: Border.all(color: Colors.red.shade200),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.warning_amber,
-                                        color: Colors.red,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Expanded(
-                                        child: Text(
-                                          'Overlapping work experience dates detected',
-                                          style: TextStyle(
-                                            color: Colors.red,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  ...overlaps
-                                      .map(
-                                        (m) => Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 2,
-                                          ),
-                                          child: Text(
-                                            m,
-                                            style: const TextStyle(
-                                              color: Colors.red,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                ],
-                              ),
+                    ),
+                    const Divider(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _workCompany,
+                            decoration: const InputDecoration(
+                              labelText: 'Company',
                             ),
-                          );
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _workRole,
+                            decoration: const InputDecoration(
+                              labelText: 'Role',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.calendar_today),
+                            label: Text(
+                              _workStart == null
+                                  ? 'Start Date'
+                                  : "${_workStart!.year}-${_workStart!.month.toString().padLeft(2, '0')}",
+                            ),
+                            onPressed: () => _pickDate(
+                              context,
+                              (d) => setState(() => _workStart = d),
+                              initial: _workStart,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.calendar_today),
+                            label: Text(
+                              _workEnd == null
+                                  ? 'End Date'
+                                  : "${_workEnd!.year}-${_workEnd!.month.toString().padLeft(2, '0')}",
+                            ),
+                            onPressed: () => _pickDate(
+                              context,
+                              (d) => setState(() => _workEnd = d),
+                              initial: _workEnd,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // AI Bullet Point Generator for Work Experience
+                    if (_workCompany.text.isNotEmpty &&
+                        _workRole.text.isNotEmpty)
+                      AIBulletPointGenerator(
+                        jobTitle: _workRole.text,
+                        company: _workCompany.text,
+                        description:
+                            'Professional experience in ${_workRole.text} at ${_workCompany.text}',
+                        onGenerated: (bulletPoints) {
+                          setState(() {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Generated ${bulletPoints.length} bullet points!',
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          });
                         },
                       ),
-                      const SizedBox(height: 12),
-                      ..._workTimeline.map(
-                        (w) => _timelineTile(
-                          title: w['role'],
-                          subtitle: w['company'],
-                          start: w['start'],
-                          end: w['end'],
-                          color: accent,
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.purple,
                         ),
+                        onPressed: _addWork,
                       ),
-                      const Divider(),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _workCompany,
-                              decoration: const InputDecoration(
-                                labelText: 'Company',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _workRole,
-                              decoration: const InputDecoration(
-                                labelText: 'Role',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextButton.icon(
-                              icon: const Icon(Icons.calendar_today),
-                              label: Text(
-                                _workStart == null
-                                    ? 'Start Date'
-                                    : "${_workStart!.year}-${_workStart!.month.toString().padLeft(2, '0')}",
-                              ),
-                              onPressed: () => _pickDate(
-                                context,
-                                (d) => setState(() => _workStart = d),
-                                initial: _workStart,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: TextButton.icon(
-                              icon: const Icon(Icons.calendar_today),
-                              label: Text(
-                                _workEnd == null
-                                    ? 'End Date'
-                                    : "${_workEnd!.year}-${_workEnd!.month.toString().padLeft(2, '0')}",
-                              ),
-                              onPressed: () => _pickDate(
-                                context,
-                                (d) => setState(() => _workEnd = d),
-                                initial: _workEnd,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // AI Bullet Point Generator for Work Experience
-                      if (_workCompany.text.isNotEmpty &&
-                          _workRole.text.isNotEmpty)
-                        AIBulletPointGenerator(
-                          jobTitle: _workRole.text,
-                          company: _workCompany.text,
-                          description:
-                              'Professional experience in ${_workRole.text} at ${_workCompany.text}',
-                          onGenerated: (bulletPoints) {
-                            setState(() {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Generated ${bulletPoints.length} bullet points!',
-                                  ),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            });
-                          },
-                        ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: accent,
-                          ),
-                          onPressed: _addWork,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
@@ -1317,6 +1356,21 @@ class _ModernResumeFormScreenState extends State<ModernResumeFormScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.palette),
+                  label: const Text('Choose Colorful Template'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accent.withOpacity(0.1),
+                    foregroundColor: accent,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: BorderSide(color: accent),
+                  ),
+                  onPressed: _navigateToColorfulTemplates,
+                ),
+              ),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(

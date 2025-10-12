@@ -1,66 +1,51 @@
 # Copilot instructions for this repo
 
-This Flutter app builds resumes with multiple templates (Modern, Classic, Minimal, Professional, Creative, One Page) and can export/share as PDF/DOCX/TXT. The app also supports a Node.js backend for cloud saves and OTP.
+Flutter app for building resumes with multiple templates (Classic, Modern, Minimal, Professional, Creative, One Page). Exports/share via PDF/DOCX/TXT. Optional Node.js backend for auth/cloud saves/OTP.
 
-## How the app is structured
+## Big picture architecture
 
-- lib/models: domain models, e.g. `saved_resume.dart`
-- lib/screens: UI flows for creating, editing, previewing resumes. Each template has a form screen and some have a preview screen (e.g., `one_page_resume_form_screen.dart`, `one_page_resume_preview.dart`).
-- lib/services: cross-cutting services for persistence, export/share, AI assistance, OTP, etc. One-page PDF generation is `services/one_page_pdf_exporter.dart`. Generic export is `services/share_export_service.dart`.
-- widgets/: reusable input controls and form sections (skills picker, dynamic work/education sections, requirements banner, etc.).
+- Data model: `SavedResume` wraps a flexible `data` map; templates read different keys. See `lib/models/saved_resume.dart`.
+- UI: Forms and previews live under `lib/screens/…` (ex: `one_page_resume_form_screen.dart`, `one_page_resume_preview.dart`). Reusable inputs in `lib/widgets/…` (dynamic sections, skills pickers, export options).
+- Services: Cross-cutting logic under `lib/services/…`:
+  - PDF export: `share_export_service.dart` orchestrates routing and sharing; template exporters like `one_page_pdf_exporter.dart`, `classic_pdf_exporter.dart`, `colorful_minimal_pdf_exporter.dart` mirror preview layout.
+  - Cloud API: `node_api_service.dart` with base URL via `--dart-define=API_BASE_URL=…`, token stored with `shared_preferences`.
+  - Premium gating: `premium_service.dart` controls features/templates; use `PremiumService.isPremiumWithDialog` before gated actions.
 
-## Key data shape
+## Key data shapes and conventions
 
-- A resume is `SavedResume` with a free-form `data` map holding fields used by different templates.
-- One Page template stores structured sections in JSON strings:
-  - `workExperiencesJson`: JSON array of items with keys `{ jobTitle, company, location, startDate, endDate, description, achievements? }`
-  - `educationsJson`: JSON array with `{ degree, institution|university|school, startDate, endDate, description? }`
-- Skills are CSV for One Page (`coreSkills`); other templates may use `skills`, `skillsCsv`, or arrays.
+- One Page template stores structured sections as JSON strings in `data`:
+  - `workExperiencesJson`: array of `{ jobTitle, company, location, startDate, endDate, description, achievements? }`
+  - `educationsJson`: array of `{ degree, institution|university|school, startDate, endDate, description? }`
+- Skills inputs vary by template: One Page uses comma CSV `coreSkills`; others may use `skills` or `skillsCsv` (string or array). Exporters try multiple keys.
+- Contact/social keys: `linkedIn` or `linkedin` accepted; include `portfolio` where present. Dates prefer ISO; render compact as `yyyy-MM – yyyy-MM` or `Present`.
+- Images: For One Page, `profilePhotoBase64` should be raw base64 (no data URI prefix). Creative template exporter strips a prefix if present.
 
-## Render/Export flow
+## Export/share flow (what runs where)
 
-- Preview widgets render native Flutter UI (e.g., `one_page_resume_preview.dart`).
-- Export and Share go through `ShareExportService`:
-  - `exportAndOpenPdf(resume)` routes by template; One Page uses `OnePagePdfExporter` for styled PDF if `ats_friendly` is not set.
-  - If `ats_friendly == 'true'`, a minimal single-font PDF is created for ATS parsing.
-  - Email/WhatsApp share call `share_plus` with the generated PDF.
-- One Page styled PDF exporter mirrors the preview layout: left rail ~220px with contact, education, skills, awards; right content with banner (name/title), profile, and experience.
+- Callers use `ShareExportService.exportAndOpenPdf(resume)` or `shareViaEmail/WhatsApp`.
+- Routing: Colorful Minimal → `ColorfulMinimalPdfExporter`; One Page → `OnePagePdfExporter`; Classic → `ClassicPdfExporter`; otherwise a generic fallback.
+- Fallbacks: If styled export fails, a generic PDF is created; final fallback is a minimal single-font PDF built from `_buildPlainTextForDoc` (good for ATS/text-mode). TXT export UI also advertises ATS-friendly content.
+- One Page PDF mirrors preview: left rail ~220px with contact/education/skills/awards; right content with name/title, profile, and experience.
+- Sharing: Uses `share_plus`; WhatsApp has a URL-launch fallback (see `ShareExportService._launchWhatsAppFallback`).
 
-## Common pitfalls and conventions
+## Build/run and debugging
 
-- When adding fields for One Page, update both preview (`one_page_resume_preview.dart`) and PDF (`one_page_pdf_exporter.dart`). Keep keys consistent: `linkedIn` or `linkedin` both accepted; include `portfolio` when present.
-- The minimal ATS export now reads One Page specifics: `coreSkills`, `workExperiencesJson`, `educationsJson`, `awards`, `languages`, `portfolio`.
-- Date ranges prefer ISO strings; format compact as `yyyy-MM – yyyy-MM` or `Present`.
-- Keep hidden JSON controllers in sync in the One Page form (`workExperiencesJson`, `educationsJson`). The form writes these on change for save/export.
+- Run with cloud API: VS Code task “Flutter: Run (Cloud API)” or `flutter run --dart-define=API_BASE_URL=https://resume-builder-api-8kc0.onrender.com/api`.
+ - Run with local API: `flutter run --dart-define=API_BASE_URL=http://127.0.0.1:3001/api` (replace 127.0.0.1 with your PC IP for Android devices).
+- Build APK: task “Flutter: Build APK (Cloud API) [release]”.
+- Entry point `lib/main.dart` boots UI quickly then initializes services in parallel (currency, premium, API, storage).
+- Saved list (`saved_resumes_screen.dart`) is the hub for Edit/Preview/Export/Share. Watch console “DEBUG:” logs in `ShareExportService` during export failures.
 
-## Build, run, and preview
+## Patterns to follow (and pitfalls to avoid)
 
-- Local run (with cloud API): VS Code Task "Flutter: Run (Cloud API)" or:
-  - `flutter run --dart-define=API_BASE_URL=https://resume-builder-api-8kc0.onrender.com/api`
-- Build APK release (cloud API): Task "Flutter: Build APK (Cloud API) [release]".
-- Saved resumes list (`saved_resumes_screen.dart`) provides menu actions: Edit, Save, Export (PDF/DOCX/TXT), Preview, Share (Email/WhatsApp), Print.
-- Premium gating: actions like Export/Preview/Share check `PremiumService.isPremium`; use `PremiumService.showUpgradeDialog` for gating.
+- When adding/modifying One Page fields, update both preview (`one_page_resume_preview.dart`) and PDF (`one_page_pdf_exporter.dart`). Keep JSON controllers in sync in forms (`workExperiencesJson`, `educationsJson`).
+- Exporters are tolerant to key variants (e.g., `skills` vs `skillsCsv` vs `coreSkills`; `linkedIn` vs `linkedin`), but keep new fields consistent across preview and exporter.
+- Premium gating: Before enabling export/share/AI-only features, check `PremiumService.isPremium` and surface `PremiumService.showUpgradeDialog` when needed.
+- Template names vary in switches (e.g., "One Page" vs identifiers elsewhere). Match existing switch cases in `ShareExportService` and screens when adding a template.
 
-## External services
+## Extending the app
 
-- PDF generation uses `pdf` package for styled exports; a hand-rolled minimal writer is used in `ShareExportService` for ATS-friendly mode.
-- Sharing uses `share_plus`.
-- Cloud API base URL is passed with `--dart-define=API_BASE_URL=...` and read in `node_api_service.dart`.
+- New template: add form/preview under `lib/screens`, create a styled exporter under `lib/services`, and add routing in `ShareExportService._generatePdf`. Mirror preview layout in exporter.
+- Cloud API usage: configure `API_BASE_URL` via dart-define; see `README.md` and `server.js` for local/dev server and deployment tips.
 
-## Examples and patterns
-
-- One Page preview builds a left rail + right content layout and splits comma CSV into chips/bullets; PDF mirrors this. See:
-  - `lib/screens/one_page_resume_preview.dart`
-  - `lib/services/one_page_pdf_exporter.dart`
-- To add a new template:
-  - Create form and preview screens under `lib/screens/`.
-  - Add a styled exporter under `lib/services/` and route in `ShareExportService.exportAndOpenPdf`.
-  - Update selection and saved list switch statements to include the new template.
-
-## Testing/debug tips
-
-- If Preview and Export differ, compare the preview widget and exporter side-by-side and align field names and section ordering. For One Page, keep the rail width near 220 to match layout.
-- Use `SavedResumesScreen` → Preview to verify visual layout, then Export PDF and open to compare.
-- For ATS-friendly checks, toggle the switch in the One Page form (`ats_friendly`).
-
-If anything here is unclear or you need more conventions documented (e.g., other templates’ field keys), ask for specifics and we’ll expand this guide.
+Questions or gaps? If other templates’ field keys or flows are unclear, call them out and we’ll expand this guide.

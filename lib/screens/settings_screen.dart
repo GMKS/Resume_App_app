@@ -223,26 +223,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
+                  // Responsive pricing chips; Wrap prevents horizontal overflow on small screens
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      _priceChip(
-                        'Monthly',
-                        CurrencyService.formatPrice('monthly'),
-                        '/mo',
+                      SizedBox(
+                        width:
+                            280, // will be clamped by Expanded in Row-less context
+                        child: _priceChip(
+                          'Monthly',
+                          CurrencyService.formatPrice('monthly'),
+                          '/mo',
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      _priceChip(
-                        'Yearly',
-                        CurrencyService.formatPrice('yearly'),
-                        '/yr',
-                        highlight: true,
-                        note: 'Save 58%',
+                      SizedBox(
+                        width: 280,
+                        child: _priceChip(
+                          'Yearly',
+                          CurrencyService.formatPrice('yearly'),
+                          '/yr',
+                          highlight: true,
+                          note: 'Save 58%',
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      _priceChip(
-                        'Lifetime',
-                        CurrencyService.formatPrice('lifetime'),
-                        'one-time',
+                      SizedBox(
+                        width: 280,
+                        child: _priceChip(
+                          'Lifetime',
+                          CurrencyService.formatPrice('lifetime'),
+                          'one-time',
+                        ),
                       ),
                     ],
                   ),
@@ -571,33 +582,38 @@ Widget _priceChip(
   bool highlight = false,
   String? note,
 }) {
-  return Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: highlight
-            ? Colors.deepPurple.withOpacity(0.08)
-            : Colors.grey.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: highlight ? Colors.deepPurple : Colors.grey.shade300,
-        ),
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: highlight
+          ? Colors.deepPurple.withOpacity(0.08)
+          : Colors.grey.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: highlight ? Colors.deepPurple : Colors.grey.shade300,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: highlight ? Colors.deepPurple : Colors.black87,
-                ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title + optional note badge; use Wrap to avoid overflow on small widths
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: highlight ? Colors.deepPurple : Colors.black87,
               ),
-              if (note != null) ...[
-                const SizedBox(width: 6),
-                Container(
+            ),
+            if (note != null)
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 100),
+                child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
                     vertical: 2,
@@ -607,7 +623,8 @@ Widget _priceChip(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    note,
+                    note!,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
@@ -615,20 +632,21 @@ Widget _priceChip(
                     ),
                   ),
                 ),
-              ],
-            ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          price,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: highlight ? Colors.deepPurple : Colors.black87,
           ),
-          const SizedBox(height: 6),
-          Text(
-            price,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: highlight ? Colors.deepPurple : Colors.black87,
-            ),
-          ),
-          Text(period, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
-        ],
-      ),
+        ),
+        Text(period, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+      ],
     ),
   );
 }

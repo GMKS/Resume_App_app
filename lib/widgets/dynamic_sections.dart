@@ -49,6 +49,16 @@ class WorkExperience {
       achievements: List<String>.from(json['achievements'] ?? []),
     );
   }
+
+  bool hasData() {
+    return jobTitle.isNotEmpty ||
+        company.isNotEmpty ||
+        location.isNotEmpty ||
+        description.isNotEmpty ||
+        startDate != null ||
+        endDate != null ||
+        achievements.isNotEmpty;
+  }
 }
 
 /// Dynamic Education Entry Model
@@ -99,6 +109,16 @@ class Education {
       gpa: json['gpa'] ?? '',
       description: json['description'] ?? '',
     );
+  }
+
+  bool hasData() {
+    return degree.isNotEmpty ||
+        institution.isNotEmpty ||
+        location.isNotEmpty ||
+        gpa.isNotEmpty ||
+        description.isNotEmpty ||
+        startDate != null ||
+        endDate != null;
   }
 }
 
@@ -200,24 +220,9 @@ class _DynamicWorkExperienceSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Add Experience button (removed title since it's in card header)
         Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (!widget.atsFriendly) ...[
-              Icon(Icons.work, color: accentColor, size: 24),
-              const SizedBox(width: 8),
-            ],
-            Expanded(
-              child: Text(
-                'Work Experience',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: accentColor,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
             const SizedBox(width: 8),
             ElevatedButton.icon(
               onPressed: _addWorkExperience,
@@ -725,7 +730,7 @@ class _DynamicEducationSectionState extends State<DynamicEducationSection> {
                           child: TextFormField(
                             initialValue: education.institution,
                             decoration: const InputDecoration(
-                              labelText: 'University *',
+                              labelText: 'College/University *',
                               border: OutlineInputBorder(),
                             ),
                             onChanged: (value) {
