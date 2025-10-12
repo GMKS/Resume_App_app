@@ -8,12 +8,12 @@ class ReferencesSection extends StatefulWidget {
   final Function(bool) onShowReferencesChanged;
 
   const ReferencesSection({
-    Key? key,
+    super.key,
     required this.references,
     required this.showReferences,
     required this.onReferencesChanged,
     required this.onShowReferencesChanged,
-  }) : super(key: key);
+  });
 
   @override
   _ReferencesSectionState createState() => _ReferencesSectionState();
@@ -21,7 +21,7 @@ class ReferencesSection extends StatefulWidget {
 
 class _ReferencesSectionState extends State<ReferencesSection> {
   void _addReference() {
-    final newReference = Reference(name: '');
+    const newReference = Reference(name: '');
 
     final updatedReferences = List<Reference>.from(widget.references)
       ..add(newReference);
@@ -67,7 +67,7 @@ class _ReferencesSectionState extends State<ReferencesSection> {
                   ),
                   value: widget.showReferences,
                   onChanged: widget.onShowReferencesChanged,
-                  activeColor: Colors.indigo,
+                  activeThumbColor: Colors.indigo,
                   contentPadding: EdgeInsets.zero,
                 ),
                 if (!widget.showReferences)
@@ -159,7 +159,7 @@ class _ReferencesSectionState extends State<ReferencesSection> {
                           color: Colors.indigo.shade50,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.person,
                           color: Colors.indigo,
                           size: 20,
@@ -288,7 +288,7 @@ class _ReferencesSectionState extends State<ReferencesSection> {
               ),
             ),
           );
-        }).toList(),
+        }),
 
         const SizedBox(height: 16),
 
@@ -336,26 +336,24 @@ class _ReferencesSectionState extends State<ReferencesSection> {
                 ),
                 const SizedBox(height: 12),
                 ...const [
-                      '• Always ask permission before listing someone as a reference',
-                      '• Provide your references with your current resume and job description',
-                      '• Choose references who can speak to different aspects of your work',
-                      '• Include a mix of supervisors, colleagues, and clients if possible',
-                      '• Keep your references updated on your job search progress',
-                      '• Consider 3-5 references as the optimal number',
-                    ]
-                    .map(
-                      (guideline) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          guideline,
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontSize: 12,
-                          ),
-                        ),
+                  '• Always ask permission before listing someone as a reference',
+                  '• Provide your references with your current resume and job description',
+                  '• Choose references who can speak to different aspects of your work',
+                  '• Include a mix of supervisors, colleagues, and clients if possible',
+                  '• Keep your references updated on your job search progress',
+                  '• Consider 3-5 references as the optimal number',
+                ].map(
+                  (guideline) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      guideline,
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 12,
                       ),
-                    )
-                    .toList(),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

@@ -6,10 +6,10 @@ class PersonalInfoSection extends StatelessWidget {
   final Function(CustomResumeData) onResumeDataChanged;
 
   const PersonalInfoSection({
-    Key? key,
+    super.key,
     required this.resumeData,
     required this.onResumeDataChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

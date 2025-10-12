@@ -6,10 +6,10 @@ class AchievementsSection extends StatefulWidget {
   final Function(List<Achievement>) onAchievementsChanged;
 
   const AchievementsSection({
-    Key? key,
+    super.key,
     required this.achievements,
     required this.onAchievementsChanged,
-  }) : super(key: key);
+  });
 
   @override
   _AchievementsSectionState createState() => _AchievementsSectionState();
@@ -17,7 +17,7 @@ class AchievementsSection extends StatefulWidget {
 
 class _AchievementsSectionState extends State<AchievementsSection> {
   void _addAchievement() {
-    final newAchievement = Achievement(title: '');
+    const newAchievement = Achievement(title: '');
 
     final updatedAchievements = List<Achievement>.from(widget.achievements)
       ..add(newAchievement);
@@ -215,7 +215,7 @@ class _AchievementsSectionState extends State<AchievementsSection> {
               ),
             ),
           );
-        }).toList(),
+        }),
 
         const SizedBox(height: 16),
 

@@ -22,6 +22,32 @@
 -keep class com.google.android.gms.ads.** { *; }
 -dontwarn com.google.android.gms.ads.**
 
+# ===== APP SIZE OPTIMIZATION =====
+
+# Remove debug information for smaller APK
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+}
+
+# Aggressive optimization settings
+-optimizationpasses 5
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclasses
+-dontpreverify
+-optimizations !code/simplification/arithmetic,!field/*,!class/merging/*,!code/allocation/variable
+
+# Keep essential attributes only
+-keepattributes *Annotation*
+-keepattributes SourceFile,LineNumberTable
+-keepattributes Signature
+
+# Remove reflection dependencies not used
+-dontwarn java.lang.invoke**
+-dontwarn **MethodHandle
+-dontwarn java.lang.invoke.MethodHandle
+
 # === FLUTTER PERFORMANCE OPTIMIZATION ===
 # Keep Flutter engine classes for faster startup
 -keep class io.flutter.app.** { *; }

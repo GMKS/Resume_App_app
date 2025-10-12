@@ -194,7 +194,9 @@ class _PrewrittenContentScreenState extends State<PrewrittenContentScreen>
   }
 
   Widget _buildExperienceTab() {
-    final actionVerbs = _prewrittenService.getActionVerbs(_selectedIndustry);
+    final actionVerbs = PrewrittenContentService.getActionVerbs(
+      _selectedIndustry,
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -314,7 +316,7 @@ class _PrewrittenContentScreenState extends State<PrewrittenContentScreen>
   }
 
   Widget _buildKeywordsTab() {
-    final keywords = _prewrittenService.getATSKeywords(_selectedIndustry);
+    final keywords = PrewrittenContentService.getATSKeywords(_selectedIndustry);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),

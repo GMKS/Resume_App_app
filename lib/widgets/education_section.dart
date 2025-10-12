@@ -6,10 +6,10 @@ class EducationSection extends StatefulWidget {
   final Function(List<Education>) onEducationsChanged;
 
   const EducationSection({
-    Key? key,
+    super.key,
     required this.educations,
     required this.onEducationsChanged,
-  }) : super(key: key);
+  });
 
   @override
   _EducationSectionState createState() => _EducationSectionState();
@@ -17,7 +17,7 @@ class EducationSection extends StatefulWidget {
 
 class _EducationSectionState extends State<EducationSection> {
   void _addEducation() {
-    final newEducation = Education(degree: '', institution: '');
+    const newEducation = Education(degree: '', institution: '');
 
     final updatedEducations = List<Education>.from(widget.educations)
       ..add(newEducation);
@@ -272,7 +272,7 @@ class _EducationSectionState extends State<EducationSection> {
               ),
             ),
           );
-        }).toList(),
+        }),
 
         const SizedBox(height: 16),
 

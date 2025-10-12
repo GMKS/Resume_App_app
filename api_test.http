@@ -1,0 +1,48 @@
+### Simple REST Client tests (use VS Code REST Client extension or Thunder Client import)
+
+@base = http://localhost:3000
+@json = Content-Type: application/json
+
+### Root health
+GET {{base}}/
+
+### DB health
+GET {{base}}/api/health/db
+
+### Register (email+password)
+POST {{base}}/api/register
+{{json}}
+
+{
+  "name": "Test User",
+  "email": "test.user@example.com",
+  "password": "Password123",
+  "phone": "+919999998888"
+}
+
+### Login (may require OTP if not verified)
+POST {{base}}/api/login
+{{json}}
+
+{
+  "email": "test.user@example.com",
+  "password": "Password123"
+}
+
+### Send OTP (email or phone)
+POST {{base}}/api/auth/send-otp
+{{json}}
+
+{
+  "identifier": "test.user@example.com",
+  "type": "login"
+}
+
+### Verify OTP (generic identifier)
+POST {{base}}/api/verify-otp
+{{json}}
+
+{
+  "identifier": "test.user@example.com",
+  "otp": "123456"
+}

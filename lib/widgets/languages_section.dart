@@ -6,10 +6,10 @@ class LanguagesSection extends StatefulWidget {
   final Function(List<Language>) onLanguagesChanged;
 
   const LanguagesSection({
-    Key? key,
+    super.key,
     required this.languages,
     required this.onLanguagesChanged,
-  }) : super(key: key);
+  });
 
   @override
   _LanguagesSectionState createState() => _LanguagesSectionState();
@@ -227,7 +227,7 @@ class _LanguagesSectionState extends State<LanguagesSection> {
                         color: Colors.indigo.shade50,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.language,
                         color: Colors.indigo,
                         size: 20,
@@ -322,7 +322,7 @@ class _LanguagesSectionState extends State<LanguagesSection> {
                 ),
               ),
             );
-          }).toList(),
+          }),
 
         const SizedBox(height: 16),
 

@@ -245,7 +245,7 @@ class _SmartAssistScreenState extends State<SmartAssistScreen> {
                           ),
                           const SizedBox(height: 16),
                           // Professional Experience
-                          _SectionHeader('PROFESSIONAL EXPERIENCE'),
+                          const _SectionHeader('PROFESSIONAL EXPERIENCE'),
                           const SizedBox(height: 8),
                           _ExperienceBlock(
                             bullets: _result!.enhancedBullets,
@@ -254,7 +254,7 @@ class _SmartAssistScreenState extends State<SmartAssistScreen> {
                           ),
                           const SizedBox(height: 16),
                           // Education
-                          _SectionHeader('EDUCATION'),
+                          const _SectionHeader('EDUCATION'),
                           const SizedBox(height: 8),
                           _SimpleTextBlock(
                             _result!.sectionsRaw['education'] ??
@@ -262,7 +262,7 @@ class _SmartAssistScreenState extends State<SmartAssistScreen> {
                           ),
                           const SizedBox(height: 16),
                           // Skills
-                          _SectionHeader('SKILLS'),
+                          const _SectionHeader('SKILLS'),
                           const SizedBox(height: 8),
                           Align(
                             alignment: Alignment.centerLeft,

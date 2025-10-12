@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/saved_resume.dart';
+import '../models/branding.dart';
 
 class ClassicResumePreview extends StatelessWidget {
   final SavedResume resume;
@@ -11,9 +12,21 @@ class ClassicResumePreview extends StatelessWidget {
     final d = resume.data;
 
     String name = (d['name'] ?? '').toString().trim();
+    String title = (d['title'] ?? d['professionalTitle'] ?? '')
+        .toString()
+        .trim();
     String email = (d['email'] ?? '').toString().trim();
     String phone = (d['phone'] ?? '').toString().trim();
+    String linkedin = (d['linkedIn'] ?? d['linkedin'] ?? '').toString().trim();
+    String portfolio = (d['portfolio'] ?? d['website'] ?? '').toString().trim();
     String summary = (d['summary'] ?? '').toString().trim();
+    // Strengths can be a comma/newline separated string
+    final strengthsRaw = (d['strengths'] ?? '').toString();
+    final strengths = strengthsRaw
+        .split(RegExp('[,\n]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
     final skillsCsv = (d['skills'] ?? '').toString();
     final skills = skillsCsv
         .split(',')
@@ -49,16 +62,22 @@ class ClassicResumePreview extends StatelessWidget {
       } catch (_) {}
     }
 
-    Widget sectionTitle(String t) => Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 6),
-      child: Text(
-        t,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          decoration: TextDecoration.underline,
+    Widget sectionHeader(String t) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 14, bottom: 6),
+          child: Text(
+            t.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+            ),
+          ),
         ),
-      ),
+        Container(height: 1, color: Colors.grey.shade300),
+      ],
     );
 
     String fmtRange(String? startIso, String? endIso) {
@@ -80,58 +99,113 @@ class ClassicResumePreview extends StatelessWidget {
       return e.isEmpty ? '$s - Present' : '$s - $e';
     }
 
+    // Branding-driven accent color for subtitle and accents
+    Color accent = const Color(0xFF1976D2);
+    try {
+      final brandingJson = d['branding'];
+      if (brandingJson != null && brandingJson.toString().isNotEmpty) {
+        final theme = BrandingTheme.fromJson(
+          jsonDecode(brandingJson.toString()) as Map<String, dynamic>,
+        );
+        final h = theme.accentColor.replaceAll('#', '');
+        if (h.length == 6) {
+          final r = int.parse(h.substring(0, 2), radix: 16);
+          final g = int.parse(h.substring(2, 4), radix: 16);
+          final b = int.parse(h.substring(4, 6), radix: 16);
+          accent = Color.fromARGB(0xFF, r, g, b);
+        }
+      }
+    } catch (_) {}
+
     return Scaffold(
       appBar: AppBar(title: const Text('Classic Preview')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header: name + contact
             Text(
               name.isEmpty ? resume.title : name,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
+            if (title.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2.0),
+                child: Text(
+                  title,
+                  style: TextStyle(color: accent, fontSize: 12),
+                ),
+              ),
             const SizedBox(height: 6),
             Wrap(
-              spacing: 12,
+              spacing: 8,
               runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                if (email.isNotEmpty)
-                  Row(
-                    children: [
-                      const Icon(Icons.email, size: 14),
-                      const SizedBox(width: 4),
-                      Text(email),
-                    ],
-                  ),
-                if (phone.isNotEmpty)
-                  Row(
-                    children: [
-                      const Icon(Icons.phone, size: 14),
-                      const SizedBox(width: 4),
-                      Text(phone),
-                    ],
-                  ),
+                if (phone.isNotEmpty) Text(phone),
+                if (phone.isNotEmpty && email.isNotEmpty) const Text('•'),
+                if (email.isNotEmpty) Text(email),
+                if ((email.isNotEmpty || phone.isNotEmpty) &&
+                    (portfolio.isNotEmpty || linkedin.isNotEmpty))
+                  const Text('•'),
+                if (portfolio.isNotEmpty) Text(portfolio),
+                if (portfolio.isNotEmpty && linkedin.isNotEmpty)
+                  const Text('•'),
+                if (linkedin.isNotEmpty) Text(linkedin),
               ],
             ),
 
             if (summary.isNotEmpty) ...[
-              sectionTitle('Professional Summary'),
-              Text(summary),
+              sectionHeader('Summary'),
+              const SizedBox(height: 6),
+              const SizedBox(height: 2),
+              Text(summary, style: const TextStyle(height: 1.35)),
+            ],
+
+            if (strengths.isNotEmpty) ...[
+              sectionHeader('Strengths'),
+              const SizedBox(height: 6),
+              ...strengths.map(
+                (s) => Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('• '),
+                    Expanded(
+                      child: Text(s, style: const TextStyle(height: 1.3)),
+                    ),
+                  ],
+                ),
+              ),
             ],
 
             if (skills.isNotEmpty) ...[
-              sectionTitle('Skills'),
+              sectionHeader('Skills'),
+              const SizedBox(height: 6),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: skills.map((s) => Chip(label: Text(s))).toList(),
+                spacing: 6,
+                runSpacing: 6,
+                children: skills
+                    .map(
+                      (s) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade400),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(s, style: const TextStyle(fontSize: 12)),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
 
             if (work.isNotEmpty) ...[
-              sectionTitle('Work Experience'),
+              sectionHeader('Experience'),
+              const SizedBox(height: 6),
               ...work.map((w) {
                 final title = (w['jobTitle'] ?? '').toString();
                 final company = (w['company'] ?? '').toString();
@@ -154,7 +228,7 @@ class ClassicResumePreview extends StatelessWidget {
                       Text(
                         title,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
                       ),
@@ -169,7 +243,7 @@ class ClassicResumePreview extends StatelessWidget {
                       ),
                       if (desc.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(desc),
+                        Text(desc, style: const TextStyle(height: 1.35)),
                       ],
                       if (ach.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -178,7 +252,12 @@ class ClassicResumePreview extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text('• '),
-                              Expanded(child: Text(a)),
+                              Expanded(
+                                child: Text(
+                                  a,
+                                  style: const TextStyle(height: 1.3),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -190,7 +269,8 @@ class ClassicResumePreview extends StatelessWidget {
             ],
 
             if (edu.isNotEmpty) ...[
-              sectionTitle('Education'),
+              sectionHeader('Education'),
+              const SizedBox(height: 6),
               ...edu.map((e) {
                 final degree = (e['degree'] ?? '').toString();
                 final inst = (e['institution'] ?? '').toString();
@@ -208,7 +288,7 @@ class ClassicResumePreview extends StatelessWidget {
                       Text(
                         degree,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           fontSize: 13,
                         ),
                       ),
@@ -224,7 +304,7 @@ class ClassicResumePreview extends StatelessWidget {
                       if (gpa.isNotEmpty) Text('GPA: $gpa'),
                       if (desc.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(desc),
+                        Text(desc, style: const TextStyle(height: 1.35)),
                       ],
                     ],
                   ),
@@ -233,13 +313,16 @@ class ClassicResumePreview extends StatelessWidget {
             ],
 
             if (certs.isNotEmpty) ...[
-              sectionTitle('Certifications'),
+              sectionHeader('Certifications'),
+              const SizedBox(height: 6),
               ...certs.map(
                 (c) => Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('• '),
-                    Expanded(child: Text(c)),
+                    Expanded(
+                      child: Text(c, style: const TextStyle(height: 1.3)),
+                    ),
                   ],
                 ),
               ),

@@ -9,12 +9,12 @@ class SmartFeaturesTab extends StatefulWidget {
   final Function(CustomResumeData) onResumeDataChanged;
 
   const SmartFeaturesTab({
-    Key? key,
+    super.key,
     required this.settings,
     required this.resumeData,
     required this.onSettingsChanged,
     required this.onResumeDataChanged,
-  }) : super(key: key);
+  });
 
   @override
   _SmartFeaturesTabState createState() => _SmartFeaturesTabState();
@@ -180,11 +180,11 @@ class _SmartFeaturesTabState extends State<SmartFeaturesTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.auto_awesome, color: Colors.indigo),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.auto_awesome, color: Colors.indigo),
+                SizedBox(width: 8),
+                Text(
                   'AI Content Suggestions',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
@@ -231,7 +231,7 @@ class _SmartFeaturesTabState extends State<SmartFeaturesTab> {
                   widget.settings.copyWith(aiSuggestions: value),
                 );
               },
-              activeColor: Colors.indigo,
+              activeThumbColor: Colors.indigo,
               contentPadding: EdgeInsets.zero,
             ),
           ],
@@ -247,11 +247,11 @@ class _SmartFeaturesTabState extends State<SmartFeaturesTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.search, color: Colors.indigo),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.search, color: Colors.indigo),
+                SizedBox(width: 8),
+                Text(
                   'Keyword Optimization',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
@@ -298,7 +298,7 @@ class _SmartFeaturesTabState extends State<SmartFeaturesTab> {
                   widget.settings.copyWith(keywordOptimizer: value),
                 );
               },
-              activeColor: Colors.indigo,
+              activeThumbColor: Colors.indigo,
               contentPadding: EdgeInsets.zero,
             ),
           ],
@@ -314,11 +314,11 @@ class _SmartFeaturesTabState extends State<SmartFeaturesTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.spellcheck, color: Colors.indigo),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.spellcheck, color: Colors.indigo),
+                SizedBox(width: 8),
+                Text(
                   'Grammar & Spell Check',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
@@ -363,7 +363,7 @@ class _SmartFeaturesTabState extends State<SmartFeaturesTab> {
                   widget.settings.copyWith(grammarCheck: value),
                 );
               },
-              activeColor: Colors.indigo,
+              activeThumbColor: Colors.indigo,
               contentPadding: EdgeInsets.zero,
             ),
           ],
@@ -379,11 +379,11 @@ class _SmartFeaturesTabState extends State<SmartFeaturesTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.work_outline, color: Colors.indigo),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.work_outline, color: Colors.indigo),
+                SizedBox(width: 8),
+                Text(
                   'Job Description Analysis',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
@@ -453,11 +453,11 @@ class _SmartFeaturesTabState extends State<SmartFeaturesTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Icon(Icons.settings, color: Colors.indigo),
-                const SizedBox(width: 8),
-                const Text(
+                Icon(Icons.settings, color: Colors.indigo),
+                SizedBox(width: 8),
+                Text(
                   'Smart Feature Settings',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),

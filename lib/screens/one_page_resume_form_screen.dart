@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
-import '../widgets/requirements_banner.dart';
 import '../widgets/profile_photo_picker.dart'; // ADD for photo picker
 import '../widgets/ai_widgets.dart';
 import '../widgets/dynamic_sections.dart';
@@ -11,15 +10,6 @@ import '../widgets/skills_picker_field.dart';
 class OnePageResumeFormScreen extends StatelessWidget {
   final SavedResume? existing;
   const OnePageResumeFormScreen({super.key, this.existing});
-
-  // FIX: typed map (no stray import inside)
-  static const Map<String, String> _requiredMap = {
-    'name': 'Full Name',
-    'phone': 'Phone Number',
-    'email': 'Email Address',
-    'summary': 'Professional Summary',
-    'coreSkills': 'Key Skills',
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +39,8 @@ class OnePageResumeFormScreen extends StatelessWidget {
         'educationsJson',
         // ATS flag
         'ats_friendly',
+        // Section order for drag-drop functionality
+        'sectionOrder',
       ],
       child: const _OnePageBody(),
     );
@@ -69,6 +61,30 @@ class _OnePageBodyState extends State<_OnePageBody> {
   // Color theme for One Page template
   static const Color _accentColor = Color(0xFF1976D2);
 
+  // Collapsible section states - all sections start collapsed
+  Map<String, bool> _sectionExpanded = {
+    'contact': false,
+    'summary': false,
+    'skills': false,
+    'experience': false,
+    'education': false,
+    'certifications': false,
+    'projects': false,
+    'additional': false,
+    'ats': false,
+  };
+
+  // Default section order for reordering functionality
+  List<String> _sectionOrder = [
+    'summary',
+    'skills',
+    'experience',
+    'education',
+    'projects',
+    'certifications',
+    'additional',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +97,22 @@ class _OnePageBodyState extends State<_OnePageBody> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _loadExistingData();
+    _loadSectionOrder();
+  }
+
+  void _loadSectionOrder() {
+    final state = BaseResumeForm.of(context);
+    if (state != null) {
+      final orderJson = state.controllerFor('sectionOrder').text;
+      if (orderJson.isNotEmpty) {
+        try {
+          final parsed = jsonDecode(orderJson) as List;
+          _sectionOrder = parsed.map((e) => e.toString()).toList();
+        } catch (e) {
+          // Keep default order if parsing fails
+        }
+      }
+    }
   }
 
   void _loadExistingData() {
@@ -116,6 +148,77 @@ class _OnePageBodyState extends State<_OnePageBody> {
         }
       }
     }
+  }
+
+  // Collapsible section wrapper for One Page resume sections
+  Widget _onePageCollapsibleSection({
+    Key? key,
+    required String title,
+    required String sectionKey,
+    required Widget child,
+    IconData? icon,
+    int? dragIndex, // when provided, show a drag handle in header
+  }) {
+    final isExpanded = _sectionExpanded[sectionKey] ?? false;
+
+    return Card(
+      key: key,
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: _accentColor.withValues(alpha: 0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _sectionExpanded[sectionKey] = !isExpanded;
+                });
+              },
+              child: Row(
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, color: _accentColor, size: 24),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                  if (dragIndex != null) ...[
+                    // Visible drag handle for reordering in the list
+                    ReorderableDragStartListener(
+                      index: dragIndex,
+                      child: const Padding(
+                        padding: EdgeInsets.only(right: 8.0),
+                        child: Icon(Icons.drag_handle, color: Colors.grey),
+                      ),
+                    ),
+                  ],
+                  Icon(
+                    isExpanded ? Icons.remove : Icons.add,
+                    size: 24,
+                    color: Colors.grey.shade600,
+                  ),
+                ],
+              ),
+            ),
+            if (isExpanded) ...[const SizedBox(height: 16), child],
+          ],
+        ),
+      ),
+    );
   }
 
   String _getResumeContent(Map<String, TextEditingController> controllers) {
@@ -199,183 +302,99 @@ class _OnePageBodyState extends State<_OnePageBody> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const RequirementsBanner(
-              requiredFieldLabels: OnePageResumeFormScreen._requiredMap,
-            ),
-
-            _section('Contact Information'),
-            Center(
-              child: ProfilePhotoPicker(
-                size: 90,
-                initialBase64:
-                    state.controllerFor('profilePhotoBase64').text.isEmpty
-                    ? null
-                    : state.controllerFor('profilePhotoBase64').text,
-                onChanged: (b64) {
-                  state.controllerFor('profilePhotoBase64').text = b64 ?? '';
-                },
+            _onePageCollapsibleSection(
+              title: 'Contact Information',
+              sectionKey: 'contact',
+              icon: Icons.contact_page,
+              child: Column(
+                children: [
+                  Center(
+                    child: ProfilePhotoPicker(
+                      size: 90,
+                      initialBase64:
+                          state.controllerFor('profilePhotoBase64').text.isEmpty
+                          ? null
+                          : state.controllerFor('profilePhotoBase64').text,
+                      onChanged: (b64) {
+                        state.controllerFor('profilePhotoBase64').text =
+                            b64 ?? '';
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  state.buildTextField('name', 'Full Name', required: true),
+                  state.buildTextField('title', 'Professional Title'),
+                  state.buildTextField(
+                    'phone',
+                    'Phone Number',
+                    required: true,
+                    keyboard: TextInputType.phone,
+                  ),
+                  state.buildTextField(
+                    'email',
+                    'Email Address',
+                    required: true,
+                    keyboard: TextInputType.emailAddress,
+                  ),
+                  state.buildTextField(
+                    'linkedIn',
+                    'LinkedIn Profile (optional)',
+                  ),
+                  state.buildTextField(
+                    'portfolio',
+                    'Personal Website / Portfolio',
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            // Place Name and Summary right below the Change Photo button for better visibility
-            state.buildTextField('name', 'Full Name', required: true),
-            state.buildTextField(
-              'summary',
-              '2–3 line Professional Summary',
-              required: true,
-              maxLines: 4,
-            ),
-            state.buildTextField('title', 'Professional Title'),
-            state.buildTextField(
-              'phone',
-              'Phone Number',
-              required: true,
-              keyboard: TextInputType.phone,
-            ),
-            state.buildTextField(
-              'email',
-              'Email Address',
-              required: true,
-              keyboard: TextInputType.emailAddress,
-            ),
-            state.buildTextField('linkedIn', 'LinkedIn Profile (optional)'),
-            state.buildTextField('portfolio', 'Personal Website / Portfolio'),
 
-            _divider(),
-            _section('Professional Summary / Objective'),
-            AISummaryGenerator(
-              name: state.controllers['name']?.text ?? '',
-              targetRole: _workExperiences.isNotEmpty
-                  ? _workExperiences.first.jobTitle
-                  : '',
-              skills: (state.controllers['coreSkills']?.text ?? '')
-                  .split(',')
-                  .map((s) => s.trim())
-                  .where((s) => s.isNotEmpty)
-                  .toList(),
-              experience: _workExperiences
-                  .map((exp) => exp.description)
-                  .where((desc) => desc.isNotEmpty)
-                  .toList(),
-              onGenerated: (summary) {
-                state.controllers['summary']?.text = summary;
-              },
-            ),
-
-            // Summary field moved below photo for better visibility
-            _divider(),
-            _section('Key Skills'),
-            SkillsPickerField(
-              controller: state.controllerFor('coreSkills'),
-              label: '6–10 Relevant Skills',
-            ),
-            // Hidden validator to enforce at least one skill
-            FormField<String>(
-              validator: (v) {
-                final hasSkills = state
-                    .controllerFor('coreSkills')
-                    .text
-                    .trim()
-                    .isNotEmpty;
-                return hasSkills ? null : 'Please add at least one skill';
-              },
-              builder: (field) => field.hasError
-                  ? Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        field.errorText!,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-
-            _divider(),
-            DynamicWorkExperienceSection(
-              workExperiences: _workExperiences,
-              onWorkExperiencesChanged: (experiences) {
+            // Reorderable main content sections - using simple ReorderableListView
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              onReorder: (oldIndex, newIndex) {
                 setState(() {
-                  _workExperiences = experiences;
-                  // Store as JSON in a hidden controller for saving
-                  state.controllerFor('workExperiencesJson').text = json.encode(
-                    experiences.map((e) => e.toJson()).toList(),
+                  if (newIndex > oldIndex) newIndex--;
+                  final item = _sectionOrder.removeAt(oldIndex);
+                  _sectionOrder.insert(newIndex, item);
+                  // Save section order to controller for persistence
+                  state.controllerFor('sectionOrder').text = jsonEncode(
+                    _sectionOrder,
                   );
                 });
               },
-              accentColor: _accentColor,
-              atsFriendly: isAts,
+              children: [
+                for (int i = 0; i < _sectionOrder.length; i++)
+                  _buildSection(_sectionOrder[i], i, state),
+              ],
             ),
 
-            _divider(),
-            DynamicEducationSection(
-              educations: _educations,
-              onEducationsChanged: (educations) {
-                setState(() {
-                  _educations = educations;
-                  // Store as JSON in a hidden controller for saving
-                  state.controllerFor('educationsJson').text = json.encode(
-                    educations.map((e) => e.toJson()).toList(),
-                  );
-                });
-              },
-              accentColor: _accentColor,
-              atsFriendly: isAts,
-            ),
-
-            _divider(),
-            _section('Certifications (if relevant)'),
-            state.buildTextField(
-              'certifications',
-              'Certification Name | Issuer | Year',
-              maxLines: 3,
-            ),
-
-            _divider(),
-            _section('Projects (if relevant)'),
-            state.buildTextField(
-              'projects',
-              'Project Title – Brief Description – Tech / Role',
-              maxLines: 4,
-            ),
-
-            _divider(),
-            _section('Additional (Optional)'),
-            state.buildTextField('awards', 'Awards & Honors', maxLines: 3),
-            state.buildTextField('languages', 'Languages Known', maxLines: 2),
-            state.buildTextField(
-              'volunteer',
-              'Volunteer Experience',
-              maxLines: 3,
-            ),
-            state.buildTextField(
-              'memberships',
-              'Professional Memberships',
-              maxLines: 3,
-            ),
-            state.buildTextField(
-              'hobbies',
-              'Hobbies / Interests (only if relevant)',
-              maxLines: 2,
-            ),
-
-            const SizedBox(height: 24),
-            // ATS Optimization Panel
-            ATSOptimizationPanel(
-              content: _getResumeContent(state.controllers),
-              jobDescription:
-                  '', // Can be enhanced to accept job description input
-            ),
-
-            const SizedBox(height: 8),
-            SwitchListTile.adaptive(
-              value: isAts,
-              onChanged: (v) {
-                state.controllerFor('ats_friendly').text = v ? 'true' : 'false';
-                setState(() {});
-              },
-              title: const Text('ATS-friendly formatting'),
-              subtitle: const Text(
-                'Simplifies layout and headings for better ATS parsing.',
+            _onePageCollapsibleSection(
+              title: 'ATS Optimization',
+              sectionKey: 'ats',
+              icon: Icons.tune,
+              child: Column(
+                children: [
+                  ATSOptimizationPanel(
+                    content: _getResumeContent(state.controllers),
+                    jobDescription:
+                        '', // Can be enhanced to accept job description input
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    value: isAts,
+                    onChanged: (v) {
+                      state.controllerFor('ats_friendly').text = v
+                          ? 'true'
+                          : 'false';
+                      setState(() {});
+                    },
+                    title: const Text('ATS-friendly formatting'),
+                    subtitle: const Text(
+                      'Simplifies layout and headings for better ATS parsing.',
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -394,20 +413,162 @@ class _OnePageBodyState extends State<_OnePageBody> {
     );
   }
 
-  Widget _section(String t) => Padding(
-    padding: const EdgeInsets.only(top: 18, bottom: 6),
-    child: Text(
-      t,
-      style: const TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 15.5,
-        letterSpacing: .3,
-      ),
-    ),
-  );
+  // Build individual sections for reordering
+  Widget _buildSection(String sectionKey, int index, dynamic state) {
+    final isAts = state.controllerFor('ats_friendly').text == 'true';
 
-  Widget _divider() => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 14),
-    child: Divider(thickness: 1),
-  );
+    switch (sectionKey) {
+      case 'summary':
+        return _onePageCollapsibleSection(
+          key: ValueKey('summary'),
+          title: 'Professional Summary / Objective',
+          sectionKey: 'summary',
+          icon: Icons.badge,
+          dragIndex: index,
+          child: Column(
+            children: [
+              state.buildTextField(
+                'summary',
+                '2–3 line Professional Summary',
+                required: true,
+                maxLines: 4,
+              ),
+              const SizedBox(height: 16),
+              AISummaryGenerator(
+                name: state.controllers['name']?.text ?? '',
+                targetRole: _workExperiences.isNotEmpty
+                    ? _workExperiences.first.jobTitle
+                    : '',
+                skills:
+                    ((state.controllers['coreSkills']?.text ?? '') as String)
+                        .split(',')
+                        .map((String s) => s.trim())
+                        .where((String s) => s.isNotEmpty)
+                        .toList(),
+                experience: _workExperiences
+                    .map((WorkExperience exp) => exp.description)
+                    .where((String desc) => desc.isNotEmpty)
+                    .toList(),
+                onGenerated: (summary) {
+                  state.controllers['summary']?.text = summary;
+                },
+              ),
+            ],
+          ),
+        );
+      case 'skills':
+        return _onePageCollapsibleSection(
+          key: ValueKey('skills'),
+          title: 'Key Skills',
+          sectionKey: 'skills',
+          icon: Icons.handyman,
+          dragIndex: index,
+          child: SkillsPickerField(
+            controller: state.controllerFor('coreSkills'),
+            label: '6–10 Relevant Skills',
+          ),
+        );
+      case 'experience':
+        return _onePageCollapsibleSection(
+          key: ValueKey('experience'),
+          title: 'Work Experience',
+          sectionKey: 'experience',
+          icon: Icons.work,
+          dragIndex: index,
+          child: DynamicWorkExperienceSection(
+            workExperiences: _workExperiences,
+            onWorkExperiencesChanged: (experiences) {
+              setState(() {
+                _workExperiences = experiences;
+                // Store as JSON in a hidden controller for saving
+                state.controllerFor('workExperiencesJson').text = json.encode(
+                  experiences.map((e) => e.toJson()).toList(),
+                );
+              });
+            },
+            accentColor: _accentColor,
+            atsFriendly: isAts,
+          ),
+        );
+      case 'education':
+        return _onePageCollapsibleSection(
+          key: ValueKey('education'),
+          title: 'Education',
+          sectionKey: 'education',
+          icon: Icons.school,
+          dragIndex: index,
+          child: DynamicEducationSection(
+            educations: _educations,
+            onEducationsChanged: (educations) {
+              setState(() {
+                _educations = educations;
+                // Store as JSON in a hidden controller for saving
+                state.controllerFor('educationsJson').text = json.encode(
+                  educations.map((e) => e.toJson()).toList(),
+                );
+              });
+            },
+            accentColor: _accentColor,
+            atsFriendly: isAts,
+          ),
+        );
+      case 'projects':
+        return _onePageCollapsibleSection(
+          key: ValueKey('projects'),
+          title: 'Projects (if relevant)',
+          sectionKey: 'projects',
+          icon: Icons.code,
+          dragIndex: index,
+          child: state.buildTextField(
+            'projects',
+            'Project Title – Brief Description – Tech / Role',
+            maxLines: 4,
+          ),
+        );
+      case 'certifications':
+        return _onePageCollapsibleSection(
+          key: ValueKey('certifications'),
+          title: 'Certifications (if relevant)',
+          sectionKey: 'certifications',
+          icon: Icons.workspace_premium,
+          dragIndex: index,
+          child: state.buildTextField(
+            'certifications',
+            'Certification Name | Issuer | Year',
+            maxLines: 3,
+          ),
+        );
+      case 'additional':
+        return _onePageCollapsibleSection(
+          key: ValueKey('additional'),
+          title: 'Additional (Optional)',
+          sectionKey: 'additional',
+          icon: Icons.more_horiz,
+          dragIndex: index,
+          child: Column(
+            children: [
+              state.buildTextField('awards', 'Awards & Honors', maxLines: 3),
+              state.buildTextField('languages', 'Languages Known', maxLines: 2),
+              state.buildTextField(
+                'volunteer',
+                'Volunteer Experience',
+                maxLines: 3,
+              ),
+              state.buildTextField(
+                'memberships',
+                'Professional Memberships',
+                maxLines: 3,
+              ),
+              state.buildTextField(
+                'hobbies',
+                'Hobbies / Interests (only if relevant)',
+                maxLines: 2,
+              ),
+            ],
+          ),
+        );
+      default:
+        return Container(key: ValueKey(sectionKey));
+    }
+  }
 }

@@ -413,7 +413,7 @@ class _CoverLetterFormScreenState extends State<CoverLetterFormScreen> {
   }
 
   void _loadTemplate() {
-    final template = _coverLetterService.getTemplate(_selectedTemplate);
+    final template = CoverLetterService.getTemplate(_selectedTemplate);
     setState(() {
       _customContentController.text = template.content;
     });

@@ -15,10 +15,10 @@ class ContentSectionsTab extends StatefulWidget {
   final Function(CustomResumeData) onResumeDataChanged;
 
   const ContentSectionsTab({
-    Key? key,
+    super.key,
     required this.resumeData,
     required this.onResumeDataChanged,
-  }) : super(key: key);
+  });
 
   @override
   _ContentSectionsTabState createState() => _ContentSectionsTabState();

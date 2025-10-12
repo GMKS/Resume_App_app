@@ -11,6 +11,7 @@ import 'modern_resume_form_screen.dart';
 import 'classic_resume_form_screen.dart';
 import 'minimal_resume_form_screen.dart';
 import 'professional_resume_form_screen.dart';
+import 'professional_resume_preview.dart';
 import 'creative_resume_form_screen.dart';
 import 'one_page_resume_form_screen.dart';
 import 'one_page_resume_preview.dart';
@@ -19,6 +20,79 @@ import 'customize_screen.dart';
 
 class SavedResumesScreen extends StatelessWidget {
   const SavedResumesScreen({super.key});
+
+  // Helper method to navigate to appropriate edit screen
+  void _navigateToEditScreen(BuildContext context, SavedResume resume) {
+    Widget screen;
+    final template = resume.template.toLowerCase();
+
+    switch (template) {
+      case 'modern':
+        screen = ModernResumeFormScreen(existingResume: resume);
+        break;
+      case 'classic':
+        screen = ClassicResumeFormScreen(existing: resume);
+        break;
+      case 'minimal':
+        screen = MinimalResumeFormScreen(existing: resume);
+        break;
+      case 'professional':
+        screen = ProfessionalResumeFormScreen(existing: resume);
+        break;
+      case 'creative':
+        screen = CreativeResumeFormScreen(existing: resume);
+        break;
+      case 'one page':
+        screen = OnePageResumeFormScreen(existing: resume);
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Template ${resume.template} not supported yet'),
+          ),
+        );
+        return;
+    }
+
+    if (context.mounted) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    }
+  }
+
+  // Helper method to navigate to appropriate preview screen
+  void _navigateToPreviewScreen(BuildContext context, SavedResume resume) {
+    Widget screen;
+    final template = resume.template.toLowerCase();
+
+    switch (template) {
+      case 'modern':
+        screen = ModernResumePreview(resume: resume);
+        break;
+      case 'classic':
+        screen = ClassicResumePreview(resume: resume);
+        break;
+      case 'professional':
+        screen = ProfessionalResumePreview(resume: resume);
+        break;
+      case 'creative':
+        screen = CreativeResumePreview(resume: resume);
+        break;
+      case 'one page':
+        screen = OnePageResumePreview(resume: resume);
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Preview not available for ${resume.template} yet'),
+          ),
+        );
+        return;
+    }
+
+    if (context.mounted) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,133 +121,12 @@ class SavedResumesScreen extends StatelessWidget {
                 subtitle: Text(
                   '${r.template} • Updated ${_formatTime(r.updatedAt)}',
                 ),
-                onTap: () {
-                  final t = r.template.toLowerCase();
-                  if (t == 'modern') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ModernResumeFormScreen(existingResume: r),
-                      ),
-                    );
-                  } else if (t == 'classic') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ClassicResumeFormScreen(existing: r),
-                      ),
-                    );
-                  } else if (t == 'minimal') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MinimalResumeFormScreen(existing: r),
-                      ),
-                    );
-                  } else if (t == 'professional') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ProfessionalResumeFormScreen(existing: r),
-                      ),
-                    );
-                  } else if (t == 'creative') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CreativeResumeFormScreen(existing: r),
-                      ),
-                    );
-                  } else if (t == 'one page') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => OnePageResumeFormScreen(existing: r),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Unknown template: ${r.template}'),
-                      ),
-                    );
-                  }
-                },
+                onTap: () => _navigateToEditScreen(context, r),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) async {
                     switch (value) {
                       case 'edit':
-                        if (r.template.toLowerCase() == 'modern') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ModernResumeFormScreen(existingResume: r),
-                              ),
-                            );
-                          }
-                        } else if (r.template.toLowerCase() == 'classic') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ClassicResumeFormScreen(existing: r),
-                              ),
-                            );
-                          }
-                        } else if (r.template.toLowerCase() == 'minimal') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    MinimalResumeFormScreen(existing: r),
-                              ),
-                            );
-                          }
-                        } else if (r.template.toLowerCase() == 'professional') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ProfessionalResumeFormScreen(existing: r),
-                              ),
-                            );
-                          }
-                        } else if (r.template.toLowerCase() == 'creative') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    CreativeResumeFormScreen(existing: r),
-                              ),
-                            );
-                          }
-                        } else if (r.template.toLowerCase() == 'one page') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    OnePageResumeFormScreen(existing: r),
-                              ),
-                            );
-                          }
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Editor for ${r.template} not wired yet',
-                              ),
-                            ),
-                          );
-                        }
+                        _navigateToEditScreen(context, r);
                         break;
                       case 'save':
                         // Force update timestamp
@@ -206,52 +159,7 @@ class SavedResumesScreen extends StatelessWidget {
                           PremiumService.showUpgradeDialog(context, 'Preview');
                           return;
                         }
-                        if (r.template.toLowerCase() == 'modern') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ModernResumePreview(resume: r),
-                              ),
-                            );
-                          }
-                        } else if (r.template.toLowerCase() == 'classic') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ClassicResumePreview(resume: r),
-                              ),
-                            );
-                          }
-                        } else if (r.template.toLowerCase() == 'creative') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    CreativeResumePreview(resume: r),
-                              ),
-                            );
-                          }
-                        } else if (r.template.toLowerCase() == 'one page') {
-                          if (context.mounted) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => OnePageResumePreview(resume: r),
-                              ),
-                            );
-                          }
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Preview is not available for ${r.template} yet',
-                              ),
-                            ),
-                          );
-                        }
+                        _navigateToPreviewScreen(context, r);
                         break;
                       case 'share_email':
                         if (!PremiumService.isPremium) {
@@ -269,16 +177,27 @@ class SavedResumesScreen extends StatelessWidget {
                         break;
                       case 'customize':
                         if (context.mounted) {
-                          Navigator.push(
+                          final result = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                               builder: (_) => CustomizeScreen(
                                 initialResumeData: _convertToCustomResumeData(
                                   r,
                                 ),
+                                originalResume: r,
                               ),
                             ),
                           );
+
+                          // If customizations were saved, refresh the list
+                          if (result == true && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Resume customizations saved!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
                         }
                         break;
                       case 'delete':

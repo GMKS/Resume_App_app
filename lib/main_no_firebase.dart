@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/mock_auth_service.dart';
 import 'screens/mock_login_screen.dart';
-import 'screens/mock_home_screen.dart';
+import 'screens/simple_home_screen.dart';
 
 import 'screens/onboarding_screen.dart';
 
@@ -220,7 +220,7 @@ class MyApp extends StatelessWidget {
                   print('DEBUG: Main app - loggedIn: $loggedIn');
                   try {
                     return loggedIn
-                        ? const MockHomeScreen()
+                        ? const SimpleHomeScreen()
                         : const MockLoginScreen();
                   } catch (e) {
                     print('ERROR: Failed to load main screens: $e');

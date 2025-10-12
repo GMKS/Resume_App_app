@@ -6,10 +6,10 @@ class ProjectsSection extends StatefulWidget {
   final Function(List<Project>) onProjectsChanged;
 
   const ProjectsSection({
-    Key? key,
+    super.key,
     required this.projects,
     required this.onProjectsChanged,
-  }) : super(key: key);
+  });
 
   @override
   _ProjectsSectionState createState() => _ProjectsSectionState();
@@ -17,7 +17,7 @@ class ProjectsSection extends StatefulWidget {
 
 class _ProjectsSectionState extends State<ProjectsSection> {
   void _addProject() {
-    final newProject = Project(title: '');
+    const newProject = Project(title: '');
 
     final updatedProjects = List<Project>.from(widget.projects)
       ..add(newProject);
@@ -202,7 +202,7 @@ class _ProjectsSectionState extends State<ProjectsSection> {
               ),
             ),
           );
-        }).toList(),
+        }),
 
         const SizedBox(height: 16),
 

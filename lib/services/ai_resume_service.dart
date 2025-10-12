@@ -537,6 +537,68 @@ $name''';
     });
     return buffer.toString();
   }
+
+  /// Generate executive summary for Professional template
+  static Future<String> generateExecutiveSummary({
+    required String name,
+    required String targetRole,
+    required List<String> keySkills,
+    required List<String> experience,
+    String? industry,
+  }) async {
+    return generateSummary(
+      name: name,
+      targetRole: targetRole,
+      skills: keySkills,
+      experience: experience,
+      industry: industry,
+    );
+  }
+
+  /// Optimize existing summary for better impact
+  static Future<String> optimizeSummary({
+    required String currentSummary,
+    required String targetRole,
+    required List<String> keySkills,
+    String? industry,
+  }) async {
+    if (!PremiumService.hasAIFeatures) {
+      throw Exception('AI features require Premium subscription');
+    }
+
+    try {
+      final prompt =
+          '''
+Optimize this resume summary for better impact and ATS compatibility:
+
+Current Summary: "$currentSummary"
+Target Role: $targetRole
+Key Skills: ${keySkills.join(', ')}
+${industry != null ? 'Industry: $industry' : ''}
+
+Requirements:
+- Improve clarity and impact
+- Add stronger action words
+- Include relevant keywords for ATS
+- Keep it concise (2-3 sentences)
+- Make it more compelling to recruiters
+- Ensure professional tone
+- Quantify achievements where possible
+
+Return only the optimized summary text.
+''';
+
+      final response = await _makeOpenAIRequest(
+        prompt,
+        temperature: 0.7,
+        seed: DateTime.now().millisecondsSinceEpoch % 1000,
+      );
+      return _parseSummary(response);
+    } catch (e) {
+      // Return original if optimization fails
+      return currentSummary;
+    }
+  }
 }
 
 /// Data models for AI features
