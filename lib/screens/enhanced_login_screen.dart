@@ -82,40 +82,121 @@ class _EnhancedLoginScreenState extends State<EnhancedLoginScreen>
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF1E88E5), Color(0xFF1565C0)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF667eea),
+              Color(0xFF764ba2),
+              Color(0xFF8B5FBF),
+              Color(0xFFf093fb),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: [0.0, 0.3, 0.7, 1.0],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // Header
+              // Header with animation
               Container(
                 padding: const EdgeInsets.all(32),
                 child: Column(
                   children: [
-                    const Icon(
-                      Icons.description,
-                      size: 80,
-                      color: Colors.white,
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 1500),
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) {
+                        return Transform.scale(
+                          scale: value,
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(50),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.white.withOpacity(0.2),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.description,
+                              size: 60,
+                              color: Colors.white,
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Resume Builder',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    const SizedBox(height: 24),
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 2000),
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) {
+                        return Opacity(
+                          opacity: value,
+                          child: Transform.translate(
+                            offset: Offset(0, 30 * (1 - value)),
+                            child: const Text(
+                              'Resume Builder',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black26,
+                                    offset: Offset(2, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Create professional resumes with ease',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 16,
-                      ),
+                    const SizedBox(height: 12),
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 2500),
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) {
+                        return Opacity(
+                          opacity: value,
+                          child: Transform.translate(
+                            offset: Offset(0, 20 * (1 - value)),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: const Text(
+                                'Resume ready, Future steady',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
 

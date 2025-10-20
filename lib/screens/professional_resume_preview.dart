@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 import '../models/saved_resume.dart';
 import '../models/branding.dart';
 
@@ -21,7 +20,7 @@ class ProfessionalResumePreview extends StatelessWidget {
     String phone = (d['phone'] ?? '').toString().trim();
     String location = (d['location'] ?? '').toString().trim();
     String linkedin = (d['linkedIn'] ?? d['linkedin'] ?? '').toString().trim();
-    String portfolio = (d['portfolio'] ?? d['website'] ?? '').toString().trim();
+    String portfolio = (d['website'] ?? d['portfolio'] ?? '').toString().trim();
     String summary = (d['executiveSummary'] ?? d['summary'] ?? '')
         .toString()
         .trim();
@@ -122,31 +121,42 @@ class ProfessionalResumePreview extends StatelessWidget {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: _buildLayoutContent(
-          layout: layout,
-          name: name,
-          title: title,
-          email: email,
-          phone: phone,
-          location: location,
-          linkedin: linkedin,
-          portfolio: portfolio,
-          summary: summary,
-          skills: skills,
-          certifications: certs,
-          workExperience: work,
-          education: edu,
-          projects: projects,
-          languages: languages,
-          hobbies: hobbies,
-          references: references,
-          profilePhotoBase64: profilePhotoBase64,
-          primaryColor: primaryColor,
-          accentColor: accentColor,
-          fontFamily: fontFamily,
-          resumeTitle: resume.title,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 595, // A4 width in logical pixels
+            maxHeight: 842, // A4 height in logical pixels
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: DefaultTextStyle(
+              style: const TextStyle(fontFamily: 'Roboto', color: Colors.black),
+              child: _buildLayoutContent(
+                layout: layout,
+                name: name,
+                title: title,
+                email: email,
+                phone: phone,
+                location: location,
+                linkedin: linkedin,
+                portfolio: portfolio,
+                summary: summary,
+                skills: skills,
+                certifications: certs,
+                workExperience: work,
+                education: edu,
+                projects: projects,
+                languages: languages,
+                hobbies: hobbies,
+                references: references,
+                profilePhotoBase64: profilePhotoBase64,
+                primaryColor: primaryColor,
+                accentColor: accentColor,
+                fontFamily: fontFamily,
+                resumeTitle: resume.title,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -516,7 +526,9 @@ class ProfessionalResumePreview extends StatelessWidget {
       try {
         final dt = DateTime.tryParse(date);
         if (dt == null) return date;
-        return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+        final m = dt.month.toString().padLeft(2, '0');
+        final d = dt.day.toString().padLeft(2, '0');
+        return '$m/$d/${dt.year}';
       } catch (_) {
         return date;
       }

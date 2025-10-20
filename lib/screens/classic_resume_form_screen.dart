@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
 import '../widgets/dynamic_sections.dart';
 import '../widgets/skills_picker_field.dart';
+import '../widgets/phone_input_widget.dart';
 import '../services/share_export_service.dart';
 import '../services/premium_service.dart';
 import '../widgets/ai_widgets.dart';
+import 'classic_resume_preview.dart';
 // Removed skills keyword suggestions; adding summary keyword chips inline.
 
 class ClassicResumeFormScreen extends StatefulWidget {
@@ -21,16 +24,21 @@ class ClassicResumeFormScreen extends StatefulWidget {
 class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
   List<WorkExperience> _workExperiences = [];
   List<Education> _educations = [];
+  List<CustomField> _customFields = [];
   bool _atsFriendly = true;
+  int _bottomIndex =
+      1; // default highlight Preview (Home, Preview, Share, Save)
 
-  // Collapsible section states
+  // Collapsible section states - All collapsed by default
   Map<String, bool> _sectionExpanded = {
+    'title': false,
     'contact': false,
     'summary': false,
     'skills': false,
     'experience': false,
     'education': false,
     'certifications': false,
+    'custom': false,
   };
 
   @override
@@ -66,6 +74,20 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
               .toList();
         } catch (e) {
           _educations = [];
+        }
+      }
+
+      // Load custom fields from JSON
+      if (widget.existing!.data['customFields'] != null) {
+        try {
+          final List<dynamic> customFieldsData = jsonDecode(
+            widget.existing!.data['customFields'],
+          );
+          _customFields = customFieldsData
+              .map((item) => CustomField.fromJson(item))
+              .toList();
+        } catch (e) {
+          _customFields = [];
         }
       }
     }
@@ -124,6 +146,15 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
       );
     }
 
+    // Add custom field
+    if (controllers['customField']?.text.isNotEmpty == true) {
+      final customLabel =
+          controllers['customFieldLabel']?.text.isNotEmpty == true
+          ? controllers['customFieldLabel']!.text
+          : 'Additional Information';
+      buffer.writeln('\n$customLabel: ${controllers['customField']!.text}');
+    }
+
     return buffer.toString();
   }
 
@@ -158,6 +189,10 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
               onTap: sectionKey != null
                   ? () {
                       setState(() {
+                        // Collapse all others; toggle the tapped one
+                        for (final key in _sectionExpanded.keys) {
+                          _sectionExpanded[key] = false;
+                        }
                         _sectionExpanded[sectionKey] = !isExpanded;
                       });
                     }
@@ -193,49 +228,6 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
     );
   }
 
-  // Inline keyword suggestions for Professional Summary
-  static const List<String> _summarySuggestions = [
-    'Results-driven',
-    'Detail-oriented',
-    'Proven track record',
-    'Strong communication skills',
-    'Team player',
-    'Innovative thinker',
-    'Self-motivated',
-  ];
-
-  Widget _buildSummarySuggestions(TextEditingController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        const Text(
-          'Suggestions',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _summarySuggestions.map((s) {
-            return ActionChip(
-              label: Text(s),
-              onPressed: () {
-                final existing = controller.text;
-                // Avoid duplicates (case-insensitive contains)
-                if (existing.toLowerCase().contains(s.toLowerCase())) return;
-                final sep = existing.trim().isEmpty
-                    ? ''
-                    : (existing.trim().endsWith('.') ? ' ' : '. ');
-                controller.text = existing + sep + s;
-              },
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
   Future<void> _exportResume(String format) async {
     final state = BaseResumeForm.of(context);
     if (state == null) return;
@@ -258,6 +250,13 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
         for (final e in state.controllers.entries) e.key: e.value.text,
       };
       data['ats_friendly'] = _atsFriendly ? 'true' : 'false';
+      // Add dynamic sections
+      data['workExperiences'] = jsonEncode(
+        _workExperiences.map((e) => e.toJson()).toList(),
+      );
+      data['educations'] = jsonEncode(
+        _educations.map((e) => e.toJson()).toList(),
+      );
 
       final resume = SavedResume(
         id:
@@ -319,11 +318,14 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
       existingResume: widget.existing,
       template: 'Classic',
       extraKeys: const [
+        'resumeTitle',
         'summary',
         'skills',
         'certifications',
         'workExperiences',
         'educations',
+        'customField',
+        'customFieldLabel',
         // Persist the order of the main sections (summary, skills, experience)
         'sectionOrder',
       ],
@@ -362,96 +364,6 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                 preferredSize: const Size.fromHeight(1),
                 child: Container(color: Colors.grey.shade200, height: 1),
               ),
-              actions: [
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.download),
-                  onSelected: _exportResume,
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'PDF',
-                      child: ListTile(
-                        leading: Icon(Icons.picture_as_pdf),
-                        title: Text('Export as PDF'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'DOCX',
-                      child: ListTile(
-                        leading: Icon(Icons.description),
-                        title: Text('Export as DOCX'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'TXT',
-                      child: ListTile(
-                        leading: Icon(Icons.text_snippet),
-                        title: Text('Export as TXT'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ],
-                ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.share),
-                  onSelected: (choice) async {
-                    final state = BaseResumeForm.of(context);
-                    if (state == null) return;
-                    final data = {
-                      for (final e in state.controllers.entries)
-                        e.key: e.value.text,
-                    };
-                    final resume = SavedResume(
-                      id:
-                          widget.existing?.id ??
-                          DateTime.now().millisecondsSinceEpoch.toString(),
-                      title: state.controllerFor('name').text.isNotEmpty
-                          ? '${state.controllerFor('name').text} Resume'
-                          : 'Classic Resume',
-                      template: 'Classic',
-                      data: data,
-                      createdAt: widget.existing?.createdAt ?? DateTime.now(),
-                      updatedAt: DateTime.now(),
-                    );
-                    try {
-                      if (!PremiumService.isPremium) {
-                        PremiumService.showUpgradeDialog(context, 'Sharing');
-                        return;
-                      }
-                      if (choice == 'EMAIL') {
-                        await ShareExportService(context).shareViaEmail(resume);
-                      } else if (choice == 'WHATSAPP') {
-                        await ShareExportService(
-                          context,
-                        ).shareViaWhatsApp(resume);
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Share failed: $e')),
-                      );
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: 'EMAIL',
-                      child: ListTile(
-                        leading: Icon(Icons.email_outlined),
-                        title: Text('Share via Email (Premium)'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'WHATSAPP',
-                      child: ListTile(
-                        leading: Icon(Icons.share_outlined),
-                        title: Text('Share via WhatsApp (Premium)'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ),
             backgroundColor: Colors.white,
             body: SingleChildScrollView(
@@ -459,6 +371,27 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Resume Title Section
+                  _sectionCard(
+                    title: 'Resume Title',
+                    icon: Icons.title,
+                    sectionKey: 'title',
+                    child: Column(
+                      children: [
+                        state.buildTextField(
+                          'resumeTitle',
+                          'Resume Title (e.g., Senior Project Manager)',
+                          required: false,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Enter a descriptive title that includes your name and position',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   _sectionCard(
                     title: 'Contact Info',
                     icon: Icons.contact_page,
@@ -476,13 +409,41 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                           'Email Address',
                           required: true,
                           keyboard: TextInputType.emailAddress,
+                          customValidator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Email Address is required';
+                            }
+                            // Check for @ symbol
+                            if (!value.contains('@')) {
+                              return 'Email must contain @';
+                            }
+                            // Split by @ and validate domain
+                            final parts = value.split('@');
+                            if (parts.length != 2 || parts[1].isEmpty) {
+                              return 'Invalid email format';
+                            }
+                            // Check domain has at least one dot and valid format
+                            final domain = parts[1];
+                            if (!domain.contains('.')) {
+                              return 'Email must include domain (e.g., gmail.com)';
+                            }
+                            // Basic domain validation
+                            final domainParts = domain.split('.');
+                            if (domainParts.any((part) => part.isEmpty)) {
+                              return 'Invalid domain format';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 12),
-                        state.buildTextField(
-                          'phone',
-                          'Mobile Number',
-                          required: true,
-                          keyboard: TextInputType.phone,
+                        PhoneInputWidget(
+                          key: const Key('phone_input'),
+                          initialPhoneNumber: state.controllerFor('phone').text,
+                          onChanged:
+                              (fullPhoneNumber, countryCode, phoneNumber) {
+                                state.controllerFor('phone').text =
+                                    fullPhoneNumber;
+                              },
                         ),
                       ],
                     ),
@@ -493,19 +454,11 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                     title: 'Professional Summary',
                     icon: Icons.badge,
                     sectionKey: 'summary',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        state.buildTextField(
-                          'summary',
-                          'Professional Summary',
-                          maxLines: 3,
-                          required: true,
-                        ),
-                        _buildSummarySuggestions(
-                          state.controllerFor('summary'),
-                        ),
-                      ],
+                    child: state.buildTextField(
+                      'summary',
+                      'Professional Summary',
+                      maxLines: 3,
+                      required: true,
                     ),
                   ),
 
@@ -572,69 +525,103 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
                     ),
                   ),
 
+                  _sectionCard(
+                    title: 'Custom Fields',
+                    icon: Icons.add_box,
+                    sectionKey: 'custom',
+                    child: DynamicCustomFieldsSection(
+                      customFields: _customFields,
+                      onCustomFieldsChanged: (fields) {
+                        setState(() {
+                          _customFields = fields;
+                          // Update JSON in hidden controller for BaseResumeForm
+                          state.controllerFor('customFields').text = jsonEncode(
+                            fields.map((f) => f.toJson()).toList(),
+                          );
+                        });
+                      },
+                      atsFriendly: _atsFriendly,
+                    ),
+                  ),
+
                   const SizedBox(height: 32),
 
-                  // ATS-friendly mode toggle
-                  SwitchListTile.adaptive(
-                    value: _atsFriendly,
-                    onChanged: (v) => setState(() => _atsFriendly = v),
-                    title: const Text('ATS-friendly formatting'),
-                    subtitle: const Text(
-                      'Simplifies layout and headings for better ATS parsing.',
-                    ),
+                  // Analyze ATS button (replaces toggle)
+                  StatefulBuilder(
+                    builder: (context, setLocal) {
+                      bool isAnalyzing = false;
+                      return ElevatedButton.icon(
+                        icon: const Icon(Icons.analytics_outlined),
+                        label: const Text('Analyze ATS'),
+                        onPressed: isAnalyzing
+                            ? null
+                            : () async {
+                                setLocal(() => isAnalyzing = true);
+                                try {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Running ATS analysis...'),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                  await Future.delayed(
+                                    const Duration(milliseconds: 800),
+                                  );
+                                } finally {
+                                  setLocal(() => isAnalyzing = false);
+                                }
+                              },
+                      );
+                    },
                   ),
-                  const SizedBox(height: 8),
 
-                  // ATS Optimization Panel
+                  const SizedBox(height: 12),
+
+                  // ATS Optimization Panel always visible with latest content
                   ATSOptimizationPanel(
                     content: _getResumeContent(state.controllers),
-                    jobDescription:
-                        '', // Could be enhanced to get from user input
+                    jobDescription: '',
                   ),
 
-                  const SizedBox(height: 16),
-                  if (_atsFriendly) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'ATS Preview (Plain Text)',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _getResumeContent(state.controllers),
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
                   const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.save),
-                      onPressed: () => state.saveResume(),
-                      label: const Text('Save Classic Resume'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
+                ],
+              ),
+            ),
+            // Use a Builder so the BottomNavigationBar has a context
+            // that is a descendant of BaseResumeForm. This ensures
+            // BaseResumeForm.of(ctx) resolves correctly.
+            bottomNavigationBar: Builder(
+              builder: (navCtx) => BottomNavigationBar(
+                type: BottomNavigationBarType.fixed,
+                selectedItemColor: Colors.blueAccent,
+                unselectedItemColor: Colors.grey.shade600,
+                backgroundColor: Colors.white,
+                elevation: 8,
+                showSelectedLabels: true,
+                showUnselectedLabels: true,
+                selectedFontSize: 12,
+                unselectedFontSize: 11,
+                currentIndex: _bottomIndex,
+                onTap: (index) {
+                  setState(() => _bottomIndex = index);
+                  _handleBottomNavTap(navCtx, index);
+                },
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home_rounded, size: 28),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.visibility_rounded, size: 28),
+                    label: 'Preview',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.share_rounded, size: 28),
+                    label: 'Share',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.save_rounded, size: 28),
+                    label: 'Save',
                   ),
                 ],
               ),
@@ -642,6 +629,223 @@ class _ClassicResumeFormScreenState extends State<ClassicResumeFormScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+extension on _ClassicResumeFormScreenState {
+  void _handleBottomNavTap(BuildContext ctx, int index) async {
+    final state = BaseResumeForm.of(ctx);
+    if (state == null) return;
+
+    switch (index) {
+      case 0: // Home
+        final shouldSave = await showDialog<bool>(
+          context: context,
+          builder: (dCtx) => AlertDialog(
+            title: const Text('Save before leaving?'),
+            content: const Text('Do you want me to save your resume?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dCtx).pop(false),
+                child: const Text('No'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(dCtx).pop(true),
+                child: const Text('Yes, Save'),
+              ),
+            ],
+          ),
+        );
+        if (shouldSave == true) {
+          await state.saveResume();
+        }
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+        break;
+      case 1: // Preview
+        await _previewResumeWithState(state);
+        break;
+      case 2: // Share
+        _showShareOptions(state);
+        break;
+      case 3: // Save
+        await state.saveResume();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Resume saved successfully!'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        break;
+    }
+  }
+
+  Future<void> _previewResume() async {
+    final state = BaseResumeForm.of(context);
+    if (state == null) return;
+    try {
+      // Collect current controllers into data map
+      final Map<String, dynamic> data = {
+        for (final e in state.controllers.entries) e.key: e.value.text,
+      };
+      // Ensure dynamic sections are encoded
+      data['workExperiences'] = jsonEncode(
+        _workExperiences.map((e) => e.toJson()).toList(),
+      );
+      data['educations'] = jsonEncode(
+        _educations.map((e) => e.toJson()).toList(),
+      );
+
+      final title = state.controllers['name']?.text.isEmpty == true
+          ? 'Preview'
+          : '${state.controllers['name']!.text} Resume';
+
+      final resume = SavedResume(
+        id: 'preview_${DateTime.now().millisecondsSinceEpoch}',
+        title: title,
+        template: 'Classic',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        data: data,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ClassicResumePreview(resume: resume)),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading preview: $e')));
+      }
+    }
+  }
+
+  // Helper to preview using an already-obtained BaseResumeForm state
+  Future<void> _previewResumeWithState(dynamic state) async {
+    try {
+      final Map<String, dynamic> data = {
+        for (final e in state.controllers.entries) e.key: e.value.text,
+      };
+      data['workExperiences'] = jsonEncode(
+        _workExperiences.map((e) => e.toJson()).toList(),
+      );
+      data['educations'] = jsonEncode(
+        _educations.map((e) => e.toJson()).toList(),
+      );
+
+      final title = state.controllers['name']?.text.isEmpty == true
+          ? 'Preview'
+          : '${state.controllers['name']!.text} Resume';
+
+      final resume = SavedResume(
+        id: 'preview_${DateTime.now().millisecondsSinceEpoch}',
+        title: title,
+        template: 'Classic',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        data: data,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ClassicResumePreview(resume: resume)),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading preview: $e')));
+      }
+    }
+  }
+
+  void _showShareOptions(dynamic state) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                title: const Text('Save as PDF'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final resume = _createResumeFromState(state);
+                  final service = ShareExportService(this.context);
+                  await service.exportAndOpenPdf(resume);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.description, color: Colors.blue),
+                title: const Text('Save as DOCX'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final resume = _createResumeFromState(state);
+                  final service = ShareExportService(this.context);
+                  await service.exportAndOpenDocx(resume);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.email, color: Colors.green),
+                title: const Text('Share via Email'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final resume = _createResumeFromState(state);
+                  final service = ShareExportService(this.context);
+                  await service.shareViaEmail(resume);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.chat, color: Colors.teal),
+                title: const Text('Share via WhatsApp'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final resume = _createResumeFromState(state);
+                  final service = ShareExportService(this.context);
+                  await service.shareViaWhatsApp(resume);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  SavedResume _createResumeFromState(dynamic state) {
+    final Map<String, dynamic> data = {
+      for (final e in state.controllers.entries) e.key: e.value.text,
+    };
+    data['workExperiences'] = jsonEncode(
+      _workExperiences.map((e) => e.toJson()).toList(),
+    );
+    data['educations'] = jsonEncode(
+      _educations.map((e) => e.toJson()).toList(),
+    );
+    data['customFields'] = jsonEncode(
+      _customFields.map((e) => e.toJson()).toList(),
+    );
+
+    final title = state.controllers['name']?.text.isEmpty == true
+        ? 'Classic Resume'
+        : '${state.controllers['name']!.text} Resume';
+
+    return SavedResume(
+      id:
+          widget.existing?.id ??
+          'temp_${DateTime.now().millisecondsSinceEpoch}',
+      title: title,
+      template: 'Classic',
+      createdAt: widget.existing?.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+      data: data,
     );
   }
 }

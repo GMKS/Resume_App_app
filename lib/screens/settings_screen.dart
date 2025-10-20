@@ -3,6 +3,8 @@ import '../services/premium_service.dart';
 import '../services/hybrid_auth_service.dart';
 import '../services/currency_service.dart';
 import '../config/app_config.dart';
+import '../widgets/upi_payment_widget.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -45,6 +47,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isPremium = false;
   String _premiumStatus = '';
   late final HybridAuthService _auth;
+  bool _authInitialized = false;
+  String _selectedPlan = 'yearly'; // Default to yearly (best value)
 
   @override
   void initState() {
@@ -53,7 +57,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _auth = HybridAuthService();
     // Ensure auth is initialized so we can show current user if available
     _auth.init().then((_) {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {
+          _authInitialized = true;
+        });
+      }
     });
   }
 
@@ -96,7 +104,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  if (_auth.isLoggedIn) ...[
+                  if (!_authInitialized) ...[
+                    const Center(child: CircularProgressIndicator()),
+                  ] else if (_auth.isLoggedIn) ...[
                     // Name
                     _InfoRow(
                       label: 'Name',
@@ -228,31 +238,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      SizedBox(
-                        width:
-                            280, // will be clamped by Expanded in Row-less context
-                        child: _priceChip(
-                          'Monthly',
-                          CurrencyService.formatPrice('monthly'),
-                          '/mo',
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedPlan = 'monthly'),
+                        child: SizedBox(
+                          width: 280,
+                          child: _priceChip(
+                            'Monthly',
+                            CurrencyService.formatPrice('monthly'),
+                            '/mo',
+                            selected: _selectedPlan == 'monthly',
+                          ),
                         ),
                       ),
-                      SizedBox(
-                        width: 280,
-                        child: _priceChip(
-                          'Yearly',
-                          CurrencyService.formatPrice('yearly'),
-                          '/yr',
-                          highlight: true,
-                          note: 'Save 58%',
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedPlan = 'yearly'),
+                        child: SizedBox(
+                          width: 280,
+                          child: _priceChip(
+                            'Yearly',
+                            CurrencyService.formatPrice('yearly'),
+                            '/yr',
+                            highlight: true,
+                            note: 'Save 58%',
+                            selected: _selectedPlan == 'yearly',
+                          ),
                         ),
                       ),
-                      SizedBox(
-                        width: 280,
-                        child: _priceChip(
-                          'Lifetime',
-                          CurrencyService.formatPrice('lifetime'),
-                          'one-time',
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedPlan = 'lifetime'),
+                        child: SizedBox(
+                          width: 280,
+                          child: _priceChip(
+                            'Lifetime',
+                            CurrencyService.formatPrice('lifetime'),
+                            'one-time',
+                            selected: _selectedPlan == 'lifetime',
+                          ),
                         ),
                       ),
                     ],
@@ -269,10 +290,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onPressed: _isPremium
                           ? null
                           : () {
-                              PremiumService.showUpgradeDialog(
-                                context,
-                                'Premium Features',
-                              );
+                              // Show payment gateway dialog
+                              _showPaymentDialog(context);
                             },
                       icon: const Icon(Icons.upgrade),
                       label: Text(
@@ -573,6 +592,264 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
+  void _showPaymentDialog(BuildContext context) {
+    final planName = _selectedPlan == 'monthly'
+        ? 'Monthly'
+        : _selectedPlan == 'yearly'
+        ? 'Yearly'
+        : 'Lifetime';
+    final amount = CurrencyService.formatPrice(_selectedPlan);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.payment, color: Colors.deepPurple),
+            SizedBox(width: 8),
+            Text('Upgrade to Premium'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Selected Plan: $planName',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Amount: $amount',
+              style: const TextStyle(
+                fontSize: 18,
+                color: Colors.deepPurple,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Choose your payment method:',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            _buildPaymentOption(
+              dialogContext,
+              icon: Icons.credit_card,
+              title: 'UPI Payment',
+              subtitle: 'PhonePe, Google Pay, Paytm',
+              onTap: () {
+                Navigator.pop(dialogContext);
+                _processUPIPayment(dialogContext, _selectedPlan, amount);
+              },
+            ),
+            const SizedBox(height: 8),
+            _buildPaymentOption(
+              dialogContext,
+              icon: Icons.account_balance_wallet,
+              title: 'Razorpay',
+              subtitle: 'Cards, UPI, Wallets, NetBanking',
+              onTap: () {
+                Navigator.pop(dialogContext);
+                _processRazorpayPayment(dialogContext, _selectedPlan, amount);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentOption(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.deepPurple, size: 32),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _processUPIPayment(BuildContext context, String plan, String amount) {
+    // Extract numeric amount from formatted string
+    final numericAmount =
+        double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+
+    // Show UPI payment widget in a dialog
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.payment, color: Colors.deepPurple),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'UPI Payment',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              UpiPaymentWidget(
+                planType: plan,
+                amount: numericAmount,
+                onPaymentStart: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Starting UPI payment...')),
+                  );
+                },
+                onPaymentSuccess: (response) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Payment successful!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  // Refresh premium status
+                  setState(() {
+                    _loadPremiumStatus();
+                  });
+                },
+                onPaymentError: (error) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Payment failed: $error'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _processRazorpayPayment(
+    BuildContext context,
+    String plan,
+    String amount,
+  ) {
+    // Extract numeric amount from formatted string
+    final numericAmount =
+        double.tryParse(amount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+
+    // Initialize Razorpay
+    final razorpay = Razorpay();
+
+    razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (
+      PaymentSuccessResponse response,
+    ) {
+      razorpay.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment successful! ID: ${response.paymentId}'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      // Refresh premium status
+      setState(() {
+        _loadPremiumStatus();
+      });
+    });
+
+    razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, (
+      PaymentFailureResponse response,
+    ) {
+      razorpay.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment failed: ${response.message}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    });
+
+    razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (
+      ExternalWalletResponse response,
+    ) {
+      razorpay.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('External wallet selected: ${response.walletName}'),
+        ),
+      );
+    });
+
+    // Prepare payment options
+    final options = {
+      'key': 'rzp_test_1DP5mmOlF5G5ag', // Use your Razorpay key
+      'amount': (numericAmount * 100).toInt(), // Amount in paise
+      'name': 'Resume Builder',
+      'description': '$plan Plan Subscription',
+      'prefill': {'contact': '', 'email': ''},
+      'theme': {'color': '#6C5CE7'},
+    };
+
+    try {
+      razorpay.open(options);
+    } catch (e) {
+      razorpay.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
 }
 
 Widget _priceChip(
@@ -581,22 +858,28 @@ Widget _priceChip(
   String period, {
   bool highlight = false,
   String? note,
+  bool selected = false,
 }) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
-      color: highlight
-          ? Colors.deepPurple.withOpacity(0.08)
-          : Colors.grey.withOpacity(0.08),
+      color: selected
+          ? Colors.deepPurple.withOpacity(0.15)
+          : (highlight
+                ? Colors.deepPurple.withOpacity(0.08)
+                : Colors.grey.withOpacity(0.08)),
       borderRadius: BorderRadius.circular(8),
       border: Border.all(
-        color: highlight ? Colors.deepPurple : Colors.grey.shade300,
+        color: selected
+            ? Colors.deepPurple
+            : (highlight ? Colors.deepPurple : Colors.grey.shade300),
+        width: selected ? 2 : 1,
       ),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Title + optional note badge; use Wrap to avoid overflow on small widths
+        // Title + optional note badge + selected indicator
         Wrap(
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 6,
@@ -607,9 +890,17 @@ Widget _priceChip(
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: highlight ? Colors.deepPurple : Colors.black87,
+                color: selected || highlight
+                    ? Colors.deepPurple
+                    : Colors.black87,
               ),
             ),
+            if (selected)
+              const Icon(
+                Icons.check_circle,
+                size: 18,
+                color: Colors.deepPurple,
+              ),
             if (note != null)
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 100),
@@ -642,7 +933,7 @@ Widget _priceChip(
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: highlight ? Colors.deepPurple : Colors.black87,
+            color: selected || highlight ? Colors.deepPurple : Colors.black87,
           ),
         ),
         Text(period, style: TextStyle(fontSize: 12, color: Colors.grey[700])),

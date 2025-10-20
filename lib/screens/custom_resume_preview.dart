@@ -3,15 +3,22 @@ import '../models/customize_settings.dart';
 import '../models/custom_resume_data.dart';
 import '../models/saved_resume.dart';
 import '../services/resume_storage_service.dart';
+import '../screens/professional_resume_form_screen.dart';
+import '../screens/classic_resume_form_screen.dart';
+import '../screens/one_page_resume_form_screen.dart';
+import '../screens/minimal_resume_form_screen.dart';
+import '../screens/creative_resume_form_screen.dart';
 
 class CustomResumePreview extends StatelessWidget {
   final CustomizeSettings settings;
   final CustomResumeData resumeData;
+  final SavedResume? originalResume;
 
   const CustomResumePreview({
     super.key,
     required this.settings,
     required this.resumeData,
+    this.originalResume,
   });
 
   @override
@@ -24,7 +31,7 @@ class CustomResumePreview extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => _navigateToEditScreen(context),
             tooltip: 'Edit Resume',
           ),
           IconButton(
@@ -779,6 +786,43 @@ class CustomResumePreview extends StatelessWidget {
   String _formatDate(DateTime? date) {
     if (date == null) return '';
     return '${date.month}/${date.year}';
+  }
+
+  void _navigateToEditScreen(BuildContext context) {
+    if (originalResume == null) {
+      // Fallback to previous behavior if no original resume is provided
+      Navigator.pop(context);
+      return;
+    }
+
+    Widget? targetScreen;
+
+    switch (originalResume!.template) {
+      case 'Professional':
+        targetScreen = ProfessionalResumeFormScreen(existing: originalResume!);
+        break;
+      case 'Classic':
+        targetScreen = ClassicResumeFormScreen(existing: originalResume!);
+        break;
+      case 'One Page':
+        targetScreen = OnePageResumeFormScreen(existing: originalResume!);
+        break;
+      case 'Minimal':
+        targetScreen = MinimalResumeFormScreen(existing: originalResume!);
+        break;
+      case 'Creative':
+        targetScreen = CreativeResumeFormScreen(existing: originalResume!);
+        break;
+      default:
+        // For unknown templates, go back to previous screen
+        Navigator.pop(context);
+        return;
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => targetScreen!),
+    );
   }
 
   Future<void> _saveResume(BuildContext context) async {

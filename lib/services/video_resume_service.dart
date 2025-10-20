@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/premium_service.dart';
 
 /// Video resume service for premium users
@@ -25,21 +26,59 @@ class VideoResumeService {
       _showPremiumRequiredDialog(context);
       return null;
     }
-
-    // This would integrate with camera plugin in production
-    // For now, return null to reduce APK size
-    return null;
+    try {
+      final picker = ImagePicker();
+      final XFile? file = await picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: maxVideoDurationSeconds),
+      );
+      if (file == null) return null;
+      final videoFile = File(file.path);
+      // Optional: validate/possibly compress
+      if (!await validateVideoFile(videoFile)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected video is too large or unsupported'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return null;
+      }
+      return videoFile;
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Video capture failed: $e')));
+      return null;
+    }
   }
 
   /// Pick video from gallery
-  static Future<File?> pickVideoFromGallery() async {
+  static Future<File?> pickVideoFromGallery(BuildContext context) async {
     if (!isAvailable) {
       throw Exception('Video resume is a premium feature');
     }
-
-    // This would integrate with file picker for video selection
-    // Placeholder implementation to reduce APK size
-    return null;
+    try {
+      final picker = ImagePicker();
+      final XFile? file = await picker.pickVideo(source: ImageSource.gallery);
+      if (file == null) return null;
+      final videoFile = File(file.path);
+      if (!await validateVideoFile(videoFile)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected video is too large or unsupported'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return null;
+      }
+      return videoFile;
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Picking video failed: $e')));
+      return null;
+    }
   }
 
   /// Validate video file

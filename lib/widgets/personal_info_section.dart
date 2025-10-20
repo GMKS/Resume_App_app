@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/custom_resume_data.dart';
+import 'phone_input_widget.dart';
 
 class PersonalInfoSection extends StatelessWidget {
   final CustomResumeData resumeData;
@@ -93,19 +94,15 @@ class PersonalInfoSection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // Phone
-        TextFormField(
-          initialValue: resumeData.contactInfo.phone,
-          decoration: const InputDecoration(
-            labelText: 'Phone Number',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.phone),
-          ),
-          keyboardType: TextInputType.phone,
-          onChanged: (value) {
+        // Phone with Country Code Selector
+        PhoneInputWidget(
+          initialPhoneNumber: resumeData.contactInfo.phone,
+          onChanged: (fullPhoneNumber, countryCode, phoneNumber) {
             onResumeDataChanged(
               resumeData.copyWith(
-                contactInfo: resumeData.contactInfo.copyWith(phone: value),
+                contactInfo: resumeData.contactInfo.copyWith(
+                  phone: fullPhoneNumber,
+                ),
               ),
             );
           },

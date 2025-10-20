@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/saved_resume.dart';
 import '../screens/modern_template_selection_screen.dart';
@@ -18,6 +19,15 @@ class ColorfulModernResumePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Extract personal info
+    final personalInfo =
+        resume.data['personalInfo'] as Map<String, dynamic>? ?? {};
+    final name =
+        personalInfo['name']?.toString() ??
+        resume.data['name']?.toString() ??
+        'Your Name';
+    final jobTitle = resume.data['jobTitle']?.toString() ?? 'Your Job Title';
+
     return Container(
       color: Colors.white,
       child: SingleChildScrollView(
@@ -33,21 +43,51 @@ class ColorfulModernResumePreview extends StatelessWidget {
                 color: primaryColor,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    resume.data['name'] ?? 'Your Name',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  // Profile Photo
+                  if (personalInfo['profilePhotoBase64']
+                          ?.toString()
+                          .isNotEmpty ==
+                      true)
+                    Container(
+                      margin: const EdgeInsets.only(right: 24),
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
+                        image: DecorationImage(
+                          image: MemoryImage(
+                            base64Decode(personalInfo['profilePhotoBase64']),
+                          ),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    resume.data['jobTitle'] ?? 'Your Job Title',
-                    style: const TextStyle(fontSize: 18, color: Colors.white),
+                  // Name and Title
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          jobTitle,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -111,6 +151,71 @@ class ColorfulModernResumePreview extends StatelessWidget {
                       .toList(),
                 ),
               ),
+
+            // Certifications
+            if (_getCertifications().isNotEmpty)
+              _buildSection(
+                'Certifications',
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _getCertifications()
+                      .map((cert) => _buildCertification(cert))
+                      .toList(),
+                ),
+              ),
+
+            // Achievements
+            if (resume.data['achievements']?.toString().isNotEmpty == true)
+              _buildSection(
+                'Achievements',
+                Text(
+                  resume.data['achievements'],
+                  style: const TextStyle(fontSize: 14, height: 1.6),
+                ),
+              ),
+
+            // Hobbies
+            if (resume.data['hobbies']?.toString().isNotEmpty == true)
+              _buildSection(
+                'Hobbies',
+                Text(
+                  resume.data['hobbies'],
+                  style: const TextStyle(fontSize: 14, height: 1.6),
+                ),
+              ),
+
+            // Custom Fields - Display as list
+            if (resume.data['customFields'] is List &&
+                (resume.data['customFields'] as List).isNotEmpty)
+              _buildSection(
+                'Additional Information',
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: (resume.data['customFields'] as List)
+                      .map(
+                        (field) => Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.circle, size: 8, color: primaryColor),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  field.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
           ],
         ),
       ),
@@ -146,17 +251,30 @@ class ColorfulModernResumePreview extends StatelessWidget {
 
   Widget _buildContactInfo() {
     final contactItems = <Widget>[];
+    final personalInfo =
+        resume.data['personalInfo'] as Map<String, dynamic>? ?? {};
 
-    if (resume.data['email']?.toString().isNotEmpty == true) {
-      contactItems.add(_buildContactItem(Icons.email, resume.data['email']));
+    final email =
+        personalInfo['email']?.toString() ??
+        resume.data['email']?.toString() ??
+        '';
+    final phone =
+        personalInfo['phone']?.toString() ??
+        resume.data['phone']?.toString() ??
+        '';
+    final location =
+        personalInfo['location']?.toString() ??
+        resume.data['location']?.toString() ??
+        '';
+
+    if (email.isNotEmpty) {
+      contactItems.add(_buildContactItem(Icons.email, email));
     }
-    if (resume.data['phone']?.toString().isNotEmpty == true) {
-      contactItems.add(_buildContactItem(Icons.phone, resume.data['phone']));
+    if (phone.isNotEmpty) {
+      contactItems.add(_buildContactItem(Icons.phone, phone));
     }
-    if (resume.data['location']?.toString().isNotEmpty == true) {
-      contactItems.add(
-        _buildContactItem(Icons.location_on, resume.data['location']),
-      );
+    if (location.isNotEmpty) {
+      contactItems.add(_buildContactItem(Icons.location_on, location));
     }
 
     return Column(
@@ -167,19 +285,30 @@ class ColorfulModernResumePreview extends StatelessWidget {
 
   Widget _buildAdditionalContact() {
     final contactItems = <Widget>[];
+    final personalInfo =
+        resume.data['personalInfo'] as Map<String, dynamic>? ?? {};
 
-    if (resume.data['linkedin']?.toString().isNotEmpty == true) {
-      contactItems.add(
-        _buildContactItem(Icons.business, resume.data['linkedin']),
-      );
+    final linkedin =
+        personalInfo['linkedin']?.toString() ??
+        resume.data['linkedin']?.toString() ??
+        '';
+    final github =
+        personalInfo['github']?.toString() ??
+        resume.data['github']?.toString() ??
+        '';
+    final website =
+        personalInfo['website']?.toString() ??
+        resume.data['website']?.toString() ??
+        '';
+
+    if (linkedin.isNotEmpty) {
+      contactItems.add(_buildContactItem(Icons.business, linkedin));
     }
-    if (resume.data['github']?.toString().isNotEmpty == true) {
-      contactItems.add(_buildContactItem(Icons.code, resume.data['github']));
+    if (github.isNotEmpty) {
+      contactItems.add(_buildContactItem(Icons.code, github));
     }
-    if (resume.data['website']?.toString().isNotEmpty == true) {
-      contactItems.add(
-        _buildContactItem(Icons.language, resume.data['website']),
-      );
+    if (website.isNotEmpty) {
+      contactItems.add(_buildContactItem(Icons.language, website));
     }
 
     return Column(
@@ -235,10 +364,13 @@ class ColorfulModernResumePreview extends StatelessWidget {
               color: primaryColor,
             ),
           ),
-          if (exp['description']?.toString().isNotEmpty == true) ...[
+          if (((exp['description'] ?? '') as String).trim().isNotEmpty ||
+              ((exp['summary'] ?? '') as String).trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              exp['description'],
+              ((exp['description'] ?? '').toString().trim().isNotEmpty)
+                  ? exp['description']
+                  : (exp['summary']?.toString() ?? ''),
               style: const TextStyle(fontSize: 13, height: 1.5),
             ),
           ],
@@ -308,8 +440,12 @@ class ColorfulModernResumePreview extends StatelessWidget {
   List<Map<String, dynamic>> _getWorkExperience() {
     final List<Map<String, dynamic>> experience = [];
 
-    if (resume.data['workTimeline'] is List) {
-      for (final item in resume.data['workTimeline']) {
+    // Try multiple possible keys for work experience
+    final workData =
+        resume.data['workTimeline'] ?? resume.data['workExperience'] ?? [];
+
+    if (workData is List) {
+      for (final item in workData) {
         if (item is Map<String, dynamic>) {
           experience.add(item);
         }
@@ -322,8 +458,12 @@ class ColorfulModernResumePreview extends StatelessWidget {
   List<Map<String, dynamic>> _getEducation() {
     final List<Map<String, dynamic>> education = [];
 
-    if (resume.data['eduTimeline'] is List) {
-      for (final item in resume.data['eduTimeline']) {
+    // Try multiple possible keys for education
+    final eduData =
+        resume.data['eduTimeline'] ?? resume.data['education'] ?? [];
+
+    if (eduData is List) {
+      for (final item in eduData) {
         if (item is Map<String, dynamic>) {
           education.add(item);
         }
@@ -390,5 +530,47 @@ class ColorfulModernResumePreview extends StatelessWidget {
     }
 
     return '$startStr - $endStr';
+  }
+
+  List<String> _getCertifications() {
+    final List<String> certifications = [];
+
+    if (resume.data['certifications'] is String &&
+        resume.data['certifications'].toString().isNotEmpty) {
+      certifications.addAll(
+        resume.data['certifications']
+            .toString()
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty),
+      );
+    } else if (resume.data['certificationsList'] is List) {
+      for (final cert in resume.data['certificationsList']) {
+        if (cert.toString().isNotEmpty) {
+          certifications.add(cert.toString().trim());
+        }
+      }
+    }
+
+    return certifications;
+  }
+
+  Widget _buildCertification(String certification) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.verified, size: 16, color: primaryColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              certification,
+              style: const TextStyle(fontSize: 14, height: 1.5),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

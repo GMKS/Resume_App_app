@@ -18,7 +18,7 @@ import 'colorful_minimal_pdf_exporter.dart';
 import 'classic_pdf_exporter.dart';
 import 'professional_pdf_exporter.dart';
 import 'premium_service.dart';
-import 'ai_service.dart';
+import 'modern_pdf_exporter.dart';
 
 class ShareExportService {
   final BuildContext context;
@@ -51,23 +51,36 @@ class ShareExportService {
     }
 
     File? pdfFile;
+    bool progressShown = false;
+    // Show a lightweight progress indicator during generation + share
+    try {
+      if (context.mounted) {
+        progressShown = true;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
+      }
+    } catch (_) {}
     try {
       pdfFile = await _generatePdf(resume);
+      if (pdfFile == null) {
+        print('DEBUG: PDF generation returned null.');
+        await _showErrorDialog('Failed to generate PDF for sharing.');
+        return;
+      }
+      final subject = 'Resume: ${resume.data['full_name'] ?? 'Details'}';
+      // Let the inner share function manage its own fallbacks and dialogs.
+      await shareFunction(pdfFile, subject, resume.data);
     } catch (e, s) {
-      print('DEBUG: Exception during PDF generation: $e\n$s');
-      await _showErrorDialog('Failed to generate PDF for sharing.');
-      return;
+      print('DEBUG: Exception during share/export flow: $e\n$s');
+      await _showErrorDialog('Failed to share the resume.');
+    } finally {
+      if (progressShown && context.mounted) {
+        Navigator.of(context).pop();
+      }
     }
-
-    if (pdfFile == null) {
-      print('DEBUG: PDF generation returned null.');
-      await _showErrorDialog('Failed to generate PDF for sharing.');
-      return;
-    }
-
-    final subject = 'Resume: ${resume.data['full_name'] ?? 'Details'}';
-    // Let the inner share function manage its own fallbacks and dialogs.
-    await shareFunction(pdfFile, subject, resume.data);
   }
 
   Future<File?> _generatePdf(SavedResume resume) async {
@@ -91,6 +104,20 @@ class ShareExportService {
           print('DEBUG: Fallback minimal PDF failed: $ee\n$ss');
           return null;
         }
+      }
+    }
+    // Dedicated Modern template exporter for parity with preview and data shapes
+    if (resume.template == 'Modern') {
+      try {
+        print('DEBUG: Building Modern PDF…');
+        final pdf = await ModernPdfExporter.build(resume);
+        final output = await getTemporaryDirectory();
+        final file = File(p.join(output.path, 'modern_resume.pdf'));
+        await file.writeAsBytes(pdf);
+        return file;
+      } catch (e, s) {
+        print('DEBUG: ModernPdfExporter failed: $e\n$s');
+        // Fall through to generic fallback handling below
       }
     }
 
@@ -160,6 +187,26 @@ class ShareExportService {
       }
     }
 
+    if (resume.template == 'Smart Assist') {
+      try {
+        print('DEBUG: Building Smart Assist PDF…');
+        final pdf = await _buildSmartAssistPdf(resume);
+        final output = await getTemporaryDirectory();
+        final file = File(p.join(output.path, 'smart_assist_resume.pdf'));
+        await file.writeAsBytes(await pdf.save());
+        return file;
+      } catch (e, s) {
+        print('DEBUG: SmartAssistPdf failed: $e\n$s');
+        // Fallback to generic PDF
+        try {
+          return await _generateFallbackPdf(resume);
+        } catch (ee, ss) {
+          print('DEBUG: Fallback after Smart Assist failed: $ee\n$ss');
+          return null;
+        }
+      }
+    }
+
     // Fallback for other templates
     print(
       'DEBUG: Using fallback PDF generator for template "${resume.template}".',
@@ -175,6 +222,503 @@ class ShareExportService {
         return null;
       }
     }
+  }
+
+  /// Build Smart Assist PDF matching the functional resume preview layout
+  Future<pw.Document> _buildSmartAssistPdf(SavedResume resume) async {
+    final baseFont = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+    final italicFont = await PdfGoogleFonts.robotoItalic();
+
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: baseFont,
+        bold: boldFont,
+        italic: italicFont,
+      ),
+    );
+
+    final data = resume.data;
+    final personalInfo = data['personalInfo'] as Map? ?? {};
+    final name = personalInfo['name']?.toString() ?? 'No name extracted';
+    final email = personalInfo['email']?.toString() ?? '';
+    final phone = personalInfo['phone']?.toString() ?? '';
+    final location = personalInfo['location']?.toString() ?? '';
+    final linkedIn = personalInfo['linkedin']?.toString() ?? '';
+    final summary = data['summary']?.toString() ?? '';
+    final coreSkills = data['coreSkills']?.toString() ?? '';
+    final technicalSkills = data['technicalSkills'] as Map? ?? {};
+    final workExperience = data['workExperience'] as List? ?? [];
+    final education = data['education'] as List? ?? [];
+    final achievements = data['achievements']?.toString() ?? '';
+    final personalDetails = data['personalDetails'] as Map? ?? {};
+
+    pdf.addPage(
+      pw.Page(
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) {
+          return pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // LEFT SIDEBAR (30%)
+              pw.Expanded(
+                flex: 3,
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.only(right: 20),
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(
+                      right: pw.BorderSide(color: PdfColors.grey400, width: 2),
+                    ),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      _pdfSidebarTitle('CURRICULUM VITAE'),
+                      pw.SizedBox(height: 20),
+                      _pdfSidebarTitle('PERSONAL INFORMATION'),
+                      pw.SizedBox(height: 12),
+                      pw.Text(
+                        name,
+                        style: pw.TextStyle(
+                          fontSize: 15,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 8),
+                      if (email.isNotEmpty) _pdfInfoRow('Email: $email'),
+                      if (phone.isNotEmpty) _pdfInfoRow('Phone: $phone'),
+                      if (location.isNotEmpty)
+                        _pdfInfoRow('Location: $location'),
+                      if (linkedIn.isNotEmpty)
+                        _pdfInfoRow('LinkedIn: $linkedIn'),
+                      pw.SizedBox(height: 20),
+                      if (summary.isNotEmpty) ...[
+                        _pdfSidebarTitle('PROFESSIONAL SUMMARY'),
+                        pw.SizedBox(height: 12),
+                        pw.Text(
+                          summary.length > 300
+                              ? '${summary.substring(0, 300)}...'
+                              : summary,
+                          style: const pw.TextStyle(
+                            fontSize: 11,
+                            lineSpacing: 1.5,
+                          ),
+                        ),
+                        pw.SizedBox(height: 20),
+                      ],
+                      if (coreSkills.isNotEmpty) ...[
+                        _pdfSidebarTitle('CORE SKILLS'),
+                        pw.SizedBox(height: 12),
+                        pw.Text(
+                          coreSkills,
+                          style: const pw.TextStyle(
+                            fontSize: 11,
+                            lineSpacing: 1.5,
+                          ),
+                        ),
+                        pw.SizedBox(height: 20),
+                      ],
+                      if (education.isNotEmpty) ...[
+                        _pdfSidebarTitle('EDUCATION'),
+                        pw.SizedBox(height: 12),
+                        ...education.map((edu) {
+                          final degree = edu['degree']?.toString() ?? '';
+                          final school = edu['school']?.toString() ?? '';
+                          final start = edu['start']?.toString() ?? '';
+                          final end = edu['end']?.toString() ?? '';
+                          return pw.Container(
+                            margin: const pw.EdgeInsets.only(bottom: 12),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                if (degree.isNotEmpty)
+                                  pw.Text(
+                                    degree,
+                                    style: pw.TextStyle(
+                                      fontWeight: pw.FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                if (school.isNotEmpty)
+                                  pw.Text(
+                                    school,
+                                    style: const pw.TextStyle(fontSize: 10),
+                                  ),
+                                if (start.isNotEmpty || end.isNotEmpty)
+                                  pw.Text(
+                                    '${_formatYearPdf(start)}-${_formatYearPdf(end)}',
+                                    style: const pw.TextStyle(fontSize: 10),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }),
+                        pw.SizedBox(height: 20),
+                      ],
+                      if (achievements.isNotEmpty) ...[
+                        _pdfSidebarTitle('ACHIEVEMENTS'),
+                        pw.SizedBox(height: 12),
+                        pw.Text(
+                          achievements,
+                          style: const pw.TextStyle(
+                            fontSize: 11,
+                            lineSpacing: 1.5,
+                          ),
+                        ),
+                        pw.SizedBox(height: 20),
+                      ],
+                      if (technicalSkills.isNotEmpty) ...[
+                        _pdfSidebarTitle('TECHNICAL SKILLS'),
+                        pw.SizedBox(height: 12),
+                        ...technicalSkills.entries.map((entry) {
+                          return pw.Container(
+                            margin: const pw.EdgeInsets.only(bottom: 10),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Text(
+                                  '${entry.key}:',
+                                  style: pw.TextStyle(
+                                    fontWeight: pw.FontWeight.bold,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                                pw.SizedBox(height: 4),
+                                pw.Text(
+                                  entry.value.toString(),
+                                  style: const pw.TextStyle(fontSize: 10),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        pw.SizedBox(height: 20),
+                      ],
+                      if (personalDetails.isNotEmpty) ...[
+                        _pdfSidebarTitle('PERSONAL DETAILS'),
+                        pw.SizedBox(height: 12),
+                        ...personalDetails.entries.map((entry) {
+                          return pw.Container(
+                            margin: const pw.EdgeInsets.only(bottom: 6),
+                            child: pw.Text(
+                              '${entry.key}: ${entry.value}',
+                              style: const pw.TextStyle(fontSize: 10),
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              // RIGHT CONTENT (70%)
+              pw.Expanded(
+                flex: 7,
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.only(left: 20),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      if (workExperience.isNotEmpty) ...[
+                        _pdfMainTitle('PROFESSIONAL EXPERIENCE'),
+                        pw.SizedBox(height: 16),
+                        ...workExperience.map((work) {
+                          final role = work['role']?.toString() ?? '';
+                          final company = work['company']?.toString() ?? '';
+                          final workLocation =
+                              work['location']?.toString() ?? '';
+                          final start = work['start']?.toString() ?? '';
+                          final end = work['end']?.toString() ?? '';
+                          final currentlyWorking =
+                              work['currentlyWorking'] == true;
+                          final duration = work['duration']?.toString() ?? '';
+                          final teamSize = work['teamSize']?.toString() ?? '';
+                          final tools = work['tools']?.toString() ?? '';
+                          final responsibilities =
+                              work['responsibilities'] as List? ?? [];
+                          final projects = work['projects'] as List? ?? [];
+
+                          return pw.Container(
+                            margin: const pw.EdgeInsets.only(bottom: 20),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                if (role.isNotEmpty)
+                                  pw.Text(
+                                    role.toUpperCase(),
+                                    style: pw.TextStyle(
+                                      fontWeight: pw.FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                pw.SizedBox(height: 4),
+                                if (company.isNotEmpty)
+                                  pw.Text(
+                                    company +
+                                        (workLocation.isNotEmpty
+                                            ? ' | $workLocation'
+                                            : ''),
+                                    style: pw.TextStyle(
+                                      fontSize: 12,
+                                      fontStyle: pw.FontStyle.italic,
+                                    ),
+                                  ),
+                                if (start.isNotEmpty ||
+                                    end.isNotEmpty ||
+                                    currentlyWorking ||
+                                    duration.isNotEmpty)
+                                  pw.Container(
+                                    margin: const pw.EdgeInsets.only(
+                                      top: 4,
+                                      bottom: 8,
+                                    ),
+                                    child: pw.Text(
+                                      duration.isNotEmpty
+                                          ? duration
+                                          : '${_formatYearPdf(start)}-${currentlyWorking ? "Present" : _formatYearPdf(end)}',
+                                      style: const pw.TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                                if (teamSize.isNotEmpty || tools.isNotEmpty)
+                                  pw.Container(
+                                    margin: const pw.EdgeInsets.only(bottom: 8),
+                                    child: pw.Text(
+                                      [
+                                        if (teamSize.isNotEmpty)
+                                          'Team Size: $teamSize',
+                                        if (tools.isNotEmpty) 'Tools: $tools',
+                                      ].join(' | '),
+                                      style: const pw.TextStyle(fontSize: 10),
+                                    ),
+                                  ),
+                                if (responsibilities.isNotEmpty) ...[
+                                  pw.Text(
+                                    'Key Responsibilities:',
+                                    style: pw.TextStyle(
+                                      fontWeight: pw.FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  pw.SizedBox(height: 6),
+                                  ...responsibilities.map(
+                                    (resp) => pw.Container(
+                                      margin: const pw.EdgeInsets.only(
+                                        left: 12,
+                                        bottom: 4,
+                                      ),
+                                      child: pw.Row(
+                                        crossAxisAlignment:
+                                            pw.CrossAxisAlignment.start,
+                                        children: [
+                                          pw.Text(
+                                            '• ',
+                                            style: const pw.TextStyle(
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          pw.Expanded(
+                                            child: pw.Text(
+                                              resp.toString(),
+                                              style: const pw.TextStyle(
+                                                fontSize: 11,
+                                                lineSpacing: 1.4,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  pw.SizedBox(height: 10),
+                                ],
+                                if (projects.isNotEmpty) ...[
+                                  pw.Text(
+                                    'Projects:',
+                                    style: pw.TextStyle(
+                                      fontWeight: pw.FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  pw.SizedBox(height: 8),
+                                  ...projects.map((project) {
+                                    final projectName =
+                                        project['name']?.toString() ?? '';
+                                    final projectDesc =
+                                        project['description']?.toString() ??
+                                        '';
+                                    final projectRole =
+                                        project['role']?.toString() ?? '';
+                                    final projectDuration =
+                                        project['duration']?.toString() ?? '';
+                                    final projectSkills =
+                                        project['skills']?.toString() ?? '';
+
+                                    return pw.Container(
+                                      margin: const pw.EdgeInsets.only(
+                                        left: 12,
+                                        bottom: 12,
+                                      ),
+                                      child: pw.Column(
+                                        crossAxisAlignment:
+                                            pw.CrossAxisAlignment.start,
+                                        children: [
+                                          if (projectName.isNotEmpty)
+                                            pw.Text(
+                                              '▪ $projectName',
+                                              style: pw.TextStyle(
+                                                fontWeight: pw.FontWeight.bold,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          if (projectRole.isNotEmpty ||
+                                              projectDuration.isNotEmpty)
+                                            pw.Container(
+                                              margin: const pw.EdgeInsets.only(
+                                                top: 2,
+                                              ),
+                                              child: pw.Text(
+                                                [
+                                                  if (projectRole.isNotEmpty)
+                                                    'Role: $projectRole',
+                                                  if (projectDuration
+                                                      .isNotEmpty)
+                                                    'Duration: $projectDuration',
+                                                ].join(' | '),
+                                                style: const pw.TextStyle(
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            ),
+                                          if (projectDesc.isNotEmpty)
+                                            pw.Container(
+                                              margin: const pw.EdgeInsets.only(
+                                                top: 4,
+                                              ),
+                                              child: pw.Text(
+                                                projectDesc,
+                                                style: const pw.TextStyle(
+                                                  fontSize: 10,
+                                                  lineSpacing: 1.4,
+                                                ),
+                                              ),
+                                            ),
+                                          if (projectSkills.isNotEmpty)
+                                            pw.Container(
+                                              margin: const pw.EdgeInsets.only(
+                                                top: 4,
+                                              ),
+                                              child: pw.Text(
+                                                'Skills: $projectSkills',
+                                                style: pw.TextStyle(
+                                                  fontSize: 10,
+                                                  fontStyle:
+                                                      pw.FontStyle.italic,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf;
+  }
+
+  pw.Widget _pdfSidebarTitle(String title) {
+    // Match colors from preview screen
+    PdfColor titleColor;
+    switch (title) {
+      case 'CURRICULUM VITAE':
+        titleColor = PdfColor.fromHex('#1565C0'); // blue.shade800
+        break;
+      case 'PERSONAL INFORMATION':
+        titleColor = PdfColor.fromHex('#388E3C'); // green.shade700
+        break;
+      case 'PROFESSIONAL SUMMARY':
+        titleColor = PdfColor.fromHex('#F57C00'); // orange.shade700
+        break;
+      case 'CORE SKILLS':
+        titleColor = PdfColor.fromHex('#7B1FA2'); // purple.shade700
+        break;
+      case 'EDUCATION':
+        titleColor = PdfColor.fromHex('#C62828'); // red.shade800
+        break;
+      case 'ACHIEVEMENTS':
+        titleColor = PdfColor.fromHex('#00796B'); // teal.shade700
+        break;
+      case 'TECHNICAL SKILLS':
+        titleColor = PdfColor.fromHex('#303F9F'); // indigo.shade700
+        break;
+      case 'PERSONAL DETAILS':
+        titleColor = PdfColor.fromHex('#5D4037'); // brown.shade700
+        break;
+      default:
+        titleColor = PdfColors.grey800;
+    }
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(bottom: pw.BorderSide(color: titleColor, width: 2)),
+      ),
+      child: pw.Text(
+        title,
+        style: pw.TextStyle(
+          fontSize: 11,
+          fontWeight: pw.FontWeight.bold,
+          color: titleColor,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  pw.Widget _pdfMainTitle(String title) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(
+          bottom: pw.BorderSide(color: PdfColor.fromHex('#1565C0'), width: 2),
+        ),
+      ),
+      child: pw.Text(
+        title,
+        style: pw.TextStyle(
+          fontSize: 14,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColor.fromHex('#1565C0'), // blue.shade800
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  pw.Widget _pdfInfoRow(String text) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 6),
+      child: pw.Text(text, style: const pw.TextStyle(fontSize: 10)),
+    );
+  }
+
+  String _formatYearPdf(String date) {
+    if (date.isEmpty) return '';
+    final yearMatch = RegExp(r'\d{4}').firstMatch(date);
+    return yearMatch?.group(0) ?? date;
   }
 
   Future<File> _generateFallbackPdf(SavedResume resume) async {
@@ -914,13 +1458,27 @@ class ShareExportService {
 
       try {
         List<int> bytes;
-        if (resume.template.toLowerCase() == 'professional') {
-          // Use improved DOCX export for Professional template
-          bytes = _buildProfessionalDocx(resume);
-        } else {
-          // Fallback to simple text export for other templates
-          final content = _buildPlainTextForDoc(resume);
-          bytes = buildDocxBytesFromPlainText(content);
+        switch (resume.template.toLowerCase()) {
+          case 'professional':
+            bytes = _buildProfessionalDocx(resume);
+            break;
+          case 'classic':
+            bytes = _buildClassicDocx(resume);
+            break;
+          case 'one page':
+            bytes = _buildOnePageDocx(resume);
+            break;
+          default:
+            if (resume.template.startsWith('Minimal-')) {
+              bytes = _buildMinimalDocx(resume);
+            } else if (resume.template.toLowerCase() == 'creative') {
+              bytes = _buildCreativeDocx(resume);
+            } else {
+              // Fallback to simple text export for unknown templates
+              final content = _buildPlainTextForDoc(resume);
+              bytes = buildDocxBytesFromPlainText(content);
+            }
+            break;
         }
 
         final file = File(filePath);
@@ -939,6 +1497,47 @@ class ShareExportService {
         );
       } catch (e) {
         await _showErrorDialog('Failed to export DOCX: $e');
+      }
+    }
+  }
+
+  Future<void> exportAndOpenTxt(SavedResume resume) async {
+    if (await PremiumService.isPremiumWithDialog(context)) {
+      if (resume.template != 'One Page') {
+        final ok = await _ensureFullNameIfMissing(resume);
+        if (!ok) return;
+      }
+
+      final outputDir = await _getExportBaseDir();
+      if (outputDir == null) {
+        await _showErrorDialog('Could not access storage directory.');
+        return;
+      }
+
+      final sanitizedName = _sanitize(resume.data['full_name'] ?? 'resume');
+      final filePath = p.join(
+        outputDir.path,
+        '${sanitizedName}_${DateTime.now().millisecondsSinceEpoch}.txt',
+      );
+
+      try {
+        final txtContent = _buildPlainTextForDoc(resume);
+        final file = File(filePath);
+        await file.writeAsString(txtContent, flush: true);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('TXT saved to ${file.path}'),
+            action: SnackBarAction(
+              label: 'Open',
+              onPressed: () {
+                OpenFile.open(file.path);
+              },
+            ),
+          ),
+        );
+      } catch (e) {
+        await _showErrorDialog('Failed to export TXT: $e');
       }
     }
   }
@@ -974,8 +1573,8 @@ class ShareExportService {
     final title = (data['title'] ?? data['professionalTitle'] ?? '')
         .toString()
         .trim();
-    final email = (data['email'] ?? '').toString().trim();
-    final phone = (data['phone'] ?? '').toString().trim();
+    // final email = (data['email'] ?? '').toString().trim();
+    // final phone = (data['phone'] ?? '').toString().trim();
     final location = (data['location'] ?? '').toString().trim();
     final website = (data['website'] ?? data['portfolio'] ?? '')
         .toString()
@@ -1028,8 +1627,6 @@ class ShareExportService {
 
     // Contact information
     final contacts = [
-      if (email.isNotEmpty) email,
-      if (phone.isNotEmpty) phone,
       if (location.isNotEmpty) location,
       if (website.isNotEmpty) website,
     ];
@@ -1136,7 +1733,7 @@ class ShareExportService {
           <w:b/>
           <w:sz w:val="16"/>
         </w:rPr>
-        <w:t>${_escapeXml(company)}${location.isNotEmpty ? ' • ' + location : ''}</w:t>
+        <w:t>${_escapeXml(company)}${location.isNotEmpty ? ' • $location' : ''}</w:t>
       </w:r>
     </w:p>''');
             }
@@ -1205,7 +1802,6 @@ class ShareExportService {
             final institution =
                 (edu['institution'] ?? edu['university'] ?? edu['school'] ?? '')
                     .toString();
-            final location = (edu['location'] ?? '').toString();
             final startDate = (edu['startDate'] ?? '').toString();
             final endDate = (edu['endDate'] ?? '').toString();
 
@@ -1325,6 +1921,1096 @@ class ShareExportService {
       return '$startDate – Present';
     }
     return '$startDate – $endDate';
+  }
+
+  // Classic Template DOCX Exporter
+  List<int> _buildClassicDocx(SavedResume resume) {
+    final zip = ar.Archive();
+
+    // Add basic DOCX structure files
+    zip.addFile(
+      ar.ArchiveFile.string('[Content_Types].xml', _docxContentTypesXml),
+    );
+    zip.addFile(ar.ArchiveFile.string('_rels/.rels', _docxRelsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/app.xml', _docxAppPropsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/core.xml', _docxCorePropsXml));
+    zip.addFile(ar.ArchiveFile.string('word/styles.xml', _docxStylesXml));
+    zip.addFile(
+      ar.ArchiveFile.string('word/_rels/document.xml.rels', _docxWordRelsXml),
+    );
+
+    // Create the main document content
+    final documentXml = _buildClassicDocumentXml(resume);
+    zip.addFile(ar.ArchiveFile.string('word/document.xml', documentXml));
+
+    return ar.ZipEncoder().encode(zip)!;
+  }
+
+  String _buildClassicDocumentXml(SavedResume resume) {
+    final data = Map<String, dynamic>.from(resume.data);
+    final buffer = StringBuffer();
+
+    // Extract basic info
+    final resumeTitle = (data['resumeTitle'] ?? '').toString().trim();
+    final fullName = (data['full_name'] ?? data['name'] ?? '')
+        .toString()
+        .trim();
+    // final email = (data['email'] ?? '').toString().trim();
+    // final phone = (data['phone'] ?? '').toString().trim();
+    final address = (data['address'] ?? '').toString().trim();
+    final summary = (data['summary'] ?? '').toString().trim();
+
+    // Start document
+    buffer.write('''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>''');
+
+    // Resume Title
+    if (resumeTitle.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="24"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>${_escapeXml(resumeTitle)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Full Name
+    if (fullName.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="20"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>${_escapeXml(fullName)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Contact Info
+    final contactParts = <String>[];
+    if (address.isNotEmpty) contactParts.add(address);
+
+    if (contactParts.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(contactParts.join(' | '))}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Summary
+    if (summary.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>SUMMARY</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(summary)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Skills Section
+    final skillsCsv = (data['skills'] ?? '').toString().trim();
+    if (skillsCsv.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>SKILLS</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(skillsCsv)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Work Experience Section
+    try {
+      final workData = data['workExperiences'];
+      if (workData != null && workData.toString().isNotEmpty) {
+        final List<dynamic> workList = jsonDecode(workData.toString());
+        if (workList.isNotEmpty) {
+          buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>WORK EXPERIENCE</w:t>
+      </w:r>
+    </w:p>''');
+
+          for (final work in workList) {
+            final jobTitle = (work['jobTitle'] ?? '').toString();
+            final company = (work['company'] ?? '').toString();
+            final location = (work['location'] ?? '').toString();
+            final startDate = (work['startDate'] ?? '').toString();
+            final endDate = (work['endDate'] ?? '').toString();
+            final description = (work['description'] ?? '').toString();
+
+            if (jobTitle.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(jobTitle)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (company.isNotEmpty) {
+              final companyLine = location.isNotEmpty
+                  ? '$company • $location'
+                  : company;
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(companyLine)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (startDate.isNotEmpty || endDate.isNotEmpty) {
+              final dateRange = _formatDocxDateRange(startDate, endDate);
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="14"/>
+          <w:color w:val="666666"/>
+        </w:rPr>
+        <w:t>${_escapeXml(dateRange)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (description.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(description)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Error processing work experience for Classic DOCX: $e');
+    }
+
+    // Education Section
+    try {
+      final eduData = data['educations'];
+      if (eduData != null && eduData.toString().isNotEmpty) {
+        final List<dynamic> eduList = jsonDecode(eduData.toString());
+        if (eduList.isNotEmpty) {
+          buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>EDUCATION</w:t>
+      </w:r>
+    </w:p>''');
+
+          for (final edu in eduList) {
+            final degree = (edu['degree'] ?? '').toString();
+            final institution =
+                (edu['institution'] ?? edu['university'] ?? edu['school'] ?? '')
+                    .toString();
+            final startDate = (edu['startDate'] ?? '').toString();
+            final endDate = (edu['endDate'] ?? '').toString();
+            final description = (edu['description'] ?? '').toString();
+
+            if (degree.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:b/>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(degree)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (institution.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(institution)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (startDate.isNotEmpty || endDate.isNotEmpty) {
+              final dateRange = _formatDocxDateRange(startDate, endDate);
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="60"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="14"/>
+          <w:color w:val="666666"/>
+        </w:rPr>
+        <w:t>${_escapeXml(dateRange)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+
+            if (description.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(description)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Error processing education for Classic DOCX: $e');
+    }
+
+    // Certifications Section
+    final certificationsCsv = (data['certifications'] ?? '').toString().trim();
+    if (certificationsCsv.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>CERTIFICATIONS</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(certificationsCsv)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Custom Fields Section
+    try {
+      final customFieldsData = data['customFields'];
+      if (customFieldsData != null && customFieldsData.toString().isNotEmpty) {
+        final List<dynamic> customFieldsList = jsonDecode(
+          customFieldsData.toString(),
+        );
+        if (customFieldsList.isNotEmpty) {
+          for (final field in customFieldsList) {
+            final label = (field['label'] ?? '').toString();
+            final content = (field['content'] ?? '').toString();
+
+            if (label.isNotEmpty && content.isNotEmpty) {
+              buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>${_escapeXml(label.toUpperCase())}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(content)}</w:t>
+      </w:r>
+    </w:p>''');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Error processing custom fields for Classic DOCX: $e');
+    }
+
+    // End document
+    buffer.write('''
+  </w:body>
+</w:document>''');
+
+    return buffer.toString();
+  }
+
+  // One Page Template DOCX Exporter
+  List<int> _buildOnePageDocx(SavedResume resume) {
+    final zip = ar.Archive();
+
+    zip.addFile(
+      ar.ArchiveFile.string('[Content_Types].xml', _docxContentTypesXml),
+    );
+    zip.addFile(ar.ArchiveFile.string('_rels/.rels', _docxRelsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/app.xml', _docxAppPropsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/core.xml', _docxCorePropsXml));
+    zip.addFile(ar.ArchiveFile.string('word/styles.xml', _docxStylesXml));
+    zip.addFile(
+      ar.ArchiveFile.string('word/_rels/document.xml.rels', _docxWordRelsXml),
+    );
+
+    final documentXml = _buildOnePageDocumentXml(resume);
+    zip.addFile(ar.ArchiveFile.string('word/document.xml', documentXml));
+
+    return ar.ZipEncoder().encode(zip)!;
+  }
+
+  String _buildOnePageDocumentXml(SavedResume resume) {
+    final data = Map<String, dynamic>.from(resume.data);
+    final buffer = StringBuffer();
+
+    // Extract One Page specific fields (matching PDF structure)
+    final name = (data['name'] ?? '').toString().trim();
+    final title = (data['title'] ?? '').toString().trim();
+    // final email = (data['email'] ?? '').toString().trim();
+    // final phone = (data['phone'] ?? '').toString().trim();
+    final linkedIn = (data['linkedIn'] ?? data['linkedin'] ?? '')
+        .toString()
+        .trim();
+    final summary = (data['summary'] ?? '').toString().trim();
+    final coreSkills = (data['coreSkills'] ?? '').toString().trim();
+    final awards = (data['awards'] ?? '').toString().trim();
+    final languages = (data['languages'] ?? '').toString().trim();
+
+    // Profile photo handling
+    final profilePhotoBase64 = (data['profilePhotoBase64'] ?? '')
+        .toString()
+        .trim();
+    String photoXml = '';
+    // String imageRelId = '';
+
+    if (profilePhotoBase64.isNotEmpty) {
+      try {
+        // For proper DOCX photo support, we would need to:
+        // 1. Decode the base64 image
+        // 2. Add it to the zip as word/media/image1.png
+        // 3. Add a relationship in word/_rels/document.xml.rels
+        // 4. Create proper drawing XML
+
+        // For now, we'll create a better placeholder with image dimensions
+        photoXml = '''
+        <w:p>
+          <w:pPr>
+            <w:spacing w:after="120"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:sz w:val="18"/>
+              <w:b/>
+              <w:color w:val="0066CC"/>
+            </w:rPr>
+            <w:t>[📷 Profile Photo]</w:t>
+          </w:r>
+        </w:p>
+        <w:p>
+          <w:r>
+            <w:rPr>
+              <w:sz w:val="14"/>
+              <w:i/>
+            </w:rPr>
+            <w:t>(Photo embedded in PDF export)</w:t>
+          </w:r>
+        </w:p>''';
+      } catch (e) {
+        // Skip photo if invalid
+      }
+    }
+
+    // Start document with table for two-column layout
+    buffer.write('''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <!-- Two-column table layout matching PDF structure -->
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="100%" w:type="pct"/>
+        <w:tblLayout w:type="fixed"/>
+        <w:tblCellMar>
+          <w:left w:w="100" w:type="dxa"/>
+          <w:right w:w="100" w:type="dxa"/>
+        </w:tblCellMar>
+      </w:tblPr>
+      <w:tblGrid>
+        <w:gridCol w:w="3000"/>
+        <w:gridCol w:w="6000"/>
+      </w:tblGrid>
+      <w:tr>
+        <!-- Left Sidebar (220px equivalent) -->
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="3000" w:type="dxa"/>
+            <w:shd w:val="clear" w:color="auto" w:fill="F0F0F0"/>
+            <w:vAlign w:val="top"/>
+          </w:tcPr>''');
+
+    // Contact Information in left sidebar
+    buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="16"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>CONTACT</w:t>
+            </w:r>
+          </w:p>''');
+
+    if (profilePhotoBase64.isNotEmpty) {
+      buffer.write(photoXml);
+    }
+
+    // Email/phone omitted in this simplified DOCX variant
+
+    if (linkedIn.isNotEmpty) {
+      buffer.write('''
+          <w:p>
+            <w:r>
+              <w:rPr><w:sz w:val="14"/></w:rPr>
+              <w:t>${_escapeXml(linkedIn)}</w:t>
+            </w:r>
+          </w:p>''');
+    }
+
+    // Education in left sidebar
+    try {
+      final educationsJson = data['educationsJson'];
+      if (educationsJson != null && educationsJson.toString().isNotEmpty) {
+        final educations = json.decode(educationsJson.toString()) as List;
+        if (educations.isNotEmpty) {
+          buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:before="240" w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="16"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>EDUCATION</w:t>
+            </w:r>
+          </w:p>''');
+
+          for (final education in educations) {
+            final degree = (education['degree'] ?? '').toString().trim();
+            final institution =
+                (education['institution'] ?? education['university'] ?? '')
+                    .toString()
+                    .trim();
+            final startDate = (education['startDate'] ?? '').toString().trim();
+            final endDate = (education['endDate'] ?? '').toString().trim();
+
+            if (degree.isNotEmpty) {
+              buffer.write('''
+          <w:p>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="14"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>${_escapeXml(degree)}</w:t>
+            </w:r>
+          </w:p>''');
+            }
+
+            if (institution.isNotEmpty) {
+              buffer.write('''
+          <w:p>
+            <w:r>
+              <w:rPr><w:sz w:val="12"/></w:rPr>
+              <w:t>${_escapeXml(institution)}</w:t>
+            </w:r>
+          </w:p>''');
+            }
+
+            if (startDate.isNotEmpty || endDate.isNotEmpty) {
+              final dateRange = endDate.isEmpty
+                  ? '$startDate – Present'
+                  : '$startDate – $endDate';
+              buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="12"/>
+                <w:color w:val="666666"/>
+              </w:rPr>
+              <w:t>${_escapeXml(dateRange)}</w:t>
+            </w:r>
+          </w:p>''');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Skip education section if JSON parsing fails
+    }
+
+    // Skills in left sidebar
+    if (coreSkills.isNotEmpty) {
+      buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:before="240" w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="16"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>SKILLS</w:t>
+            </w:r>
+          </w:p>''');
+
+      final skills = coreSkills
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty);
+      for (final skill in skills) {
+        buffer.write('''
+          <w:p>
+            <w:r>
+              <w:rPr><w:sz w:val="12"/></w:rPr>
+              <w:t>• ${_escapeXml(skill)}</w:t>
+            </w:r>
+          </w:p>''');
+      }
+    }
+
+    // Awards in left sidebar
+    if (awards.isNotEmpty) {
+      buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:before="240" w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="16"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>AWARDS</w:t>
+            </w:r>
+          </w:p>''');
+
+      final awardsList = awards
+          .split(',')
+          .map((a) => a.trim())
+          .where((a) => a.isNotEmpty);
+      for (final award in awardsList) {
+        buffer.write('''
+          <w:p>
+            <w:r>
+              <w:rPr><w:sz w:val="12"/></w:rPr>
+              <w:t>• ${_escapeXml(award)}</w:t>
+            </w:r>
+          </w:p>''');
+      }
+    }
+
+    // Languages in left sidebar
+    if (languages.isNotEmpty) {
+      buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:before="240" w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="16"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>LANGUAGES</w:t>
+            </w:r>
+          </w:p>
+          <w:p>
+            <w:r>
+              <w:rPr><w:sz w:val="12"/></w:rPr>
+              <w:t>${_escapeXml(languages)}</w:t>
+            </w:r>
+          </w:p>''');
+    }
+
+    // Close left sidebar cell and start main content cell
+    buffer.write('''
+        </w:tc>
+        <!-- Main Content Panel -->
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="6000" w:type="dxa"/>
+            <w:vAlign w:val="top"/>
+          </w:tcPr>''');
+
+    // Header banner in main content (matching PDF blue banner)
+    if (name.isNotEmpty || title.isNotEmpty) {
+      buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:shd w:val="clear" w:color="auto" w:fill="ADD8E6"/>
+              <w:spacing w:after="240"/>
+            </w:pPr>''');
+
+      if (name.isNotEmpty) {
+        buffer.write('''
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="28"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>${_escapeXml(name.toUpperCase())}</w:t>
+            </w:r>''');
+      }
+
+      if (title.isNotEmpty) {
+        buffer.write('''
+            <w:br/>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="16"/>
+                <w:color w:val="666666"/>
+              </w:rPr>
+              <w:t>${_escapeXml(title)}</w:t>
+            </w:r>''');
+      }
+
+      buffer.write('''
+          </w:p>''');
+    }
+
+    // Profile Summary in main content
+    if (summary.isNotEmpty) {
+      buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="18"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>PROFILE</w:t>
+            </w:r>
+          </w:p>
+          <w:p>
+            <w:pPr>
+              <w:spacing w:after="240"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr><w:sz w:val="16"/></w:rPr>
+              <w:t>${_escapeXml(summary)}</w:t>
+            </w:r>
+          </w:p>''');
+    }
+
+    // Professional Experience in main content
+    try {
+      final workExpJson = data['workExperiencesJson'];
+      if (workExpJson != null && workExpJson.toString().isNotEmpty) {
+        final workExperiences = json.decode(workExpJson.toString()) as List;
+        if (workExperiences.isNotEmpty) {
+          buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="18"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>PROFESSIONAL EXPERIENCE</w:t>
+            </w:r>
+          </w:p>''');
+
+          for (final experience in workExperiences) {
+            final jobTitle =
+                (experience['jobTitle'] ?? experience['role'] ?? '')
+                    .toString()
+                    .trim();
+            final company = (experience['company'] ?? '').toString().trim();
+            final location = (experience['location'] ?? '').toString().trim();
+            final startDate = (experience['startDate'] ?? '').toString().trim();
+            final endDate = (experience['endDate'] ?? '').toString().trim();
+            final description = (experience['description'] ?? '')
+                .toString()
+                .trim();
+            final achievements = experience['achievements'];
+
+            if (jobTitle.isNotEmpty) {
+              buffer.write('''
+          <w:p>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="16"/>
+                <w:b/>
+              </w:rPr>
+              <w:t>${_escapeXml(jobTitle)}</w:t>
+            </w:r>
+          </w:p>''');
+            }
+
+            final details = <String>[];
+            if (company.isNotEmpty) details.add(company);
+            if (location.isNotEmpty) details.add(location);
+            if (startDate.isNotEmpty || endDate.isNotEmpty) {
+              final dateRange = endDate.isEmpty
+                  ? '$startDate – Present'
+                  : '$startDate – $endDate';
+              details.add(dateRange);
+            }
+
+            if (details.isNotEmpty) {
+              buffer.write('''
+          <w:p>
+            <w:r>
+              <w:rPr>
+                <w:sz w:val="14"/>
+                <w:color w:val="666666"/>
+              </w:rPr>
+              <w:t>${_escapeXml(details.join(' • '))}</w:t>
+            </w:r>
+          </w:p>''');
+            }
+
+            if (description.isNotEmpty) {
+              buffer.write('''
+          <w:p>
+            <w:pPr>
+              <w:spacing w:after="120"/>
+            </w:pPr>
+            <w:r>
+              <w:rPr><w:sz w:val="14"/></w:rPr>
+              <w:t>${_escapeXml(description)}</w:t>
+            </w:r>
+          </w:p>''');
+            }
+
+            if (achievements is List && achievements.isNotEmpty) {
+              for (final achievement in achievements) {
+                buffer.write('''
+          <w:p>
+            <w:r>
+              <w:rPr><w:sz w:val="14"/></w:rPr>
+              <w:t>• ${_escapeXml(achievement.toString())}</w:t>
+            </w:r>
+          </w:p>''');
+              }
+            }
+
+            buffer.write('''
+          <w:p><w:r><w:t></w:t></w:r></w:p>'''); // Spacing between experiences
+          }
+        }
+      }
+    } catch (e) {
+      // Skip work experience section if JSON parsing fails
+    }
+
+    // Close main content cell and table
+    buffer.write('''
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    <!-- End document -->
+  </w:body>
+</w:document>''');
+
+    return buffer.toString();
+  }
+
+  // Minimal Template DOCX Exporter
+  List<int> _buildMinimalDocx(SavedResume resume) {
+    final zip = ar.Archive();
+
+    zip.addFile(
+      ar.ArchiveFile.string('[Content_Types].xml', _docxContentTypesXml),
+    );
+    zip.addFile(ar.ArchiveFile.string('_rels/.rels', _docxRelsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/app.xml', _docxAppPropsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/core.xml', _docxCorePropsXml));
+    zip.addFile(ar.ArchiveFile.string('word/styles.xml', _docxStylesXml));
+    zip.addFile(
+      ar.ArchiveFile.string('word/_rels/document.xml.rels', _docxWordRelsXml),
+    );
+
+    final documentXml = _buildMinimalDocumentXml(resume);
+    zip.addFile(ar.ArchiveFile.string('word/document.xml', documentXml));
+
+    return ar.ZipEncoder().encode(zip)!;
+  }
+
+  String _buildMinimalDocumentXml(SavedResume resume) {
+    final data = Map<String, dynamic>.from(resume.data);
+    final buffer = StringBuffer();
+
+    final fullName = (data['full_name'] ?? data['name'] ?? '')
+        .toString()
+        .trim();
+    // final email = (data['email'] ?? '').toString().trim();
+    // final phone = (data['phone'] ?? '').toString().trim();
+    final location = (data['location'] ?? '').toString().trim();
+
+    // Start document
+    buffer.write('''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>''');
+
+    // Minimal clean header
+    if (fullName.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="22"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>${_escapeXml(fullName)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Simple contact line
+    final contactParts = <String>[];
+    if (location.isNotEmpty) contactParts.add(location);
+
+    if (contactParts.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="16"/>
+        </w:rPr>
+        <w:t>${_escapeXml(contactParts.join(' • '))}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Add minimal content sections
+    // End document
+    buffer.write('''
+  </w:body>
+</w:document>''');
+
+    return buffer.toString();
+  }
+
+  // Creative Template DOCX Exporter
+  List<int> _buildCreativeDocx(SavedResume resume) {
+    final zip = ar.Archive();
+
+    zip.addFile(
+      ar.ArchiveFile.string('[Content_Types].xml', _docxContentTypesXml),
+    );
+    zip.addFile(ar.ArchiveFile.string('_rels/.rels', _docxRelsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/app.xml', _docxAppPropsXml));
+    zip.addFile(ar.ArchiveFile.string('docProps/core.xml', _docxCorePropsXml));
+    zip.addFile(ar.ArchiveFile.string('word/styles.xml', _docxStylesXml));
+    zip.addFile(
+      ar.ArchiveFile.string('word/_rels/document.xml.rels', _docxWordRelsXml),
+    );
+
+    final documentXml = _buildCreativeDocumentXml(resume);
+    zip.addFile(ar.ArchiveFile.string('word/document.xml', documentXml));
+
+    return ar.ZipEncoder().encode(zip)!;
+  }
+
+  String _buildCreativeDocumentXml(SavedResume resume) {
+    final data = Map<String, dynamic>.from(resume.data);
+    final buffer = StringBuffer();
+
+    final fullName = (data['full_name'] ?? data['name'] ?? '')
+        .toString()
+        .trim();
+    final jobTitle = (data['jobTitle'] ?? data['title'] ?? '')
+        .toString()
+        .trim();
+    // final email = (data['email'] ?? '').toString().trim();
+    // final phone = (data['phone'] ?? '').toString().trim();
+
+    // Start document
+    buffer.write('''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>''');
+
+    // Creative styled header
+    if (fullName.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:after="120"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="26"/>
+          <w:b/>
+        </w:rPr>
+        <w:t>${_escapeXml(fullName)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    if (jobTitle.isNotEmpty) {
+      buffer.write('''
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:after="240"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:sz w:val="18"/>
+          <w:i/>
+        </w:rPr>
+        <w:t>${_escapeXml(jobTitle)}</w:t>
+      </w:r>
+    </w:p>''');
+    }
+
+    // Add creative content sections
+    // End document
+    buffer.write('''
+  </w:body>
+</w:document>''');
+
+    return buffer.toString();
   }
 
   // DOCX XML templates
@@ -1464,7 +3150,9 @@ class ShareExportService {
           if (iso.isEmpty) return '';
           final dt = DateTime.tryParse(iso);
           if (dt == null) return '';
-          return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+          final m = dt.month.toString().padLeft(2, '0');
+          final d = dt.day.toString().padLeft(2, '0');
+          return '$m/$d/${dt.year}';
         }
 
         final start = fmtDate(val('startDate'));
@@ -1509,7 +3197,9 @@ class ShareExportService {
           if (iso.isEmpty) return '';
           final dt = DateTime.tryParse(iso);
           if (dt == null) return '';
-          return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+          final m = dt.month.toString().padLeft(2, '0');
+          final d = dt.day.toString().padLeft(2, '0');
+          return '$m/$d/${dt.year}';
         }
 
         final start = fmtDate(val('startDate'));
@@ -1539,6 +3229,21 @@ class ShareExportService {
     for (final key in ['projects', 'languages', 'hobbies', 'references']) {
       final v = (data[key] ?? '').toString().trim();
       if (v.isNotEmpty) addSection(_formatKey(key), [v]);
+    }
+
+    // Custom Fields
+    List<Map<String, dynamic>> customFields = [];
+    if (data['customFields'] != null) {
+      customFields = _parseJsonArray(data['customFields']);
+    }
+    if (customFields.isNotEmpty) {
+      for (final field in customFields) {
+        final label = (field['label'] ?? '').toString().trim();
+        final content = (field['content'] ?? '').toString().trim();
+        if (label.isNotEmpty && content.isNotEmpty) {
+          addSection(label, [content]);
+        }
+      }
     }
 
     return buffer.toString().trim();

@@ -161,6 +161,8 @@ class PremiumService {
   // Subscription Management
   static Future<bool> purchasePremium(String productId) async {
     // Stub: mark as premium locally
+    // TODO: Integrate with UPI payment system
+    // For now, just simulate premium upgrade
     _isPremium = true;
     await _prefs?.setBool('is_premium', true);
     return true;

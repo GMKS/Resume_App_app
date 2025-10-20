@@ -141,23 +141,62 @@ class _CustomizeScreenState extends State<CustomizeScreen>
 
     // Update content if resumeData has changes
     if (resumeData.fullName.isNotEmpty) {
-      if (updatedData['personalInfo'] == null) {
-        updatedData['personalInfo'] = <String, dynamic>{};
+      // For Professional template, update direct fields
+      updatedData['name'] = resumeData.fullName;
+      updatedData['full_name'] = resumeData.fullName;
+
+      if (resumeData.jobTitle.isNotEmpty) {
+        updatedData['title'] = resumeData.jobTitle;
+        updatedData['professionalTitle'] = resumeData.jobTitle;
       }
-      final personalInfo = updatedData['personalInfo'] as Map<String, dynamic>;
-      personalInfo['fullName'] = resumeData.fullName;
-      personalInfo['name'] = resumeData.fullName;
-      personalInfo['jobTitle'] = resumeData.jobTitle;
-      personalInfo['title'] = resumeData.jobTitle;
-      personalInfo['email'] = resumeData.contactInfo.email;
-      personalInfo['phone'] = resumeData.contactInfo.phone;
-      personalInfo['linkedin'] = resumeData.contactInfo.linkedin;
-      personalInfo['portfolio'] = resumeData.contactInfo.website;
-      personalInfo['location'] = resumeData.contactInfo.location;
+
+      if (resumeData.contactInfo.email.isNotEmpty) {
+        updatedData['email'] = resumeData.contactInfo.email;
+      }
+
+      if (resumeData.contactInfo.phone.isNotEmpty) {
+        updatedData['phone'] = resumeData.contactInfo.phone;
+      }
+
+      if (resumeData.contactInfo.linkedin.isNotEmpty) {
+        updatedData['linkedin'] = resumeData.contactInfo.linkedin;
+        updatedData['linkedIn'] = resumeData.contactInfo.linkedin;
+      }
+
+      if (resumeData.contactInfo.website.isNotEmpty) {
+        updatedData['portfolio'] = resumeData.contactInfo.website;
+        updatedData['website'] = resumeData.contactInfo.website;
+      }
+
+      if (resumeData.contactInfo.location.isNotEmpty) {
+        updatedData['location'] = resumeData.contactInfo.location;
+        updatedData['address'] = resumeData.contactInfo.location;
+      }
+
+      // For Professional template, avoid personalInfo structure to prevent duplication
+      // Only update personalInfo for templates that actually use it
+      if (originalResume.template != 'Professional') {
+        if (updatedData['personalInfo'] == null) {
+          updatedData['personalInfo'] = <String, dynamic>{};
+        }
+        final personalInfo =
+            updatedData['personalInfo'] as Map<String, dynamic>;
+        personalInfo['fullName'] = resumeData.fullName;
+        personalInfo['name'] = resumeData.fullName;
+        personalInfo['jobTitle'] = resumeData.jobTitle;
+        personalInfo['title'] = resumeData.jobTitle;
+        personalInfo['email'] = resumeData.contactInfo.email;
+        personalInfo['phone'] = resumeData.contactInfo.phone;
+        personalInfo['linkedin'] = resumeData.contactInfo.linkedin;
+        personalInfo['portfolio'] = resumeData.contactInfo.website;
+        personalInfo['location'] = resumeData.contactInfo.location;
+      }
     }
 
     if (resumeData.summary.isNotEmpty) {
       updatedData['summary'] = resumeData.summary;
+      updatedData['executiveSummary'] = resumeData.summary;
+      updatedData['professionalSummary'] = resumeData.summary;
     }
 
     // Return updated resume
@@ -234,8 +273,11 @@ class _CustomizeScreenState extends State<CustomizeScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            CustomResumePreview(settings: _settings, resumeData: _resumeData),
+        builder: (context) => CustomResumePreview(
+          settings: _settings,
+          resumeData: _resumeData,
+          originalResume: widget.originalResume,
+        ),
       ),
     );
   }
@@ -243,7 +285,7 @@ class _CustomizeScreenState extends State<CustomizeScreen>
   Future<bool> _onWillPop() async {
     if (!_hasUnsavedChanges) return true;
 
-    final result = await showDialog<bool>(
+    final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Unsaved Changes'),
@@ -252,21 +294,31 @@ class _CustomizeScreenState extends State<CustomizeScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(context).pop('discard'),
             child: const Text('Discard'),
           ),
           TextButton(
-            onPressed: () async {
-              await _saveChanges();
-              Navigator.of(context).pop(true);
-            },
+            onPressed: () => Navigator.of(context).pop('cancel'),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('save'),
             child: const Text('Save & Exit'),
           ),
         ],
       ),
     );
 
-    return result ?? false;
+    switch (result) {
+      case 'discard':
+        return true; // Allow navigation back without saving
+      case 'save':
+        await _saveChanges();
+        return true; // Allow navigation back after saving
+      case 'cancel':
+      default:
+        return false; // Prevent navigation back
+    }
   }
 
   @override
@@ -375,6 +427,7 @@ class _CustomizeScreenState extends State<CustomizeScreen>
           icon: const Icon(Icons.preview),
           label: const Text('Preview'),
         ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         bottomNavigationBar: _hasUnsavedChanges
             ? Container(
                 padding: const EdgeInsets.all(16),

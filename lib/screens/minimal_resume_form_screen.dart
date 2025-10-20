@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../widgets/base_resume_form.dart';
 import '../widgets/dynamic_sections.dart';
 import '../widgets/skills_picker_field.dart';
+import '../widgets/phone_input_widget.dart';
 import '../services/share_export_service.dart';
 import '../widgets/ai_widgets.dart';
 import '../services/premium_service.dart';
 import '../widgets/reorderable_sections.dart';
-import 'minimal_template_selection_screen.dart';
-import 'minimal_resume_preview_screen.dart';
+import '../widgets/speech_to_text_field.dart';
+import 'template_selection_screen.dart';
 
 class MinimalResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -198,6 +200,14 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
       for (final e in state.controllers.entries) e.key: e.value.text,
     };
 
+    // Add dynamic sections
+    data['workExperiences'] = jsonEncode(
+      _workExperiences.map((e) => e.toJson()).toList(),
+    );
+    data['educations'] = jsonEncode(
+      _educations.map((e) => e.toJson()).toList(),
+    );
+
     final resume = SavedResume(
       id:
           widget.existing?.id ??
@@ -211,10 +221,40 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
       updatedAt: DateTime.now(),
     );
 
+    // Show dialog to choose template type
+    final templateType = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Template Type'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.description, color: Colors.blue),
+              title: const Text('Minimal Templates'),
+              subtitle: const Text('Clean and simple designs'),
+              onTap: () => Navigator.pop(ctx, 'minimal'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.palette, color: Colors.purple),
+              title: const Text('Colorful Templates'),
+              subtitle: const Text('Creative and vibrant designs'),
+              onTap: () => Navigator.pop(ctx, 'creative'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (templateType == null || !mounted) return;
+
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MinimalTemplateSelectionScreen(resume: resume),
+        builder: (context) => TemplateSelectionScreen(
+          resumeData: resume,
+          templateType: templateType,
+        ),
       ),
     );
   }
@@ -230,6 +270,9 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
       );
       return;
     }
+
+    // Dismiss keyboard first
+    FocusScope.of(context).unfocus();
 
     try {
       // Create resume with current data
@@ -255,24 +298,14 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
         updatedAt: DateTime.now(),
       );
 
-      // Navigate to preview screen with default theme
-      const defaultTheme = MinimalTemplateTheme(
-        id: 'default',
-        name: 'Default',
-        description: 'Default minimal theme',
-        primaryColor: '#6C5CE7',
-        secondaryColor: '#5A4FCF',
-        accentColor: '#74B9FF',
-        backgroundColor: '#FFFFFF',
-        textColor: '#333333',
-        icon: Icons.description,
-      );
-
+      // Navigate to template selection screen
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              MinimalResumePreviewScreen(resume: resume, theme: defaultTheme),
+          builder: (context) => TemplateSelectionScreen(
+            resumeData: resume,
+            templateType: 'minimal',
+          ),
         ),
       );
     } catch (e) {
@@ -295,6 +328,7 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
         'educations',
         'sectionOrder',
         'ats_friendly',
+        'project_topic',
       ],
       child: Builder(
         builder: (ctx) {
@@ -355,9 +389,7 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  // Header Card
-                  _buildHeaderCard(),
-
+                  // Header removed per design request
                   const SizedBox(height: 20),
 
                   // Personal Information Card
@@ -393,7 +425,9 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
                   const SizedBox(height: 30),
 
                   // Action Buttons
-                  _buildActionButtons(ctx), const SizedBox(height: 20),
+                  _buildActionButtons(ctx),
+
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -409,15 +443,25 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
       backgroundColor: const Color(0xFF6C5CE7),
       foregroundColor: Colors.white,
       title: const Text(
-        'CV Builder',
+        'Minimal Resume',
         style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
       ),
       centerTitle: false,
       actions: [
+        // Template Selection Button
+        IconButton(
+          icon: const Icon(Icons.view_list, color: Colors.white),
+          tooltip: 'Select Template',
+          onPressed: () => _navigateToTemplateSelection(context),
+        ),
         // Export Menu
         PopupMenuButton<String>(
           icon: const Icon(Icons.file_download_outlined, color: Colors.white),
           onSelected: _exportResume,
+          onOpened: () {
+            // Dismiss keyboard when opening menu
+            FocusScope.of(context).unfocus();
+          },
           itemBuilder: (context) => const [
             PopupMenuItem(
               value: 'PDF',
@@ -440,6 +484,10 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
         // Share Menu
         PopupMenuButton<String>(
           icon: const Icon(Icons.share, color: Colors.white),
+          onOpened: () {
+            // Dismiss keyboard when opening menu
+            FocusScope.of(context).unfocus();
+          },
           onSelected: (choice) async {
             if (!PremiumService.isPremium) {
               PremiumService.showUpgradeDialog(context, 'Sharing');
@@ -498,74 +546,7 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
     );
   }
 
-  Widget _buildHeaderCard() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6C5CE7), Color(0xFF74B9FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6C5CE7).withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.description,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create Your Perfect CV',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Stand out from the crowd',
-                        style: TextStyle(
-                          color: Color(0xE6FFFFFF), // 0.9 opacity white
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Header card removed
 
   Widget _buildPersonalInfoCard(BuildContext context) {
     final state = BaseResumeForm.of(context)!;
@@ -575,13 +556,24 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
       Icons.person_outline,
       const Color(0xFF00B894),
       [
-        state.buildTextField('name', 'Full Name', required: true),
+        SpeechToTextField(
+          controller: state.controllerFor('name'),
+          label: 'Full Name *',
+          hint: 'Enter your full name',
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Full Name is required';
+            }
+            return null;
+          },
+        ),
         const SizedBox(height: 16),
-        state.buildTextField(
-          'phone',
-          'Mobile Number',
-          required: true,
-          keyboard: TextInputType.phone,
+        PhoneInputWidget(
+          key: const Key('phone_input'),
+          initialPhoneNumber: state.controllerFor('phone').text,
+          onChanged: (fullPhoneNumber, countryCode, phoneNumber) {
+            state.controllerFor('phone').text = fullPhoneNumber;
+          },
         ),
         const SizedBox(height: 16),
         state.buildTextField(
@@ -589,6 +581,19 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
           'Email Address',
           required: true,
           keyboard: TextInputType.emailAddress,
+          customValidator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Email is required';
+            }
+            if (!value.contains('@') || !value.contains('.')) {
+              return 'Please enter a valid email (e.g., user@domain.com)';
+            }
+            final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+            if (!emailRegex.hasMatch(value)) {
+              return 'Please enter a valid email format';
+            }
+            return null;
+          },
         ),
       ],
     );
@@ -602,25 +607,54 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
       Icons.text_snippet_outlined,
       const Color(0xFFE17055),
       [
-        AISummaryGenerator(
-          name: state.controllerFor('name').text,
-          targetRole: '', // Could be enhanced to get from user input
-          skills: state.controllerFor('skills').text.split(','),
-          experience: [], // Could be enhanced to get from work experience
-          seed: state
-              .controllerFor('summary')
-              .text, // Use existing summary as seed
-          onGenerated: (summary) {
-            state.controllerFor('summary').text = summary;
-            setState(() {});
-          },
+        // Project/Topic input field
+        SpeechToTextField(
+          controller: state.controllerFor('project_topic'),
+          label: 'Project/Topic (Optional)',
+          hint:
+              'e.g., Automation Selenium, Data Analytics, Mobile App Development',
+          maxLines: 1,
         ),
         const SizedBox(height: 12),
-        state.buildTextField(
-          'summary',
-          'Write a brief summary about yourself...',
+        // Generate from Profile button
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              final generated = _generateDynamicSummary(context);
+              state.controllerFor('summary').text = generated;
+              setState(() {});
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Summary generated from your profile!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            icon: const Icon(Icons.stars, size: 18),
+            label: const Text('Generate from Profile'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE17055),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SpeechToTextField(
+          controller: state.controllerFor('summary'),
+          label: 'Professional Summary *',
+          hint: 'Write a brief summary about yourself...',
           maxLines: 4,
-          required: true,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Professional Summary is required';
+            }
+            return null;
+          },
         ),
       ],
     );
@@ -921,5 +955,132 @@ class _MinimalResumeFormScreenState extends State<MinimalResumeFormScreen> {
   ) {
     final state = BaseResumeForm.of(context)!;
     return state.buildTextField(key, hint, maxLines: 2);
+  }
+
+  String _generateDynamicSummary(BuildContext ctx) {
+    final state = BaseResumeForm.of(ctx)!;
+    final name = state.controllerFor('name').text.trim();
+    final skills = state.controllerFor('skills').text.trim();
+    final projectTopic = state.controllerFor('project_topic').text.trim();
+
+    // Extract years of experience from work history
+    int totalYears = 0;
+    if (_workExperiences.isNotEmpty) {
+      for (var exp in _workExperiences) {
+        try {
+          final start = exp.startDate;
+          final end = exp.isCurrentlyWorking ? DateTime.now() : exp.endDate;
+          if (start != null && end != null) {
+            totalYears += end.difference(start).inDays ~/ 365;
+          }
+        } catch (e) {
+          // Skip invalid dates
+        }
+      }
+    }
+
+    // Extract degree from education
+    String degree = '';
+    if (_educations.isNotEmpty && _educations.first.degree != null) {
+      degree = _educations.first.degree!;
+    }
+
+    // Extract latest job title
+    String latestRole = '';
+    if (_workExperiences.isNotEmpty &&
+        _workExperiences.first.jobTitle != null) {
+      latestRole = _workExperiences.first.jobTitle!;
+    }
+
+    // Build dynamic summary
+    List<String> summaryParts = [];
+
+    // PRIORITY: Use project/topic if provided
+    if (projectTopic.isNotEmpty) {
+      if (totalYears > 0) {
+        summaryParts.add(
+          'Experienced professional specializing in $projectTopic with $totalYears+ years of hands-on expertise.',
+        );
+      } else if (degree.isNotEmpty) {
+        summaryParts.add(
+          '$degree graduate with strong knowledge and practical experience in $projectTopic.',
+        );
+      } else {
+        summaryParts.add(
+          'Skilled professional with demonstrated expertise in $projectTopic and a proven track record of successful project delivery.',
+        );
+      }
+
+      if (skills.isNotEmpty) {
+        final skillsList = skills
+            .split(',')
+            .take(3)
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        if (skillsList.isNotEmpty) {
+          summaryParts.add(
+            'Proficient in ${skillsList.join(", ")}, with strong problem-solving abilities and attention to detail.',
+          );
+        }
+      } else {
+        summaryParts.add(
+          'Adept at analyzing complex requirements and delivering innovative solutions that exceed expectations.',
+        );
+      }
+
+      summaryParts.add(
+        'Committed to continuous learning and staying current with industry best practices to drive project success.',
+      );
+    } else {
+      // FALLBACK: Generic summary if no project/topic provided
+      if (totalYears > 0 && latestRole.isNotEmpty) {
+        summaryParts.add(
+          'Accomplished $latestRole with $totalYears+ years of progressive experience in delivering results.',
+        );
+      } else if (totalYears > 0) {
+        summaryParts.add(
+          'Experienced professional with $totalYears+ years of demonstrated expertise in the field.',
+        );
+      } else if (degree.isNotEmpty) {
+        summaryParts.add(
+          '$degree graduate with a strong academic foundation and passion for excellence.',
+        );
+      } else {
+        summaryParts.add(
+          'Motivated professional committed to delivering high-quality results.',
+        );
+      }
+
+      if (skills.isNotEmpty) {
+        final skillsList = skills
+            .split(',')
+            .take(3)
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        if (skillsList.isNotEmpty) {
+          summaryParts.add(
+            'Proficient in ${skillsList.join(", ")}, with a proven ability to adapt and excel in dynamic environments.',
+          );
+        }
+      } else {
+        summaryParts.add(
+          'Quick learner with strong analytical and problem-solving abilities, eager to contribute to organizational success.',
+        );
+      }
+
+      if (_workExperiences.length > 1) {
+        summaryParts.add(
+          'Track record of successfully managing multiple projects and consistently exceeding expectations.',
+        );
+      } else {
+        summaryParts.add(
+          'Dedicated team player focused on achieving goals and driving positive outcomes.',
+        );
+      }
+    }
+
+    return summaryParts.take(3).join(' ');
   }
 }

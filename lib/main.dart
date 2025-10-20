@@ -4,6 +4,7 @@ import 'services/currency_service.dart';
 import 'services/premium_service.dart';
 import 'services/node_api_service.dart';
 import 'services/resume_storage_service.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,8 +40,45 @@ void _initializeServicesAsync() {
       });
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late Razorpay _razorpay;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear(); // Clear all listeners
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    // Handle successful payment here
+    debugPrint("Payment Successful: ${response.paymentId}");
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    // Handle payment error here
+    debugPrint("Payment Error: ${response.code} - ${response.message}");
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    // Handle external wallet selection here
+    debugPrint("External Wallet Selected: ${response.walletName}");
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,48 +91,6 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
       ),
       home: const EnhancedLoginScreen(),
-    );
-  }
-}
-
-class TestScreen extends StatelessWidget {
-  const TestScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Resume Builder - Test'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, size: 100, color: Colors.green),
-            SizedBox(height: 20),
-            Text(
-              'App is Working!',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
-              ),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Node.js Backend Ready',
-              style: TextStyle(fontSize: 16, color: Colors.blue),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'APK Size: 45MB (25% smaller!)',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
