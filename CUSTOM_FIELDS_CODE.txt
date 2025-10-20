@@ -1,0 +1,186 @@
+// ADD THIS TO THE END OF lib/widgets/dynamic_sections.dart
+
+/// Dynamic Custom Fields Section Widget
+class DynamicCustomFieldsSection extends StatefulWidget {
+  final List<CustomField> customFields;
+  final Function(List<CustomField>) onCustomFieldsChanged;
+  final Color? accentColor;
+  final bool atsFriendly;
+
+  const DynamicCustomFieldsSection({
+    super.key,
+    required this.customFields,
+    required this.onCustomFieldsChanged,
+    this.accentColor,
+    this.atsFriendly = false,
+  });
+
+  @override
+  State<DynamicCustomFieldsSection> createState() =>
+      _DynamicCustomFieldsSectionState();
+}
+
+class _DynamicCustomFieldsSectionState
+    extends State<DynamicCustomFieldsSection> {
+  void _addCustomField() {
+    final newField = CustomField(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+    );
+
+    final updatedList = [...widget.customFields, newField];
+    widget.onCustomFieldsChanged(updatedList);
+  }
+
+  void _removeCustomField(String id) {
+    final updatedList = widget.customFields
+        .where((field) => field.id != id)
+        .toList();
+    widget.onCustomFieldsChanged(updatedList);
+  }
+
+  void _updateCustomField(int index, CustomField field) {
+    final updatedList = [...widget.customFields];
+    updatedList[index] = field;
+    widget.onCustomFieldsChanged(updatedList);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = widget.atsFriendly
+        ? (widget.accentColor ?? Colors.black87)
+        : (widget.accentColor ?? Colors.blue);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Add Custom Field button
+        Row(
+          children: [
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: _addCustomField,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add Custom Field'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: widget.atsFriendly
+                    ? Colors.black87
+                    : accentColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (widget.customFields.isEmpty)
+          Card(
+            elevation: widget.atsFriendly ? 0 : null,
+            shape: widget.atsFriendly
+                ? RoundedRectangleBorder(
+                    side: BorderSide(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4),
+                  )
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  if (!widget.atsFriendly)
+                    Icon(Icons.add_box_outlined, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No custom fields added yet',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Click "Add Custom Field" to add additional sections',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...widget.customFields.asMap().entries.map((entry) {
+            final index = entry.key;
+            final field = entry.value;
+
+            return Card(
+              elevation: widget.atsFriendly ? 0 : null,
+              shape: widget.atsFriendly
+                  ? RoundedRectangleBorder(
+                      side: BorderSide(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(4),
+                    )
+                  : null,
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Custom Field ${index + 1}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => _removeCustomField(field.id),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                          ),
+                          tooltip: 'Remove this field',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: field.label,
+                      decoration: const InputDecoration(
+                        labelText: 'Field Label *',
+                        hintText: 'e.g., Volunteer Work, Publications, Awards',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      onChanged: (value) {
+                        field.label = value;
+                        _updateCustomField(index, field);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: field.content,
+                      decoration: const InputDecoration(
+                        labelText: 'Content *',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                        hintText: 'Enter the content for this custom section',
+                      ),
+                      maxLines: 3,
+                      onChanged: (value) {
+                        field.content = value;
+                        _updateCustomField(index, field);
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+}

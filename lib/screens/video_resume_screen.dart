@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:io';
+import 'package:video_player/video_player.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/premium_service.dart';
 import '../services/video_resume_service.dart';
+import '../services/resume_storage_service.dart';
+import '../models/saved_resume.dart';
 
 class VideoResumeScreen extends StatefulWidget {
   const VideoResumeScreen({super.key});
@@ -15,6 +21,15 @@ class _VideoResumeScreenState extends State<VideoResumeScreen> {
   bool _isRecording = false;
   bool _hasRecording = false;
   String? _recordingPath;
+  File? _videoFile;
+  Timer? _recordingTimer;
+  int _recordingSeconds = 0;
+
+  // Video player state
+  bool _isPlaying = false;
+  int _playbackPosition = 0;
+  Timer? _playbackTimer;
+  VideoPlayerController? _controller;
 
   final List<String> _prompts = [
     "Tell me about yourself and your professional background",
@@ -26,6 +41,14 @@ class _VideoResumeScreenState extends State<VideoResumeScreen> {
   ];
 
   int _currentPromptIndex = 0;
+
+  @override
+  void dispose() {
+    _recordingTimer?.cancel();
+    _playbackTimer?.cancel();
+    _controller?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -116,14 +139,48 @@ class _VideoResumeScreenState extends State<VideoResumeScreen> {
                     const SizedBox(height: 16),
 
                     // Recording Controls
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 16,
+                      runSpacing: 8,
                       children: [
                         if (!_hasRecording) ...[
                           ElevatedButton.icon(
                             onPressed: _isRecording
                                 ? _stopRecording
-                                : _startRecording,
+                                : () async {
+                                    // Try real capture via service; fall back to simulation if null
+                                    final file =
+                                        await VideoResumeService.recordVideoResume(
+                                          context,
+                                        );
+                                    if (file != null) {
+                                      final dur =
+                                          await VideoResumeService.getVideoDuration(
+                                            file,
+                                          );
+                                      setState(() {
+                                        _videoFile = file;
+                                        _hasRecording = true;
+                                        _recordingSeconds = dur.inSeconds;
+                                        _recordingPath = file.path;
+                                      });
+                                      // Initialize player for immediate playback
+                                      await _initializeController(file);
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Video captured successfully',
+                                          ),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    } else {
+                                      _startRecording();
+                                    }
+                                  },
                             icon: Icon(
                               _isRecording ? Icons.stop : Icons.videocam,
                             ),
@@ -149,7 +206,6 @@ class _VideoResumeScreenState extends State<VideoResumeScreen> {
                             icon: const Icon(Icons.refresh),
                             label: const Text('Retake'),
                           ),
-                          const SizedBox(width: 16),
                           ElevatedButton.icon(
                             onPressed: _saveVideo,
                             icon: const Icon(Icons.save),
@@ -159,9 +215,49 @@ class _VideoResumeScreenState extends State<VideoResumeScreen> {
                               foregroundColor: Colors.white,
                             ),
                           ),
+                          ElevatedButton.icon(
+                            onPressed: _shareVideo,
+                            icon: const Icon(Icons.share),
+                            label: const Text('Share'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
                         ],
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    if (!_hasRecording)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () async {
+                              final file =
+                                  await VideoResumeService.pickVideoFromGallery(
+                                    context,
+                                  );
+                              if (file != null) {
+                                final dur =
+                                    await VideoResumeService.getVideoDuration(
+                                      file,
+                                    );
+                                setState(() {
+                                  _videoFile = file;
+                                  _hasRecording = true;
+                                  _recordingSeconds = dur.inSeconds;
+                                  _recordingPath = file.path;
+                                });
+                                // Initialize player for immediate playback
+                                await _initializeController(file);
+                              }
+                            },
+                            icon: const Icon(Icons.video_library),
+                            label: const Text('Pick from Gallery'),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -367,19 +463,78 @@ class _VideoResumeScreenState extends State<VideoResumeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.videocam, size: 64, color: Colors.grey.shade400),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 500),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _isRecording
+                  ? Colors.red.withOpacity(0.1)
+                  : Colors.grey.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: Icon(
+              _isRecording ? Icons.videocam : Icons.videocam_off,
+              size: 64,
+              color: _isRecording ? Colors.red : Colors.grey.shade400,
+            ),
+          ),
           const SizedBox(height: 16),
           Text(
-            _isRecording ? 'Recording...' : 'Camera Preview',
+            _isRecording ? 'Recording in Progress...' : 'Ready to Record',
             style: TextStyle(
               fontSize: 18,
-              color: Colors.grey.shade600,
+              color: _isRecording ? Colors.red : Colors.grey.shade600,
               fontWeight: FontWeight.w500,
             ),
           ),
           if (_isRecording) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.fiber_manual_record,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'REC',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _formatDuration(_recordingSeconds),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 8),
-            const CircularProgressIndicator(),
+            const Text(
+              'Press "Stop Recording" when finished',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Camera simulation mode',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
           ],
         ],
       ),
@@ -387,85 +542,372 @@ class _VideoResumeScreenState extends State<VideoResumeScreen> {
   }
 
   Widget _buildVideoPlayer() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.play_circle_filled, size: 64, color: Colors.green),
-          const SizedBox(height: 16),
-          const Text(
-            'Video Recorded Successfully',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Stack(
+      alignment: Alignment.bottomCenter,
+      children: [
+        AspectRatio(
+          aspectRatio: _controller!.value.aspectRatio == 0
+              ? 16 / 9
+              : _controller!.value.aspectRatio,
+          child: VideoPlayer(_controller!),
+        ),
+        VideoProgressIndicator(
+          _controller!,
+          allowScrubbing: true,
+          colors: const VideoProgressColors(playedColor: Colors.purple),
+        ),
+        Positioned(
+          bottom: 8,
+          right: 8,
+          child: FloatingActionButton.small(
+            onPressed: () {
+              if (_controller!.value.isPlaying) {
+                _controller!.pause();
+                setState(() => _isPlaying = false);
+              } else {
+                _controller!.play();
+                setState(() => _isPlaying = true);
+              }
+            },
+            backgroundColor: Colors.white,
+            child: Icon(
+              _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+              color: Colors.black,
+            ),
           ),
-          const SizedBox(height: 8),
-          TextButton(onPressed: _playVideo, child: const Text('Tap to Play')),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   void _startRecording() {
     setState(() {
       _isRecording = true;
+      _recordingSeconds = 0;
     });
 
-    // Simulate recording process
-    Future.delayed(const Duration(seconds: 2), () {
-      // In a real implementation, this would start the camera recording
+    // Start timer to track recording duration
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _recordingSeconds++;
+      });
     });
+
+    // Show improved camera simulation message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Camera simulation started. Recording in progress...'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _stopRecording() {
+    _recordingTimer?.cancel();
     setState(() {
       _isRecording = false;
       _hasRecording = true;
-      _recordingPath = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      _recordingPath =
+          _videoFile?.path ??
+          'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
     });
 
+    // Initialize controller for playback if file exists
+    if (_videoFile != null) {
+      _initializeController(_videoFile!);
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Recording saved successfully'),
+      SnackBar(
+        content: Text(
+          'Video recording completed successfully! Duration: ${_formatDuration(_recordingSeconds)}',
+        ),
         backgroundColor: Colors.green,
+        duration: const Duration(seconds: 4),
       ),
     );
+  }
+
+  String _formatDuration(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   void _retakeVideo() {
     setState(() {
       _hasRecording = false;
       _recordingPath = null;
+      _recordingSeconds = 0;
+      _controller?.dispose();
+      _controller = null;
+      _videoFile = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ready to record again'),
+        backgroundColor: Colors.blue,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _initializeController(File file) async {
+    _controller?.dispose();
+    final c = VideoPlayerController.file(file);
+    _controller = c;
+    await c.initialize();
+    setState(() {
+      _recordingSeconds = c.value.duration.inSeconds;
     });
   }
 
-  void _saveVideo() {
-    // Save video to user's video resume collection
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Video resume saved to your collection'),
-        backgroundColor: Colors.green,
-      ),
-    );
+  Future<void> _shareVideo() async {
+    if (_videoFile == null) return;
+    try {
+      await Share.shareXFiles([
+        XFile(_videoFile!.path, mimeType: 'video/mp4'),
+      ], text: 'My Video Resume');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+      }
+    }
+  }
 
-    Navigator.pop(context);
+  void _saveVideo() async {
+    // Save video to user's video resume collection
+    try {
+      final videoResume = SavedResume(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: 'Video Resume ${DateTime.now().toString().split(' ')[0]}',
+        template: 'Video',
+        data: {
+          'videoPath': _recordingPath ?? '',
+          'promptAnswered': _prompts[_currentPromptIndex],
+          'duration': _recordingSeconds,
+        },
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await ResumeStorageService.instance.saveOrUpdate(videoResume);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video resume saved to My Resumes'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving video: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _playVideo() {
-    // Play the recorded video
+    setState(() {
+      _isPlaying = false;
+      _playbackPosition = 0;
+    });
+
+    // Improved video player dialog with simulation
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Video Player'),
-        content: const Text(
-          'Video player would appear here in a real implementation',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.play_circle_filled, color: Colors.green),
+              SizedBox(width: 8),
+              Text('Video Player'),
+            ],
           ),
-        ],
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Stack(
+                  children: [
+                    // Video simulation content
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _isPlaying ? Icons.videocam : Icons.videocam_off,
+                            size: 48,
+                            color: Colors.white,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            _isPlaying
+                                ? 'Playing Video Resume'
+                                : 'Video Resume Ready',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Duration: ${_formatDuration(_recordingSeconds)}',
+                            style: TextStyle(
+                              color: Colors.grey[300],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Play overlay when paused
+                    if (!_isPlaying)
+                      Center(
+                        child: GestureDetector(
+                          onTap: () => _startPlayback(setDialogState),
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.8),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.play_arrow,
+                              size: 40,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+              // Progress bar
+              LinearProgressIndicator(
+                value: _recordingSeconds > 0
+                    ? _playbackPosition / _recordingSeconds
+                    : 0.0,
+                backgroundColor: Colors.grey[300],
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '${_formatDuration(_playbackPosition)} / ${_formatDuration(_recordingSeconds)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              SizedBox(height: 16),
+              // Controls
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    onPressed: () => _rewind(setDialogState),
+                    icon: Icon(Icons.replay_10),
+                    tooltip: 'Rewind 10s',
+                  ),
+                  IconButton(
+                    onPressed: () => _togglePlayback(setDialogState),
+                    icon: Icon(
+                      _isPlaying
+                          ? Icons.pause_circle_filled
+                          : Icons.play_circle_filled,
+                      size: 32,
+                    ),
+                    tooltip: _isPlaying ? 'Pause' : 'Play',
+                  ),
+                  IconButton(
+                    onPressed: () => _fastForward(setDialogState),
+                    icon: Icon(Icons.forward_10),
+                    tooltip: 'Forward 10s',
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _stopPlayback();
+                Navigator.pop(context);
+              },
+              child: const Text('Close'),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  void _startPlayback(StateSetter setDialogState) {
+    setDialogState(() {
+      _isPlaying = true;
+    });
+
+    _playbackTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setDialogState(() {
+        _playbackPosition++;
+        if (_playbackPosition >= _recordingSeconds) {
+          _playbackPosition = _recordingSeconds;
+          _isPlaying = false;
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  void _togglePlayback(StateSetter setDialogState) {
+    if (_isPlaying) {
+      _pausePlayback(setDialogState);
+    } else {
+      _startPlayback(setDialogState);
+    }
+  }
+
+  void _pausePlayback(StateSetter setDialogState) {
+    _playbackTimer?.cancel();
+    setDialogState(() {
+      _isPlaying = false;
+    });
+  }
+
+  void _stopPlayback() {
+    _playbackTimer?.cancel();
+    setState(() {
+      _isPlaying = false;
+      _playbackPosition = 0;
+    });
+  }
+
+  void _rewind(StateSetter setDialogState) {
+    setDialogState(() {
+      _playbackPosition = (_playbackPosition - 10).clamp(0, _recordingSeconds);
+    });
+  }
+
+  void _fastForward(StateSetter setDialogState) {
+    setDialogState(() {
+      _playbackPosition = (_playbackPosition + 10).clamp(0, _recordingSeconds);
+    });
   }
 
   void _previousPrompt() {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/ai_text_enhancement_service.dart';
 
 /// Dynamic Work Experience Entry Model
 class WorkExperience {
@@ -10,6 +11,7 @@ class WorkExperience {
   DateTime? endDate;
   String description;
   List<String> achievements;
+  bool isCurrentlyWorking;
 
   WorkExperience({
     required this.id,
@@ -20,6 +22,7 @@ class WorkExperience {
     this.endDate,
     this.description = '',
     this.achievements = const [],
+    this.isCurrentlyWorking = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -32,6 +35,7 @@ class WorkExperience {
       'endDate': endDate?.toIso8601String(),
       'description': description,
       'achievements': achievements,
+      'isCurrentlyWorking': isCurrentlyWorking,
     };
   }
 
@@ -47,6 +51,7 @@ class WorkExperience {
       endDate: json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
       description: json['description'] ?? '',
       achievements: List<String>.from(json['achievements'] ?? []),
+      isCurrentlyWorking: json['isCurrentlyWorking'] ?? false,
     );
   }
 
@@ -122,6 +127,31 @@ class Education {
   }
 }
 
+/// Custom Field Entry Model
+class CustomField {
+  String id;
+  String label;
+  String content;
+
+  CustomField({required this.id, this.label = '', this.content = ''});
+
+  Map<String, dynamic> toJson() {
+    return {'id': id, 'label': label, 'content': content};
+  }
+
+  factory CustomField.fromJson(Map<String, dynamic> json) {
+    return CustomField(
+      id: json['id'],
+      label: json['label'] ?? '',
+      content: json['content'] ?? '',
+    );
+  }
+
+  bool hasData() {
+    return label.isNotEmpty || content.isNotEmpty;
+  }
+}
+
 /// Dynamic Work Experience Section Widget
 class DynamicWorkExperienceSection extends StatefulWidget {
   final List<WorkExperience> workExperiences;
@@ -144,6 +174,32 @@ class DynamicWorkExperienceSection extends StatefulWidget {
 
 class _DynamicWorkExperienceSectionState
     extends State<DynamicWorkExperienceSection> {
+  // Controllers for description fields to fix AI text not showing
+  final Map<String, TextEditingController> _descriptionControllers = {};
+
+  @override
+  void dispose() {
+    // Clean up controllers
+    for (final controller in _descriptionControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _getDescriptionController(
+    String id,
+    String initialText,
+  ) {
+    if (!_descriptionControllers.containsKey(id)) {
+      _descriptionControllers[id] = TextEditingController(text: initialText);
+    }
+    // Update text if it changed
+    if (_descriptionControllers[id]!.text != initialText) {
+      _descriptionControllers[id]!.text = initialText;
+    }
+    return _descriptionControllers[id]!;
+  }
+
   bool _overlaps(DateTime? s1, DateTime? e1, DateTime? s2, DateTime? e2) {
     if (s1 == null || s2 == null) return false; // can't compare without starts
     final end1 = e1 ?? DateTime(9999, 12, 31);
@@ -194,6 +250,18 @@ class _DynamicWorkExperienceSectionState
     final updatedList = [...widget.workExperiences];
     updatedList[index] = experience;
     widget.onWorkExperiencesChanged(updatedList);
+  }
+
+  void _showAIEnhancement(
+    BuildContext context,
+    TextEditingController controller,
+    VoidCallback onUpdate,
+  ) {
+    AITextEnhancementService.showEnhancementDialog(
+      context,
+      controller,
+      onUpdate,
+    );
   }
 
   Future<void> _pickDate(
@@ -425,29 +493,106 @@ class _DynamicWorkExperienceSectionState
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _pickDate(context, (date) {
-                              setState(() {
-                                experience.endDate = date;
-                                _updateWorkExperience(index, experience);
-                              });
-                            }, initial: experience.endDate),
-                            icon: const Icon(Icons.calendar_today, size: 16),
+                            onPressed: experience.isCurrentlyWorking
+                                ? null
+                                : () => _pickDate(context, (date) {
+                                    setState(() {
+                                      experience.endDate = date;
+                                      _updateWorkExperience(index, experience);
+                                    });
+                                  }, initial: experience.endDate),
+                            icon: Icon(
+                              Icons.calendar_today,
+                              size: 16,
+                              color: experience.isCurrentlyWorking
+                                  ? Colors.grey
+                                  : null,
+                            ),
                             label: Text(
-                              experience.endDate == null
+                              experience.isCurrentlyWorking
+                                  ? 'Present'
+                                  : experience.endDate == null
                                   ? 'End Date'
                                   : '${experience.endDate!.month}/${experience.endDate!.year}',
+                              style: TextStyle(
+                                color: experience.isCurrentlyWorking
+                                    ? Colors.grey
+                                    : null,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      title: const Text(
+                        'Currently working here',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      value: experience.isCurrentlyWorking,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          // If checking this one, uncheck all others
+                          if (value == true) {
+                            final updatedList = [...widget.workExperiences];
+                            for (var i = 0; i < updatedList.length; i++) {
+                              if (i == index) {
+                                updatedList[i].isCurrentlyWorking = true;
+                                updatedList[i].endDate =
+                                    null; // Clear end date if currently working
+                              } else {
+                                updatedList[i].isCurrentlyWorking = false;
+                              }
+                            }
+                            widget.onWorkExperiencesChanged(updatedList);
+                          } else {
+                            experience.isCurrentlyWorking = false;
+                            _updateWorkExperience(index, experience);
+                          }
+                        });
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
                     const SizedBox(height: 12),
+                    // AI Enhancement Button
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        final controller = _getDescriptionController(
+                          experience.id,
+                          experience.description,
+                        );
+                        _showAIEnhancement(context, controller, () {
+                          experience.description = controller.text;
+                          _updateWorkExperience(index, experience);
+                          setState(() {});
+                        });
+                      },
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: const Text('Enhance with AI'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     TextFormField(
-                      initialValue: experience.description,
+                      controller: _getDescriptionController(
+                        experience.id,
+                        experience.description,
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Description',
                         border: OutlineInputBorder(),
                         alignLabelWithHint: true,
+                        hintText:
+                            'E.g., Have experience in Automation using Core Java, Selenium',
                       ),
                       maxLines: 3,
                       onChanged: (value) {
@@ -823,6 +968,195 @@ class _DynamicEducationSectionState extends State<DynamicEducationSection> {
                       onChanged: (value) {
                         education.description = value;
                         _updateEducation(index, education);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+}
+
+/// Dynamic Custom Fields Section Widget
+class DynamicCustomFieldsSection extends StatefulWidget {
+  final List<CustomField> customFields;
+  final Function(List<CustomField>) onCustomFieldsChanged;
+  final Color? accentColor;
+  final bool atsFriendly;
+
+  const DynamicCustomFieldsSection({
+    super.key,
+    required this.customFields,
+    required this.onCustomFieldsChanged,
+    this.accentColor,
+    this.atsFriendly = false,
+  });
+
+  @override
+  State<DynamicCustomFieldsSection> createState() =>
+      _DynamicCustomFieldsSectionState();
+}
+
+class _DynamicCustomFieldsSectionState
+    extends State<DynamicCustomFieldsSection> {
+  void _addCustomField() {
+    final newField = CustomField(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+    );
+
+    final updatedList = [...widget.customFields, newField];
+    widget.onCustomFieldsChanged(updatedList);
+  }
+
+  void _removeCustomField(String id) {
+    final updatedList = widget.customFields
+        .where((field) => field.id != id)
+        .toList();
+    widget.onCustomFieldsChanged(updatedList);
+  }
+
+  void _updateCustomField(int index, CustomField field) {
+    final updatedList = [...widget.customFields];
+    updatedList[index] = field;
+    widget.onCustomFieldsChanged(updatedList);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = widget.atsFriendly
+        ? (widget.accentColor ?? Colors.black87)
+        : (widget.accentColor ?? Colors.blue);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Add Custom Field button
+        Row(
+          children: [
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: _addCustomField,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add Custom Field'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: widget.atsFriendly
+                    ? Colors.black87
+                    : accentColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (widget.customFields.isEmpty)
+          Card(
+            elevation: widget.atsFriendly ? 0 : null,
+            shape: widget.atsFriendly
+                ? RoundedRectangleBorder(
+                    side: BorderSide(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4),
+                  )
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  if (!widget.atsFriendly)
+                    Icon(
+                      Icons.add_box_outlined,
+                      size: 48,
+                      color: Colors.grey[400],
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No custom fields added yet',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Click "Add Custom Field" to add additional sections',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...widget.customFields.asMap().entries.map((entry) {
+            final index = entry.key;
+            final field = entry.value;
+
+            return Card(
+              elevation: widget.atsFriendly ? 0 : null,
+              shape: widget.atsFriendly
+                  ? RoundedRectangleBorder(
+                      side: BorderSide(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(4),
+                    )
+                  : null,
+              margin: const EdgeInsets.only(bottom: 16),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Custom Field ${index + 1}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => _removeCustomField(field.id),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                          ),
+                          tooltip: 'Remove this field',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: field.label,
+                      decoration: const InputDecoration(
+                        labelText: 'Field Label *',
+                        hintText: 'e.g., Volunteer Work, Publications, Awards',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      onChanged: (value) {
+                        field.label = value;
+                        _updateCustomField(index, field);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: field.content,
+                      decoration: const InputDecoration(
+                        labelText: 'Content *',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                        hintText: 'Enter the content for this custom section',
+                      ),
+                      maxLines: 3,
+                      onChanged: (value) {
+                        field.content = value;
+                        _updateCustomField(index, field);
                       },
                     ),
                   ],

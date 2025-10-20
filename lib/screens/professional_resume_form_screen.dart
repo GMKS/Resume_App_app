@@ -15,6 +15,7 @@ import '../services/premium_service.dart';
 import '../services/resume_storage_service.dart';
 import '../widgets/ai_widgets.dart';
 import '../widgets/dynamic_sections.dart';
+import '../widgets/phone_input_widget.dart';
 import '../screens/customization_screen.dart';
 import '../screens/professional_resume_preview.dart';
 import '../widgets/skills_picker_field.dart';
@@ -190,19 +191,69 @@ class _ProfessionalResumeFormScreenState
   }
 
   void _loadBrandingFromResume() {
-    if (widget.existing?.data['branding'] != null) {
+    if (widget.existing == null) return;
+
+    final data = widget.existing!.data;
+    print('DEBUG: Loading existing resume data: ${data.keys.toList()}');
+
+    // Load branding
+    if (data['branding'] != null) {
       try {
-        final brandingJson = jsonDecode(widget.existing!.data['branding']);
+        final brandingJson = jsonDecode(data['branding']);
         _currentBranding = BrandingTheme.fromJson(brandingJson);
+        print('DEBUG: Loaded branding theme');
       } catch (e) {
+        print('DEBUG: Error loading branding: $e');
         _currentBranding = BrandingTheme.professional;
       }
     }
+
     // Load ATS flag if present
     try {
-      final atsv = (widget.existing?.data['ats_friendly'] ?? '').toString();
+      final atsv = (data['ats_friendly'] ?? '').toString();
       _atsFriendly = atsv == 'true';
-    } catch (_) {}
+      print('DEBUG: Loaded ATS friendly: $_atsFriendly');
+    } catch (e) {
+      print('DEBUG: Error loading ATS flag: $e');
+    }
+
+    // Load work experiences
+    if (data['workExperiences'] != null &&
+        data['workExperiences'].toString().isNotEmpty) {
+      try {
+        final workExpList =
+            jsonDecode(data['workExperiences'].toString()) as List;
+        _workExperiences.clear();
+        _workExperiences.addAll(
+          workExpList.map(
+            (item) => WorkExperience.fromJson(item as Map<String, dynamic>),
+          ),
+        );
+        print('DEBUG: Loaded ${_workExperiences.length} work experiences');
+      } catch (e) {
+        print('DEBUG: Error loading work experiences: $e');
+        // Keep the default empty entry if loading fails
+      }
+    }
+
+    // Load educations
+    if (data['educations'] != null &&
+        data['educations'].toString().isNotEmpty) {
+      try {
+        final educationsList =
+            jsonDecode(data['educations'].toString()) as List;
+        _educations.clear();
+        _educations.addAll(
+          educationsList.map(
+            (item) => Education.fromJson(item as Map<String, dynamic>),
+          ),
+        );
+        print('DEBUG: Loaded ${_educations.length} educations');
+      } catch (e) {
+        print('DEBUG: Error loading educations: $e');
+        // Keep the default empty entry if loading fails
+      }
+    }
   }
 
   Future<void> _openCustomization() async {
@@ -483,8 +534,14 @@ class _ProfessionalResumeFormScreenState
       existingResume: widget.existing,
       template: 'Professional',
       extraKeys: const [
+        'title',
+        'professionalTitle',
+        'location',
         'linkedIn',
+        'linkedin',
         'address',
+        'website',
+        'portfolio',
         'executiveSummary',
         'keySkills',
         'certifications',
@@ -492,7 +549,7 @@ class _ProfessionalResumeFormScreenState
         'awards',
         'languages',
         'references',
-        'profilePhotoBase64', // ADDED
+        'profilePhotoBase64',
         'workExperiences',
         'educations',
         'branding',
@@ -700,11 +757,17 @@ class _ProfessionalResumeFormScreenState
                           onChanged: _markAsChanged,
                         ),
                         const SizedBox(height: 16),
-                        state.buildTextField(
-                          'phone',
-                          'Mobile Number',
-                          required: true,
-                          onChanged: _markAsChanged,
+                        PhoneInputWidget(
+                          initialPhoneNumber:
+                              widget.existing?.data['phone'] ?? '',
+                          onChanged:
+                              (fullPhoneNumber, countryCode, phoneNumber) {
+                                setState(() {
+                                  state.controllers['phone']?.text =
+                                      fullPhoneNumber;
+                                });
+                                _markAsChanged();
+                              },
                         ),
                         const SizedBox(height: 16),
                         state.buildTextField(
@@ -713,6 +776,31 @@ class _ProfessionalResumeFormScreenState
                           required: true,
                           keyboard: TextInputType.emailAddress,
                           onChanged: _markAsChanged,
+                          customValidator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Email Address is required';
+                            }
+                            // Check for @ symbol
+                            if (!value.contains('@')) {
+                              return 'Email must contain @';
+                            }
+                            // Split by @ and validate domain
+                            final parts = value.split('@');
+                            if (parts.length != 2 || parts[1].isEmpty) {
+                              return 'Invalid email format';
+                            }
+                            // Check domain has at least one dot and valid format
+                            final domain = parts[1];
+                            if (!domain.contains('.')) {
+                              return 'Email must include domain (e.g., gmail.com)';
+                            }
+                            // Basic domain validation
+                            final domainParts = domain.split('.');
+                            if (domainParts.any((part) => part.isEmpty)) {
+                              return 'Invalid domain format';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
                         state.buildTextField(
@@ -1237,61 +1325,188 @@ class _ProfessionalResumeFormScreenState
     try {
       // Show loading
       print('DEBUG: Showing loading snackbar');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Generating AI summary...')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generating AI summary options...')),
+      );
 
       // Gather context from form
       final name = state.controllers['name']?.text ?? '';
+      print('DEBUG: Extracted name: $name');
+
       final targetRole = _workExperiences.isNotEmpty
           ? _workExperiences.first.jobTitle
           : state.controllers['professionalTitle']?.text ?? 'Professional';
+      print('DEBUG: Extracted targetRole: $targetRole');
 
-      final skills = (state.controllers['keySkills']?.text ?? '')
-          .split(',')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
+      final skillsText = state.controllers['keySkills']?.text ?? '';
+      print('DEBUG: Raw skills text: $skillsText');
 
-      final experience = _workExperiences
-          .map((exp) => exp.description)
-          .where((desc) => desc.isNotEmpty)
-          .toList();
+      List<String> skills = [];
+      try {
+        skills = skillsText
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        print('DEBUG: Processed skills: $skills');
+      } catch (e) {
+        print('DEBUG: Error processing skills: $e');
+        skills = [];
+      }
+
+      List<String> experience = [];
+      try {
+        experience = _workExperiences
+            .map((exp) => exp.description)
+            .where((desc) => desc.isNotEmpty)
+            .toList();
+        print('DEBUG: Processed experience: ${experience.length} items');
+      } catch (e) {
+        print('DEBUG: Error processing experience: $e');
+        experience = [];
+      }
 
       print(
         'DEBUG: Calling AI service with: name=$name, role=$targetRole, skills=${skills.length}, experience=${experience.length}',
       );
 
-      // Generate summary using AI service
-      final summary = await AIResumeService.generateSummary(
-        name: name,
-        targetRole: targetRole,
-        skills: skills,
-        experience: experience,
-      );
+      // Generate multiple summary options using AI service
+      final summaryOptions = <String>[];
 
-      print('DEBUG: AI service returned: ${summary.length} characters');
+      // Generate 3 different summary variations
+      for (int i = 0; i < 3; i++) {
+        try {
+          final summary = await AIResumeService.generateSummary(
+            name: name,
+            targetRole: targetRole,
+            skills: skills,
+            experience: experience,
+          );
+          if (summary.isNotEmpty && !summaryOptions.contains(summary)) {
+            summaryOptions.add(summary);
+          }
+        } catch (e) {
+          print('DEBUG: Error generating summary option ${i + 1}: $e');
+        }
+      }
 
-      if (summary.isNotEmpty) {
-        state.controllers['executiveSummary']?.text = summary;
-        print('DEBUG: Summary set in controller');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AI summary generated successfully!')),
-        );
+      print('DEBUG: Generated ${summaryOptions.length} summary options');
+
+      if (summaryOptions.isNotEmpty) {
+        // Show selection dialog
+        _showSummarySelectionDialog(summaryOptions, state);
       } else {
-        print('DEBUG: Empty summary returned');
+        print('DEBUG: No summary options generated');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to generate summary. Please try again.'),
+            content: Text(
+              'Failed to generate summary options. Please try again.',
+            ),
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('DEBUG: Error in _generateAISummary: $e');
+      print('DEBUG: Stack trace: $stackTrace');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error generating summary: $e')));
     }
+  }
+
+  void _showSummarySelectionDialog(List<String> summaryOptions, dynamic state) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Choose AI Generated Summary'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Select one of the AI-generated professional summaries below:',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                ...summaryOptions.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final summary = entry.value;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: InkWell(
+                      onTap: () {
+                        state.controllers['executiveSummary']?.text = summary;
+                        _markAsChanged();
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Summary option ${index + 1} applied successfully!',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome,
+                                  size: 16,
+                                  color: _currentBranding.primaryColor != null
+                                      ? _hexToColor(
+                                          _currentBranding.primaryColor!,
+                                        )
+                                      : _accentColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Option ${index + 1}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: _currentBranding.primaryColor != null
+                                        ? _hexToColor(
+                                            _currentBranding.primaryColor!,
+                                          )
+                                        : _accentColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(summary, style: const TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                // Generate more options
+                Navigator.of(context).pop();
+                _generateAISummary();
+              },
+              child: const Text('Generate More'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _optimizeAISummary() async {
@@ -1304,6 +1519,10 @@ class _ProfessionalResumeFormScreenState
     }
 
     final currentSummary = state.controllers['executiveSummary']?.text ?? '';
+    print(
+      'DEBUG: _optimizeAISummary called with current summary: $currentSummary',
+    );
+
     if (currentSummary.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1323,12 +1542,24 @@ class _ProfessionalResumeFormScreenState
       final targetRole = _workExperiences.isNotEmpty
           ? _workExperiences.first.jobTitle
           : state.controllers['professionalTitle']?.text ?? 'Professional';
+      print('DEBUG: Target role for optimization: $targetRole');
 
-      final skills = (state.controllers['keySkills']?.text ?? '')
-          .split(',')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
+      List<String> skills = [];
+      try {
+        skills = (state.controllers['keySkills']?.text ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        print('DEBUG: Skills for optimization: $skills');
+      } catch (e) {
+        print('DEBUG: Error processing skills for optimization: $e');
+        skills = [];
+      }
+
+      print(
+        'DEBUG: Calling AI optimize with: currentSummary length=${currentSummary.length}, role=$targetRole, skills=${skills.length}',
+      );
 
       // Optimize summary using AI service
       final optimizedSummary = await AIResumeService.optimizeSummary(
@@ -1337,19 +1568,28 @@ class _ProfessionalResumeFormScreenState
         keySkills: skills,
       );
 
+      print(
+        'DEBUG: AI optimization returned: ${optimizedSummary.length} characters',
+      );
+
       if (optimizedSummary.isNotEmpty) {
         state.controllers['executiveSummary']?.text = optimizedSummary;
+        print('DEBUG: Optimized summary set in controller');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Summary optimized successfully!')),
         );
+        _markAsChanged();
       } else {
+        print('DEBUG: Empty optimized summary returned');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to optimize summary. Please try again.'),
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('DEBUG: Error in _optimizeAISummary: $e');
+      print('DEBUG: Stack trace: $stackTrace');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error optimizing summary: $e')));

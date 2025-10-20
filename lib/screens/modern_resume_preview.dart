@@ -16,6 +16,7 @@ class ModernResumePreview extends StatelessWidget {
     final location = (info['location'] ?? '').toString();
     final linkedIn = (info['linkedin'] ?? '').toString();
     final photoB64 = (info['profilePhotoBase64'] ?? '').toString();
+    final jobTitle = (data['jobTitle'] ?? '').toString();
     final summary = (data['summary'] ?? '').toString();
     final skills = _extractSkills(data);
     final certifications = (data['certifications'] ?? '').toString();
@@ -31,196 +32,228 @@ class ModernResumePreview extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Modern Preview')),
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 900),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.black87, width: 2),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isNarrow = constraints.maxWidth < 700;
-                  final photo = _buildPhoto(photoB64);
-                  final header = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 595, // A4 width in logical pixels
+            maxHeight: 842, // A4 height in logical pixels
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: DefaultTextStyle(
+              style: const TextStyle(fontFamily: 'Roboto', color: Colors.black),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 900),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black87, width: 2),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 700;
+                      final photo = _buildPhoto(photoB64);
+                      final header = Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (photo != null) ...[
-                            photo,
-                            const SizedBox(width: 12),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (photo != null) ...[
+                                photo,
+                                const SizedBox(width: 12),
+                              ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name.isEmpty
+                                          ? resume.title
+                                          : name.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    if (jobTitle.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        jobTitle,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade700,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                    if (summary.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      _sectionTitle('PROFESSIONAL SUMMARY'),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        summary,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 6,
+                            children: [
+                              if (email.isNotEmpty)
+                                _contactChip(Icons.email_outlined, email),
+                              if (phone.isNotEmpty)
+                                _contactChip(Icons.phone_outlined, phone),
+                              if (location.isNotEmpty)
+                                _contactChip(
+                                  Icons.location_on_outlined,
+                                  location,
+                                ),
+                              if (linkedIn.isNotEmpty)
+                                _contactChip(Icons.link, linkedIn),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                      );
+
+                      Widget buildLeftColumn() => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sectionTitle('WORK EXPERIENCE'),
+                          for (final w in work) ...[
+                            _jobBlock(
+                              title: (w['role'] ?? '').toString(),
+                              company: (w['company'] ?? '').toString(),
+                              dateRange: _dateRange(w['start'], w['end']),
+                              location: (w['location'] ?? '').toString(),
+                              bullets: const [],
+                              description:
+                                  ((w['description'] ?? '')
+                                              .toString()
+                                              .trim()
+                                              .isNotEmpty
+                                          ? (w['description'] ?? '').toString()
+                                          : (w['summary'] ?? '').toString())
+                                      .toString(),
+                            ),
                           ],
-                          Expanded(
-                            child: Column(
+                        ],
+                      );
+
+                      Widget buildRightColumn() => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sectionTitle('EDUCATION'),
+                          for (final e in education) ...[
+                            _eduBlock(
+                              degree: (e['degree'] ?? '').toString(),
+                              school: (e['school'] ?? '').toString(),
+                              dateRange: _dateRange(e['start'], e['end']),
+                              location: (e['location'] ?? '').toString(),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          const SizedBox(height: 12),
+                          _sectionTitle('SKILLS'),
+                          if (skills.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: skills
+                                    .map((s) => _bulletText(s))
+                                    .toList(),
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                          if (certifications.isNotEmpty) ...[
+                            _sectionTitle('CERTIFICATIONS'),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: certifications
+                                    .split(',')
+                                    .map((c) => c.trim())
+                                    .where((c) => c.isNotEmpty)
+                                    .map(_bulletText)
+                                    .toList(),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          if (achievements.isNotEmpty)
+                            _sectionTitle('ACHIEVEMENTS'),
+                          if (achievements.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: achievements
+                                    .split(',')
+                                    .map((a) => a.trim())
+                                    .where((a) => a.isNotEmpty)
+                                    .map(_bulletText)
+                                    .toList(),
+                              ),
+                            ),
+                          if (hobbies.isNotEmpty) ...[
+                            _sectionTitle('HOBBIES'),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: hobbies
+                                    .split(',')
+                                    .map((h) => h.trim())
+                                    .where((h) => h.isNotEmpty)
+                                    .map(_bulletText)
+                                    .toList(),
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          header,
+                          if (isNarrow)
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  name.isEmpty
-                                      ? resume.title
-                                      : name.toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                if (summary.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  _sectionTitle('PROFESSIONAL SUMMARY'),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    summary,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade800,
-                                    ),
-                                  ),
-                                ],
+                                buildLeftColumn(),
+                                const SizedBox(height: 16),
+                                buildRightColumn(),
+                              ],
+                            )
+                          else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(flex: 2, child: buildLeftColumn()),
+                                const SizedBox(width: 24),
+                                Expanded(flex: 1, child: buildRightColumn()),
                               ],
                             ),
-                          ),
                         ],
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 6,
-                        children: [
-                          if (email.isNotEmpty)
-                            _contactChip(Icons.email_outlined, email),
-                          if (phone.isNotEmpty)
-                            _contactChip(Icons.phone_outlined, phone),
-                          if (location.isNotEmpty)
-                            _contactChip(Icons.location_on_outlined, location),
-                          if (linkedIn.isNotEmpty)
-                            _contactChip(Icons.link, linkedIn),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                  );
-
-                  Widget buildLeftColumn() => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sectionTitle('WORK EXPERIENCE'),
-                      for (final w in work) ...[
-                        _jobBlock(
-                          title: (w['role'] ?? '').toString(),
-                          company: (w['company'] ?? '').toString(),
-                          dateRange: _dateRange(w['start'], w['end']),
-                          location: (w['location'] ?? '').toString(),
-                          bullets: const [],
-                        ),
-                      ],
-                    ],
-                  );
-
-                  Widget buildRightColumn() => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sectionTitle('EDUCATION'),
-                      for (final e in education) ...[
-                        _eduBlock(
-                          degree: (e['degree'] ?? '').toString(),
-                          school: (e['school'] ?? '').toString(),
-                          dateRange: _dateRange(e['start'], e['end']),
-                          location: (e['location'] ?? '').toString(),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      const SizedBox(height: 12),
-                      _sectionTitle('SKILLS'),
-                      if (skills.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: skills
-                                .map((s) => _bulletText(s))
-                                .toList(),
-                          ),
-                        ),
-                      const SizedBox(height: 12),
-                      if (certifications.isNotEmpty) ...[
-                        _sectionTitle('CERTIFICATIONS'),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: certifications
-                                .split(',')
-                                .map((c) => c.trim())
-                                .where((c) => c.isNotEmpty)
-                                .map(_bulletText)
-                                .toList(),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      if (achievements.isNotEmpty)
-                        _sectionTitle('ACHIEVEMENTS'),
-                      if (achievements.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: achievements
-                                .split(',')
-                                .map((a) => a.trim())
-                                .where((a) => a.isNotEmpty)
-                                .map(_bulletText)
-                                .toList(),
-                          ),
-                        ),
-                      if (hobbies.isNotEmpty) ...[
-                        _sectionTitle('HOBBIES'),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: hobbies
-                                .split(',')
-                                .map((h) => h.trim())
-                                .where((h) => h.isNotEmpty)
-                                .map(_bulletText)
-                                .toList(),
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      header,
-                      if (isNarrow)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            buildLeftColumn(),
-                            const SizedBox(height: 16),
-                            buildRightColumn(),
-                          ],
-                        )
-                      else
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 2, child: buildLeftColumn()),
-                            const SizedBox(width: 24),
-                            Expanded(flex: 1, child: buildRightColumn()),
-                          ],
-                        ),
-                    ],
-                  );
-                },
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
@@ -259,6 +292,7 @@ class ModernResumePreview extends StatelessWidget {
     required String dateRange,
     required String location,
     required List<String> bullets,
+    String? description,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -279,16 +313,39 @@ class ModernResumePreview extends StatelessWidget {
               if (dateRange.isNotEmpty) ...[
                 const Icon(Icons.calendar_today, size: 12),
                 const SizedBox(width: 6),
-                Text(dateRange, style: const TextStyle(fontSize: 12)),
+                Expanded(
+                  child: Text(
+                    dateRange,
+                    style: const TextStyle(fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 const SizedBox(width: 12),
               ],
               if (location.isNotEmpty) ...[
                 const Icon(Icons.location_on_outlined, size: 12),
                 const SizedBox(width: 4),
-                Text(location, style: const TextStyle(fontSize: 12)),
+                Expanded(
+                  child: Text(
+                    location,
+                    style: const TextStyle(fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ],
           ),
+          if (description != null && description.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              description,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade700,
+                height: 1.4,
+              ),
+            ),
+          ],
           if (bullets.isNotEmpty) ...[
             const SizedBox(height: 6),
             Column(
@@ -325,13 +382,25 @@ class ModernResumePreview extends StatelessWidget {
             if (dateRange.isNotEmpty) ...[
               const Icon(Icons.calendar_today, size: 12),
               const SizedBox(width: 6),
-              Text(dateRange, style: const TextStyle(fontSize: 12)),
+              Expanded(
+                child: Text(
+                  dateRange,
+                  style: const TextStyle(fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               const SizedBox(width: 12),
             ],
             if (location.isNotEmpty) ...[
               const Icon(Icons.location_on_outlined, size: 12),
               const SizedBox(width: 4),
-              Text(location, style: const TextStyle(fontSize: 12)),
+              Expanded(
+                child: Text(
+                  location,
+                  style: const TextStyle(fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ],
         ),

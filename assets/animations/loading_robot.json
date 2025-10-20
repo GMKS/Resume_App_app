@@ -1,0 +1,8 @@
+{
+  "name": "loading_robot",
+  "version": "1.0.0",
+  "description": "A simple loading animation of a robot.",
+  "main": "loading_robot.json",
+  "author": "",
+  "license": "ISC"
+}

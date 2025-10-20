@@ -10,6 +10,7 @@ import 'classic_resume_preview.dart';
 import 'modern_resume_form_screen.dart';
 import 'classic_resume_form_screen.dart';
 import 'minimal_resume_form_screen.dart';
+import 'minimal_resume_preview.dart';
 import 'professional_resume_form_screen.dart';
 import 'professional_resume_preview.dart';
 import 'creative_resume_form_screen.dart';
@@ -17,6 +18,9 @@ import 'one_page_resume_form_screen.dart';
 import 'one_page_resume_preview.dart';
 import 'creative_resume_preview.dart';
 import 'customize_screen.dart';
+import 'video_resume_screen.dart';
+import 'smart_assist_screen.dart';
+import 'smart_assist_result_preview_screen.dart';
 
 class SavedResumesScreen extends StatelessWidget {
   const SavedResumesScreen({super.key});
@@ -45,6 +49,9 @@ class SavedResumesScreen extends StatelessWidget {
       case 'one page':
         screen = OnePageResumeFormScreen(existing: resume);
         break;
+      case 'video':
+        screen = const VideoResumeScreen();
+        break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -68,6 +75,9 @@ class SavedResumesScreen extends StatelessWidget {
       case 'modern':
         screen = ModernResumePreview(resume: resume);
         break;
+      case 'minimal':
+        screen = MinimalResumePreview(resume: resume);
+        break;
       case 'classic':
         screen = ClassicResumePreview(resume: resume);
         break;
@@ -80,6 +90,35 @@ class SavedResumesScreen extends StatelessWidget {
       case 'one page':
         screen = OnePageResumePreview(resume: resume);
         break;
+      case 'smart assist':
+        screen = SmartAssistResultPreviewScreen(aiGeneratedData: resume.data);
+        break;
+      case 'video':
+        // For video resumes, show a dialog with video info
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Video Resume'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Duration: ${resume.data['duration'] ?? 0} seconds'),
+                const SizedBox(height: 8),
+                Text('Prompt: ${resume.data['promptAnswered'] ?? 'N/A'}'),
+                const SizedBox(height: 8),
+                Text('Path: ${resume.data['videoPath'] ?? 'N/A'}'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+        return;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -101,6 +140,18 @@ class SavedResumesScreen extends StatelessWidget {
         title: const Text('My Resumes'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Smart Assist',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SmartAssistScreen()),
+              );
+            },
+          ),
+        ],
       ),
       body: ValueListenableBuilder<List<SavedResume>>(
         valueListenable: ResumeStorageService.instance.resumes,
@@ -235,18 +286,27 @@ class SavedResumesScreen extends StatelessWidget {
                           contentPadding: EdgeInsets.zero,
                         ),
                       ),
-                      const PopupMenuItem(
-                        value: 'customize',
-                        child: ListTile(
-                          leading: Icon(Icons.palette),
-                          title: Text('Customize'),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
                     ];
 
+                    // Only show Customize for non-Classic templates
+                    if (r.template != 'Classic') {
+                      items.add(
+                        const PopupMenuItem(
+                          value: 'customize',
+                          child: ListTile(
+                            leading: Icon(Icons.palette),
+                            title: Text('Customize'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      );
+                    }
+
+                    // Continue with other menu items
+                    final remainingItems = <PopupMenuEntry<String>>[];
+
                     if (PremiumService.isPremium) {
-                      items.addAll(const [
+                      remainingItems.addAll(const [
                         PopupMenuItem(
                           value: 'export_pdf',
                           child: ListTile(
@@ -298,6 +358,7 @@ class SavedResumesScreen extends StatelessWidget {
                       ]);
                     }
 
+                    items.addAll(remainingItems);
                     items.add(
                       const PopupMenuItem(
                         value: 'delete',
@@ -331,19 +392,68 @@ class SavedResumesScreen extends StatelessWidget {
 
   CustomResumeData _convertToCustomResumeData(SavedResume resume) {
     final data = resume.data;
+
+    // Handle both nested personalInfo structure and direct field structure
+    // Professional template uses direct fields, while others may use personalInfo
     final personalInfo = data['personalInfo'] as Map<String, dynamic>? ?? {};
 
+    // Extract name from various possible fields
+    final fullName =
+        personalInfo['fullName'] ??
+        personalInfo['name'] ??
+        data['name'] ??
+        data['full_name'] ??
+        '';
+
+    // Extract job title from various possible fields
+    final jobTitle =
+        personalInfo['jobTitle'] ??
+        personalInfo['title'] ??
+        data['title'] ??
+        data['professionalTitle'] ??
+        '';
+
+    // Extract contact information from various possible fields
+    final email = personalInfo['email'] ?? data['email'] ?? '';
+    final phone = personalInfo['phone'] ?? data['phone'] ?? '';
+    final linkedin =
+        personalInfo['linkedin'] ??
+        personalInfo['linkedIn'] ??
+        data['linkedin'] ??
+        data['linkedIn'] ??
+        '';
+    final website =
+        personalInfo['website'] ??
+        personalInfo['portfolio'] ??
+        data['website'] ??
+        data['portfolio'] ??
+        '';
+    final location =
+        personalInfo['location'] ??
+        personalInfo['address'] ??
+        data['location'] ??
+        data['address'] ??
+        '';
+
+    // Extract summary from various possible fields
+    final summary =
+        data['executiveSummary'] ??
+        data['summary'] ??
+        data['profile'] ??
+        data['professionalSummary'] ??
+        '';
+
     return CustomResumeData(
-      fullName: personalInfo['fullName'] ?? personalInfo['name'] ?? '',
-      jobTitle: personalInfo['jobTitle'] ?? personalInfo['title'] ?? '',
+      fullName: fullName.toString(),
+      jobTitle: jobTitle.toString(),
       contactInfo: ContactInfo(
-        email: personalInfo['email'] ?? '',
-        phone: personalInfo['phone'] ?? '',
-        linkedin: personalInfo['linkedin'] ?? personalInfo['linkedIn'] ?? '',
-        website: personalInfo['website'] ?? personalInfo['portfolio'] ?? '',
-        location: personalInfo['location'] ?? personalInfo['address'] ?? '',
+        email: email.toString(),
+        phone: phone.toString(),
+        linkedin: linkedin.toString(),
+        website: website.toString(),
+        location: location.toString(),
       ),
-      summary: data['summary'] ?? data['profile'] ?? '',
+      summary: summary.toString(),
       skills: _convertSkills(data),
       experience: _convertExperience(data),
       education: _convertEducation(data),
@@ -360,8 +470,16 @@ class SavedResumesScreen extends StatelessWidget {
   List<Skill> _convertSkills(Map<String, dynamic> data) {
     final skillsList = <Skill>[];
 
-    // Handle different skill formats
-    if (data['skills'] != null) {
+    // Handle different skill formats - check Professional template keySkills first
+    if (data['keySkills'] != null && data['keySkills'] is String) {
+      final keySkills = (data['keySkills'] as String)
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty);
+      for (final name in keySkills) {
+        skillsList.add(Skill(name: name));
+      }
+    } else if (data['skills'] != null) {
       final skills = data['skills'];
       if (skills is List) {
         for (final skill in skills) {
@@ -389,16 +507,16 @@ class SavedResumesScreen extends StatelessWidget {
       }
     }
 
-    // Handle coreSkills from One Page template
-    if (data['coreSkills'] != null && data['coreSkills'] is String) {
+    // Handle coreSkills from One Page template if no other skills found
+    if (skillsList.isEmpty &&
+        data['coreSkills'] != null &&
+        data['coreSkills'] is String) {
       final coreSkills = (data['coreSkills'] as String)
           .split(',')
           .map((s) => s.trim())
           .where((s) => s.isNotEmpty);
       for (final name in coreSkills) {
-        if (!skillsList.any((s) => s.name == name)) {
-          skillsList.add(Skill(name: name, proficiency: 0.8));
-        }
+        skillsList.add(Skill(name: name, proficiency: 0.8));
       }
     }
 
@@ -446,6 +564,34 @@ class SavedResumesScreen extends StatelessWidget {
             ),
           );
         }
+      }
+    }
+
+    // Handle Professional template workExperiences (JSON string)
+    if (data['workExperiences'] != null && data['workExperiences'] is String) {
+      try {
+        final workExps = jsonDecode(data['workExperiences']) as List;
+        for (final exp in workExps) {
+          if (exp is Map) {
+            experienceList.add(
+              Experience(
+                jobTitle:
+                    exp['jobTitle'] ?? exp['position'] ?? exp['title'] ?? '',
+                companyName: exp['company'] ?? exp['employer'] ?? '',
+                location: exp['location'] ?? '',
+                startDate: _parseDate(exp['startDate']),
+                endDate: _parseDate(exp['endDate']),
+                isCurrentJob:
+                    exp['endDate'] == null ||
+                    exp['endDate'] == '' ||
+                    exp['endDate'].toString().toLowerCase().contains('present'),
+                description: exp['description'] ?? '',
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        // Handle JSON parsing error
       }
     }
 
@@ -510,6 +656,32 @@ class SavedResumesScreen extends StatelessWidget {
             ),
           );
         }
+      }
+    }
+
+    // Handle Professional template educations (JSON string)
+    if (data['educations'] != null && data['educations'] is String) {
+      try {
+        final educations = jsonDecode(data['educations']) as List;
+        for (final edu in educations) {
+          if (edu is Map) {
+            educationList.add(
+              Education(
+                degree: edu['degree'] ?? edu['qualification'] ?? '',
+                institution:
+                    edu['institution'] ??
+                    edu['university'] ??
+                    edu['school'] ??
+                    '',
+                startDate: _parseDate(edu['startDate']),
+                endDate: _parseDate(edu['endDate']),
+                description: edu['description'] ?? '',
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        // Handle JSON parsing error
       }
     }
 

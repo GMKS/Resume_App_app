@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../services/upi_payment_service.dart';
 import '../services/premium_service.dart';
 
@@ -306,67 +307,293 @@ class _UpiPaymentWidgetState extends State<UpiPaymentWidget> {
         upiApp: _selectedUpiApp!,
       );
 
-      // Show processing dialog with selected UPI app
-      UpiPaymentService.showUpiProcessingDialog(context, _selectedUpiApp!);
+      setState(() {
+        _isLoading = false;
+      });
 
-      // Simulate payment processing (replace with actual UPI payment flow)
-      await Future.delayed(const Duration(seconds: 3));
-
-      // For demo purposes, simulate successful payment
-      // In real implementation, this would be handled by Razorpay SDK
-      final mockPaymentResult = {
-        'razorpayPaymentId':
-            'pay_mock_${DateTime.now().millisecondsSinceEpoch}',
-        'razorpayOrderId': paymentIntent['paymentData']['orderId'],
-        'razorpaySignature':
-            'mock_signature_${DateTime.now().millisecondsSinceEpoch}',
-      };
-
-      // Verify payment
-      final result = await UpiPaymentService.verifyUpiPayment(
-        planType: widget.planType,
-        amount: widget.amount,
-        currency: 'INR',
-        razorpayPaymentId: mockPaymentResult['razorpayPaymentId']!,
-        razorpayOrderId: mockPaymentResult['razorpayOrderId']!,
-        razorpaySignature: mockPaymentResult['razorpaySignature']!,
-      );
-
-      // Update premium status
-      await PremiumService.updatePremiumStatus(true);
-
-      Navigator.of(context).pop(); // Close processing dialog
-      UpiPaymentService.showUpiSuccessDialog(context, _selectedUpiApp!, result);
-      widget.onPaymentSuccess(result);
-    } catch (error) {
-      Navigator.of(context).pop(); // Close processing dialog if open
-
-      // Show error dialog
-      showDialog(
+      // Show user they need to complete payment in UPI app
+      final shouldContinue = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
           title: const Row(
             children: [
-              Icon(Icons.error, color: Colors.red),
+              Icon(Icons.info, color: Colors.blue),
               SizedBox(width: 8),
-              Text('Payment Failed'),
+              Text('Complete Payment'),
             ],
           ),
-          content: Text(error.toString()),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'You will be redirected to ${UpiPaymentService.upiApps[_selectedUpiApp]!['name']} to complete the payment.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Make sure to complete the payment in your UPI app',
+                        style: TextStyle(
+                          color: Colors.orange[900],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E88E5),
+              ),
+              child: const Text('Continue'),
             ),
           ],
         ),
       );
 
-      widget.onPaymentError(error.toString());
-    } finally {
+      if (shouldContinue != true) {
+        widget.onPaymentError('Payment cancelled by user');
+        return;
+      }
+
+      // Open Razorpay checkout with real payment intent
+      _openRazorpayCheckout(paymentIntent);
+    } catch (error) {
       setState(() {
         _isLoading = false;
       });
+
+      // Show error dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.error, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Payment Failed'),
+              ],
+            ),
+            content: Text(error.toString()),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      widget.onPaymentError(error.toString());
+    }
+  }
+
+  void _openRazorpayCheckout(Map<String, dynamic> paymentIntent) {
+    final razorpay = Razorpay();
+
+    // Set up event handlers for this checkout session
+    razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (
+      PaymentSuccessResponse response,
+    ) async {
+      debugPrint('Razorpay Payment Success: ${response.paymentId}');
+
+      // Show loading while verifying
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => const Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Verifying payment...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      try {
+        // Verify payment on server BEFORE upgrading
+        final result = await UpiPaymentService.verifyUpiPayment(
+          planType: widget.planType,
+          amount: widget.amount,
+          currency: 'INR',
+          razorpayPaymentId: response.paymentId!,
+          razorpayOrderId: response.orderId!,
+          razorpaySignature: response.signature!,
+        );
+
+        // Close verification dialog
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+
+        // Only upgrade if server verification succeeds
+        if (result['success'] == true && result['verified'] == true) {
+          await PremiumService.upgradeToPremium();
+
+          // Show success UI only after verification
+          if (mounted) {
+            UpiPaymentService.showUpiSuccessDialog(
+              context,
+              _selectedUpiApp!,
+              result,
+            );
+          }
+          widget.onPaymentSuccess(result);
+        } else {
+          throw Exception('Payment verification failed');
+        }
+      } catch (e) {
+        // Close verification dialog if open
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+
+        // Show error
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.error, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Verification Failed'),
+                ],
+              ),
+              content: Text(
+                'Payment verification failed. Please contact support if amount was deducted.\n\nError: $e',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+        widget.onPaymentError('Payment verification failed: $e');
+      } finally {
+        razorpay.clear();
+      }
+    });
+
+    razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, (
+      PaymentFailureResponse response,
+    ) {
+      debugPrint(
+        'Razorpay Payment Error: ${response.code} - ${response.message}',
+      );
+
+      String errorMessage = 'Payment failed';
+
+      // Better error messages
+      if (response.message?.contains('UPI') == true) {
+        errorMessage =
+            'UPI payment failed. Please check your UPI app and try again.';
+      } else if (response.message?.contains('cancelled') == true) {
+        errorMessage = 'Payment was cancelled';
+      } else {
+        errorMessage = 'Payment failed: ${response.message}';
+      }
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.error, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Payment Failed'),
+              ],
+            ),
+            content: Text(errorMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      widget.onPaymentError(errorMessage);
+      razorpay.clear();
+    });
+
+    razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (
+      ExternalWalletResponse response,
+    ) {
+      debugPrint('Razorpay External Wallet: ${response.walletName}');
+      razorpay.clear();
+    });
+
+    // Build checkout options
+    final paymentData = paymentIntent['paymentData'];
+    final options = {
+      'key': paymentData['key'],
+      'amount': paymentData['amount'], // Amount in paise
+      'name': 'Resume Builder Premium',
+      'description': 'Premium subscription - ${widget.planType}',
+      'order_id': paymentData['orderId'],
+      'prefill': {'contact': '', 'email': ''},
+      'method': {'upi': true}, // Only allow UPI
+      'theme': {'color': '#1E88E5'},
+    };
+
+    // Set preferred UPI app
+    if (_selectedUpiApp != null) {
+      final appDetails = UpiPaymentService.upiApps[_selectedUpiApp];
+      if (appDetails != null) {
+        options['notes'] = {
+          'upi_app': _selectedUpiApp,
+          'app_name': appDetails['name'],
+        };
+      }
+    }
+
+    // Open Razorpay checkout
+    try {
+      razorpay.open(options);
+    } catch (e) {
+      debugPrint('Error opening Razorpay: $e');
+      widget.onPaymentError('Failed to open payment: $e');
+      razorpay.clear();
     }
   }
 }

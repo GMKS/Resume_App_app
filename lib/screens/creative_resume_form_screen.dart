@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import '../models/saved_resume.dart';
 import '../models/branding.dart';
@@ -10,6 +11,7 @@ import '../widgets/skills_picker_field.dart';
 import '../widgets/ai_widgets.dart';
 import '../services/share_export_service.dart';
 import '../services/premium_service.dart';
+import 'template_selection_screen.dart';
 
 class CreativeResumeFormScreen extends StatefulWidget {
   final SavedResume? existing;
@@ -123,6 +125,63 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
       if (state != null) {
         state.controllerFor('branding').text = jsonEncode(result.toJson());
       }
+    }
+  }
+
+  Future<void> _previewWithTemplates() async {
+    final state = BaseResumeForm.of(context);
+    if (state == null) return;
+
+    // Check if required fields are filled
+    if (state.controllerFor('name').text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your name first')),
+      );
+      return;
+    }
+
+    // Dismiss keyboard first
+    FocusScope.of(context).unfocus();
+
+    try {
+      // Create resume with current data
+      final data = <String, dynamic>{
+        for (final e in state.controllers.entries) e.key: e.value.text,
+        // Add work experiences and educations
+        'workExperiences': jsonEncode(
+          _workExperiences.map((e) => e.toJson()).toList(),
+        ),
+        'educations': jsonEncode(_educations.map((e) => e.toJson()).toList()),
+        'branding': jsonEncode(_currentBranding.toJson()),
+      };
+
+      final resume = SavedResume(
+        id:
+            widget.existing?.id ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
+        title: state.controllerFor('name').text.isNotEmpty
+            ? '${state.controllerFor('name').text} Resume'
+            : 'Creative Resume',
+        template: 'Creative',
+        data: data,
+        createdAt: widget.existing?.createdAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // Navigate to template selection screen
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TemplateSelectionScreen(
+            resumeData: resume,
+            templateType: 'creative',
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Template selection failed: $e')));
     }
   }
 
@@ -296,6 +355,11 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
               title: const Text('Creative Resume'),
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.view_list),
+                  tooltip: 'Select Template',
+                  onPressed: _previewWithTemplates,
+                ),
+                IconButton(
                   icon: const Icon(Icons.palette),
                   tooltip: 'Customize Branding',
                   onPressed: _openCustomization,
@@ -435,6 +499,10 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                         'Mobile Number',
                         required: true,
                         keyboard: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       state.buildTextField(
@@ -442,6 +510,31 @@ class _CreativeResumeFormScreenState extends State<CreativeResumeFormScreen> {
                         'Email Address',
                         required: true,
                         keyboard: TextInputType.emailAddress,
+                        customValidator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Email Address is required';
+                          }
+                          // Check for @ symbol
+                          if (!value.contains('@')) {
+                            return 'Email must contain @';
+                          }
+                          // Split by @ and validate domain
+                          final parts = value.split('@');
+                          if (parts.length != 2 || parts[1].isEmpty) {
+                            return 'Invalid email format';
+                          }
+                          // Check domain has at least one dot and valid format
+                          final domain = parts[1];
+                          if (!domain.contains('.')) {
+                            return 'Email must include domain (e.g., gmail.com)';
+                          }
+                          // Basic domain validation
+                          final domainParts = domain.split('.');
+                          if (domainParts.any((part) => part.isEmpty)) {
+                            return 'Invalid domain format';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
                       state.buildTextField('portfolio', 'Portfolio / Website'),

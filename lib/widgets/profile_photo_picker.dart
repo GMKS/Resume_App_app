@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'photo_crop_dialog.dart';
 
 /// Minimal profile photo picker that stores image as base64 string.
 class ProfilePhotoPicker extends StatefulWidget {
@@ -50,6 +51,13 @@ class _ProfilePhotoPickerState extends State<ProfilePhotoPicker> {
               title: const Text('Choose from Gallery'),
               onTap: () => Navigator.pop(ctx, 'gallery'),
             ),
+            if (_b64 != null) ...[
+              ListTile(
+                leading: const Icon(Icons.crop),
+                title: const Text('Crop Current Photo'),
+                onTap: () => Navigator.pop(ctx, 'crop'),
+              ),
+            ],
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Remove photo'),
@@ -71,9 +79,33 @@ class _ProfilePhotoPickerState extends State<ProfilePhotoPicker> {
         final file = File(picked.path);
         final bytes = await file.readAsBytes();
         final b64 = base64Encode(bytes);
-        setState(() => _b64 = b64);
-        widget.onChanged(b64);
+
+        // Automatically show crop dialog after capture/selection
+        if (mounted) {
+          await showDialog(
+            context: context,
+            builder: (context) => PhotoCropDialog(
+              base64Image: b64,
+              onCropped: (croppedBase64) {
+                setState(() => _b64 = croppedBase64);
+                widget.onChanged(croppedBase64);
+              },
+            ),
+          );
+        }
       }
+    } else if (choice == 'crop' && _b64 != null) {
+      // Show crop dialog
+      await showDialog(
+        context: context,
+        builder: (context) => PhotoCropDialog(
+          base64Image: _b64!,
+          onCropped: (croppedBase64) {
+            setState(() => _b64 = croppedBase64);
+            widget.onChanged(croppedBase64);
+          },
+        ),
+      );
     } else if (choice == 'remove') {
       setState(() => _b64 = null);
       widget.onChanged(null);
@@ -98,29 +130,33 @@ class _ProfilePhotoPickerState extends State<ProfilePhotoPicker> {
       avatar = CircleAvatar(radius: radius, child: const Icon(Icons.person));
     }
 
-    if (widget.buttonBelow) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          avatar,
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: _pickImage,
-            icon: const Icon(Icons.camera_alt, size: 16),
-            label: const Text('Change Photo'),
-          ),
-        ],
-      );
-    }
-
-    return Row(
+    final buttonRow = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        avatar,
-        const SizedBox(width: 12),
         ElevatedButton.icon(
           onPressed: _pickImage,
           icon: const Icon(Icons.camera_alt, size: 16),
           label: const Text('Change Photo'),
+        ),
+      ],
+    );
+
+    if (widget.buttonBelow) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [avatar, const SizedBox(height: 8), buttonRow],
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            avatar,
+            const SizedBox(width: 12),
+            Expanded(child: buttonRow),
+          ],
         ),
       ],
     );

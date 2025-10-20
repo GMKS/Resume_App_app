@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data' as td;
@@ -46,7 +46,7 @@ Future<String> getResumeTips(String resumeContent) async {
       if (line.isNotEmpty) tips.add(line);
     }
   } catch (_) {
-    // Ignore; we’ll provide heuristic tips below
+    // Ignore; weâ€™ll provide heuristic tips below
   }
 
   // 2) Heuristic tips (always available)
@@ -69,7 +69,7 @@ Future<String> getResumeTips(String resumeContent) async {
   // Combine into a readable block
   final buffer = StringBuffer('Smart Tips:\n');
   for (final t in uniqueTips) {
-    buffer.writeln('• $t');
+    buffer.writeln('â€¢ $t');
   }
   return buffer.toString().trim();
 }
@@ -94,7 +94,7 @@ List<String> _heuristicTips(String text) {
   final hasNumbers = RegExp(r'[\d%]').hasMatch(text);
   if (!hasNumbers) {
     tips.add(
-      'Add quantifiable results (e.g., “increased revenue by 15%”, “reduced latency by 200ms”).',
+      'Add quantifiable results (e.g., â€œincreased revenue by 15%â€, â€œreduced latency by 200msâ€).',
     );
   }
 
@@ -122,7 +122,7 @@ List<String> _heuristicTips(String text) {
 
   // Experience bullets
   final bulletCount = RegExp(
-    r'^(\s*[•\-\*])',
+    r'^(\s*[â€¢\-\*])',
     multiLine: true,
   ).allMatches(text).length;
   if (bulletCount < max(2, (wordCount / 200).floor())) {
@@ -133,12 +133,12 @@ List<String> _heuristicTips(String text) {
 
   // Dates format
   if (!RegExp(
-        r'\d{4}\s?[-–]\s?(\d{4}|present)',
+        r'\d{4}\s?[-â€“]\s?(\d{4}|present)',
         caseSensitive: false,
       ).hasMatch(lower) &&
       !RegExp(r'\d{4}-\d{2}').hasMatch(lower)) {
     tips.add(
-      'Use consistent date ranges (e.g., “2023-01 – 2024-06” or “2023 – Present”).',
+      'Use consistent date ranges (e.g., â€œ2023-01 â€“ 2024-06â€ or â€œ2023 â€“ Presentâ€).',
     );
   }
 
@@ -242,7 +242,7 @@ class SmartAssistResult {
     if (enhancedBullets.isNotEmpty) {
       buffer.writeln('\nENHANCED EXPERIENCE:');
       for (final bullet in enhancedBullets) {
-        buffer.writeln('• $bullet');
+        buffer.writeln('â€¢ $bullet');
       }
     }
 
@@ -478,7 +478,7 @@ Map<String, String?> _extractContacts(String text) {
 List<String> _extractSkillsFromText(String skillsBlock) {
   if (skillsBlock.isEmpty) return const [];
   final csv = skillsBlock
-      .split(RegExp(r'[\n,•]'))
+      .split(RegExp(r'[\n,â€¢]'))
       .map((s) => s.trim())
       .where((s) => s.isNotEmpty)
       .toList();
@@ -495,8 +495,10 @@ List<String> _extractBullets(String block) {
   final lines = block.split(RegExp(r'\r?\n'));
   return lines
       .map((l) => l.trim())
-      .where((l) => l.startsWith('•') || l.startsWith('-') || l.startsWith('*'))
-      .map((l) => l.replaceFirst(RegExp(r'^[•\-*]\s*'), ''))
+      .where(
+        (l) => l.startsWith('â€¢') || l.startsWith('-') || l.startsWith('*'),
+      )
+      .map((l) => l.replaceFirst(RegExp(r'^[â€¢\-*]\s*'), ''))
       .where((l) => l.isNotEmpty)
       .toList();
 }
@@ -527,7 +529,7 @@ List<String> _grammarClaritySuggestions(String text) {
   );
   if (passive.hasMatch(text)) {
     out.add(
-      'Reduce passive voice (e.g., “was implemented by”) to active voice.',
+      'Reduce passive voice (e.g., â€œwas implemented byâ€) to active voice.',
     );
   }
   // Long sentences
@@ -612,7 +614,7 @@ String _composeImprovedText({
     b.writeln('EXPERIENCE');
     if (enhancedBullets.isNotEmpty) {
       for (final e in enhancedBullets) {
-        b.writeln('• $e');
+        b.writeln('â€¢ $e');
       }
     } else {
       b.writeln(sections['experience']!.trim());
@@ -865,7 +867,7 @@ String _normalizeForPdf(String input) {
       .replaceAll('\u2014', '-') // em dash
       .replaceAll('\u2019', "'") // right single quote
       .replaceAll('\u2018', "'") // left single quote
-      .replaceAll('\u2022', '•'); // bullet
+      .replaceAll('\u2022', 'â€¢'); // bullet
 }
 
 Future<List<int>> _buildStyledPdfBytes(SmartAssistResult res) async {
@@ -1230,7 +1232,7 @@ List<String> _buildStructuredLines(SmartAssistResult res) {
   if ((res.website ?? '').isNotEmpty) contacts.add(res.website!);
   if ((res.linkedIn ?? '').isNotEmpty) contacts.add(res.linkedIn!);
   if ((res.twitter ?? '').isNotEmpty) contacts.add(res.twitter!);
-  if (contacts.isNotEmpty) lines.add(contacts.join(' • '));
+  if (contacts.isNotEmpty) lines.add(contacts.join(' â€¢ '));
 
   lines.add('');
   lines.add('SUMMARY');
@@ -1252,8 +1254,8 @@ List<String> _buildStructuredLines(SmartAssistResult res) {
       for (final l in raw.split(RegExp(r'\r?\n+'))) {
         final s = l.trim();
         if (s.isEmpty) continue;
-        if (s.startsWith(RegExp(r'[•\-*]\s*'))) {
-          lines.add('- ${s.replaceFirst(RegExp(r'^[•\-*]\s*'), '')}');
+        if (s.startsWith(RegExp(r'[â€¢\-*]\s*'))) {
+          lines.add('- ${s.replaceFirst(RegExp(r'^[â€¢\-*]\s*'), '')}');
         } else {
           lines.add(s);
         }
@@ -1277,4 +1279,512 @@ List<String> _buildStructuredLines(SmartAssistResult res) {
   }
 
   return lines;
+}
+
+class AiService {
+  /// Generates resume data from pasted text.
+  /// Enhanced extraction to capture ALL resume content
+  Future<Map<String, dynamic>> generateResumeFromText(String text) async {
+    // Simulate AI processing delay
+    await Future.delayed(const Duration(seconds: 2));
+
+    print('DEBUG AI Service: Starting text extraction...');
+    print('DEBUG AI Service: Text length: ${text.length} characters');
+
+    final lines = text.split('\n').map((l) => l.trim()).toList();
+    final nonEmptyLines = lines.where((l) => l.isNotEmpty).toList();
+
+    // Extract name (first non-empty line or line before job title)
+    String name = 'Your Name';
+    String jobTitle = '';
+
+    if (nonEmptyLines.isNotEmpty) {
+      name = nonEmptyLines.first;
+      // If second line looks like a job title (all caps or title case), capture it
+      if (nonEmptyLines.length > 1) {
+        final secondLine = nonEmptyLines[1];
+        if (secondLine == secondLine.toUpperCase() ||
+            RegExp(r'^[A-Z][a-z]+ [A-Z]').hasMatch(secondLine)) {
+          jobTitle = secondLine;
+        }
+      }
+    }
+
+    // Extract email
+    final emailRegex = RegExp(r'\b[\w\.-]+@[\w\.-]+\.\w+\b');
+    final email = emailRegex.firstMatch(text)?.group(0) ?? '';
+
+    // Extract phone (multiple patterns)
+    final phoneRegex = RegExp(
+      r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\+\d{1,3}\s?\d{4,}',
+    );
+    final phone = phoneRegex.firstMatch(text)?.group(0) ?? '';
+
+    // Extract location (look for address/city patterns)
+    String location = '';
+    final locationPatterns = [
+      RegExp(
+        r'(?:📍|Location:|Address:)\s*(.+?)(?:\n|$)',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\d+\s+[\w\s]+(?:St\.|Street|Ave|Avenue|Rd|Road|Boulevard|Blvd)[^\n]+',
+        caseSensitive: false,
+      ),
+      RegExp(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?,\s*[A-Z]{2}(?:\s+\d{5})?'),
+    ];
+    for (final pattern in locationPatterns) {
+      final match = pattern.firstMatch(text);
+      if (match != null) {
+        location = match.group(1) ?? match.group(0) ?? '';
+        break;
+      }
+    }
+
+    // Extract LinkedIn
+    final linkedInRegex = RegExp(
+      r'(?:linkedin\.com/in/|@linkedin:)\s*([\w\-]+)',
+      caseSensitive: false,
+    );
+    final linkedInMatch = linkedInRegex.firstMatch(text);
+    final linkedin = linkedInMatch != null
+        ? 'https://linkedin.com/in/${linkedInMatch.group(1)}'
+        : '';
+
+    // Extract sections using flexible patterns
+    Map<String, String> sections = _extractSections(text);
+
+    print('DEBUG AI Service: Extracted sections: ${sections.keys.join(", ")}');
+
+    // Extract summary/profile
+    String summary =
+        sections['PROFILE'] ??
+        sections['SUMMARY'] ??
+        sections['PROFESSIONAL SUMMARY'] ??
+        sections['OBJECTIVE'] ??
+        sections['ABOUT'] ??
+        '';
+
+    print('DEBUG AI Service: Summary length: ${summary.length}');
+
+    // Extract skills
+    String coreSkills =
+        sections['CORE SKILLS'] ??
+        sections['KEY SKILLS'] ??
+        sections['SKILLS'] ??
+        '';
+
+    // Extract technical skills into structured format
+    final technicalSkills = <String, String>{};
+    final techSkillsText =
+        sections['TECHNICAL SKILLS'] ?? sections['TECHNOLOGIES'] ?? '';
+    if (techSkillsText.isNotEmpty) {
+      final categoryLines = techSkillsText.split('\n');
+      for (final line in categoryLines) {
+        if (line.contains(':')) {
+          final parts = line.split(':');
+          if (parts.length == 2) {
+            technicalSkills[parts[0].trim()] = parts[1].trim();
+          }
+        }
+      }
+    }
+
+    // Extract achievements
+    String achievements =
+        sections['ACHIEVEMENTS'] ??
+        sections['AWARDS'] ??
+        sections['HONORS'] ??
+        '';
+
+    // Extract work experience with FULL details
+    final workExperience = _extractWorkExperience(text, sections);
+    print(
+      'DEBUG AI Service: Extracted ${workExperience.length} work experiences',
+    );
+
+    // Extract education
+    final education = _extractEducation(text, sections);
+    print('DEBUG AI Service: Extracted ${education.length} education entries');
+
+    // Extract certifications
+    String certifications =
+        sections['CERTIFICATIONS'] ?? sections['CERTIFICATES'] ?? '';
+
+    // Extract personal details
+    final personalDetails = <String, String>{};
+    final personalDetailsText =
+        sections['PERSONAL DETAILS'] ?? sections['PERSONAL INFORMATION'] ?? '';
+    if (personalDetailsText.isNotEmpty) {
+      final detailLines = personalDetailsText.split('\n');
+      for (final line in detailLines) {
+        if (line.contains(':')) {
+          final parts = line.split(':');
+          if (parts.length == 2) {
+            personalDetails[parts[0].trim()] = parts[1].trim();
+          }
+        }
+      }
+    }
+
+    final extractedData = {
+      'resumeTitle': 'Smart Assist Resume',
+      'personalInfo': {
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'linkedin': linkedin,
+        'location': location,
+      },
+      'jobTitle': jobTitle,
+      'summary': summary,
+      'coreSkills': coreSkills,
+      'technicalSkills': technicalSkills,
+      'skills': coreSkills
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList(),
+      'skillsCsv': coreSkills,
+      'keySkills': coreSkills,
+      'workExperience': workExperience,
+      'workExperiencesJson': '[]',
+      'education': education,
+      'educationsJson': '[]',
+      'certifications': certifications,
+      'achievements': achievements,
+      'personalDetails': personalDetails,
+      'hobbies': sections['HOBBIES'] ?? sections['INTERESTS'] ?? '',
+      // Store full original text for reference
+      'originalText': text,
+    };
+
+    print(
+      'DEBUG AI Service: Extraction complete. Data keys: ${extractedData.keys.join(", ")}',
+    );
+    return extractedData;
+  }
+
+  /// Extract sections from text based on common headings
+  Map<String, String> _extractSections(String text) {
+    final sections = <String, String>{};
+
+    // Common section headers (case-insensitive)
+    final sectionHeaders = [
+      'EDUCATION',
+      'EXPERIENCE',
+      'WORK EXPERIENCE',
+      'PROFESSIONAL EXPERIENCE',
+      'EMPLOYMENT HISTORY',
+      'PROFILE',
+      'SUMMARY',
+      'PROFESSIONAL SUMMARY',
+      'OBJECTIVE',
+      'ABOUT',
+      'SKILLS',
+      'CORE SKILLS',
+      'KEY SKILLS',
+      'TECHNICAL SKILLS',
+      'TECHNOLOGIES',
+      'CERTIFICATIONS',
+      'CERTIFICATES',
+      'ACHIEVEMENTS',
+      'AWARDS',
+      'HONORS',
+      'PROJECTS',
+      'PERSONAL DETAILS',
+      'PERSONAL INFORMATION',
+      'HOBBIES',
+      'INTERESTS',
+      'LANGUAGES',
+    ];
+
+    final lines = text.split('\n');
+    String? currentSection;
+    final sectionContent = <String>[];
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      final upperLine = line.toUpperCase();
+
+      // Check if this line is a section header
+      bool isHeader = false;
+      String? matchedHeader;
+
+      for (final header in sectionHeaders) {
+        if (upperLine == header ||
+            upperLine.startsWith(header) ||
+            (line.length < 30 && upperLine.contains(header))) {
+          isHeader = true;
+          matchedHeader = header;
+          break;
+        }
+      }
+
+      if (isHeader && matchedHeader != null) {
+        // Save previous section
+        if (currentSection != null && sectionContent.isNotEmpty) {
+          sections[currentSection] = sectionContent.join('\n').trim();
+        }
+        // Start new section
+        currentSection = matchedHeader;
+        sectionContent.clear();
+      } else if (currentSection != null && line.isNotEmpty) {
+        // Add to current section
+        sectionContent.add(line);
+      }
+    }
+
+    // Save last section
+    if (currentSection != null && sectionContent.isNotEmpty) {
+      sections[currentSection] = sectionContent.join('\n').trim();
+    }
+
+    return sections;
+  }
+
+  /// Extract work experience with full details
+  List<Map<String, dynamic>> _extractWorkExperience(
+    String text,
+    Map<String, String> sections,
+  ) {
+    final workExperience = <Map<String, dynamic>>[];
+
+    final expText =
+        sections['EXPERIENCE'] ??
+        sections['WORK EXPERIENCE'] ??
+        sections['PROFESSIONAL EXPERIENCE'] ??
+        sections['EMPLOYMENT HISTORY'] ??
+        '';
+
+    if (expText.isEmpty) return workExperience;
+
+    // Split by common job entry patterns
+    final lines = expText.split('\n');
+    Map<String, dynamic>? currentJob;
+    List<String> responsibilities = [];
+    List<Map<String, dynamic>> projects = [];
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+
+      // Check if this is a job title line (usually bold/capitalized)
+      final isJobTitle =
+          line == line.toUpperCase() ||
+          RegExp(r'^[A-Z][a-z]+ [A-Z]').hasMatch(line) ||
+          line.contains('Engineer') ||
+          line.contains('Manager') ||
+          line.contains('Developer') ||
+          line.contains('Designer') ||
+          line.contains('Analyst') ||
+          line.contains('Specialist');
+
+      if (isJobTitle &&
+          !line.contains('•') &&
+          !line.contains('-') &&
+          line.length < 100) {
+        // Save previous job
+        if (currentJob != null) {
+          currentJob['responsibilities'] = responsibilities;
+          currentJob['projects'] = projects;
+          workExperience.add(currentJob);
+        }
+
+        // Start new job
+        currentJob = {
+          'role': line,
+          'company': '',
+          'location': '',
+          'start': '',
+          'end': '',
+          'duration': '',
+          'currentlyWorking': false,
+          'teamSize': '',
+          'tools': '',
+        };
+        responsibilities = [];
+        projects = [];
+
+        // Next line might be company | location
+        if (i + 1 < lines.length) {
+          final nextLine = lines[i + 1].trim();
+          if (nextLine.contains('|')) {
+            final parts = nextLine.split('|');
+            currentJob['company'] = parts[0].trim();
+            if (parts.length > 1) {
+              currentJob['location'] = parts[1].trim();
+            }
+          } else {
+            currentJob['company'] = nextLine;
+          }
+        }
+
+        // Line after might be duration
+        if (i + 2 < lines.length) {
+          final durationLine = lines[i + 2].trim();
+          if (RegExp(r'\d{4}').hasMatch(durationLine) ||
+              durationLine.toLowerCase().contains('present') ||
+              durationLine.toLowerCase().contains('current')) {
+            currentJob['duration'] = durationLine;
+            currentJob['currentlyWorking'] =
+                durationLine.toLowerCase().contains('present') ||
+                durationLine.toLowerCase().contains('current');
+          }
+        }
+      } else if (currentJob != null) {
+        // This is a responsibility or project detail
+        if (line.startsWith('•') ||
+            line.startsWith('-') ||
+            line.startsWith('*')) {
+          responsibilities.add(line.replaceFirst(RegExp(r'^[•\-\*]\s*'), ''));
+        } else if (!line.contains('|') && !RegExp(r'\d{4}').hasMatch(line)) {
+          // Continuation of previous responsibility or additional detail
+          if (responsibilities.isNotEmpty) {
+            responsibilities[responsibilities.length - 1] += ' $line';
+          } else {
+            responsibilities.add(line);
+          }
+        }
+      }
+    }
+
+    // Save last job
+    if (currentJob != null) {
+      currentJob['responsibilities'] = responsibilities;
+      currentJob['projects'] = projects;
+      workExperience.add(currentJob);
+    }
+
+    return workExperience;
+  }
+
+  /// Extract education with full details
+  List<Map<String, dynamic>> _extractEducation(
+    String text,
+    Map<String, String> sections,
+  ) {
+    final education = <Map<String, dynamic>>[];
+
+    final eduText = sections['EDUCATION'] ?? '';
+    if (eduText.isEmpty) return education;
+
+    final lines = eduText.split('\n');
+    Map<String, String>? currentEdu;
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+
+      // Check if this is a degree line
+      final isDegree =
+          line.contains('degree') ||
+          line.contains('Degree') ||
+          line.contains('Bachelor') ||
+          line.contains('Master') ||
+          line.contains('PhD') ||
+          line.contains('Diploma') ||
+          line.contains('Certificate');
+
+      if (isDegree) {
+        // Save previous education
+        if (currentEdu != null) {
+          education.add(currentEdu);
+        }
+
+        currentEdu = {'degree': line, 'school': '', 'start': '', 'end': ''};
+
+        // Next line is usually school
+        if (i + 1 < lines.length) {
+          final schoolLine = lines[i + 1].trim();
+          if (!RegExp(r'\d{4}').hasMatch(schoolLine)) {
+            currentEdu['school'] = schoolLine;
+          }
+        }
+
+        // Look for year/date
+        if (i + 2 < lines.length) {
+          final yearLine = lines[i + 2].trim();
+          final yearMatch = RegExp(
+            r'(\d{4})\s*-?\s*(\d{4})?',
+          ).firstMatch(yearLine);
+          if (yearMatch != null) {
+            currentEdu['start'] = yearMatch.group(1) ?? '';
+            currentEdu['end'] = yearMatch.group(2) ?? yearMatch.group(1) ?? '';
+          }
+        }
+      }
+    }
+
+    // Save last education
+    if (currentEdu != null) {
+      education.add(currentEdu);
+    }
+
+    return education;
+  }
+
+  // Keep existing methods for backward compatibility
+  Future<String> suggestImprovements(String currentText) async {
+    await Future.delayed(const Duration(seconds: 2));
+    return 'Consider adding quantifiable achievements and action verbs.';
+  }
+
+  Future<Map<String, dynamic>> enhanceSection(
+    String sectionName,
+    String currentContent,
+  ) async {
+    await Future.delayed(const Duration(seconds: 2));
+    return {
+      'enhanced': currentContent,
+      'suggestions': ['Add metrics', 'Use action verbs'],
+    };
+  }
+
+  Future<List<String>> suggestSkills(String jobTitle) async {
+    await Future.delayed(const Duration(seconds: 1));
+    return ['Communication', 'Problem Solving', 'Leadership'];
+  }
+
+  Future<String> generateCoverLetter(Map<String, dynamic> resumeData) async {
+    await Future.delayed(const Duration(seconds: 3));
+    final name = resumeData['name'] ?? 'Applicant';
+    return '''Dear Hiring Manager,
+
+I am writing to express my interest in the position at your company. With my background and skills, I believe I would be a valuable addition to your team.
+
+Best regards,
+$name''';
+  }
+
+  Map<String, dynamic> analyzeTone(String text) {
+    return {
+      'score': 0.8,
+      'suggestions': ['Good professional tone'],
+    };
+  }
+
+  List<String> extractKeywords(String jobDescription) {
+    final words = jobDescription.split(RegExp(r'\s+'));
+    return words.where((w) => w.length > 5).take(10).toList();
+  }
+
+  double calculateMatch(Map<String, dynamic> resume, String jobDescription) {
+    return 0.75;
+  }
+
+  String formatSection(String sectionName, String content) {
+    return '## $sectionName\n\n$content';
+  }
+
+  bool validateContent(String content) {
+    return content.trim().isNotEmpty && content.length > 10;
+  }
+
+  Map<String, dynamic> getStatistics(String text) {
+    return {
+      'wordCount': text.split(RegExp(r'\s+')).length,
+      'characterCount': text.length,
+    };
+  }
 }

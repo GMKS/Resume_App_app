@@ -6,7 +6,13 @@ import '../services/premium_service.dart';
 
 class CreativeResumePreview extends StatelessWidget {
   final SavedResume resume;
-  const CreativeResumePreview({super.key, required this.resume});
+  final String? templateId;
+
+  const CreativeResumePreview({
+    super.key,
+    required this.resume,
+    this.templateId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -66,148 +72,159 @@ class CreativeResumePreview extends StatelessWidget {
         ],
       ),
       body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 900),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 595, // A4 width in logical pixels
+            maxHeight: 842, // A4 height in logical pixels
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: DefaultTextStyle(
+              style: const TextStyle(fontFamily: 'Roboto', color: Colors.black),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 900),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                  border: Border.all(color: Colors.grey.shade300, width: 1),
                 ),
-              ],
-              border: Border.all(color: Colors.grey.shade300, width: 1),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isNarrow = constraints.maxWidth < 700;
-                  final header = Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (photoB64.isNotEmpty) ...[
-                        _buildPhoto(photoB64) ?? const SizedBox.shrink(),
-                        const SizedBox(width: 12),
-                      ],
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name.isEmpty ? resume.title : name,
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
-                                color: accent.shade700,
-                              ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 700;
+                      final header = Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (photoB64.isNotEmpty) ...[
+                            _buildPhoto(photoB64) ?? const SizedBox.shrink(),
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name.isEmpty ? resume.title : name,
+                                  style: TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    color: accent.shade700,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (email.isNotEmpty)
+                                      _contactRow(Icons.email_outlined, email),
+                                    if (phone.isNotEmpty)
+                                      _contactRow(Icons.phone_outlined, phone),
+                                    if (portfolio.isNotEmpty)
+                                      _contactRow(Icons.public, portfolio),
+                                    if (social.isNotEmpty)
+                                      _contactRow(Icons.link, social),
+                                  ],
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 6),
+                          ),
+                        ],
+                      );
+
+                      Widget left() => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (summary.isNotEmpty) ...[
+                            _sectionTitle('CREATIVE SUMMARY'),
+                            Text(summary),
+                            const SizedBox(height: 12),
+                          ],
+                          _sectionTitle('WORK EXPERIENCE'),
+                          for (final w in work) ...[
+                            _jobBlock(w),
+                            const SizedBox(height: 10),
+                          ],
+                          const SizedBox(height: 10),
+                          _sectionTitle('PROJECTS'),
+                          if ((data['projects'] ?? '').toString().isNotEmpty)
+                            _bulletsFromCsv(
+                              (data['projects'] ?? '').toString(),
+                            ),
+                        ],
+                      );
+
+                      Widget right() => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sectionTitle('EDUCATION'),
+                          for (final e in edus) ...[
+                            _eduBlock(e),
+                            const SizedBox(height: 10),
+                          ],
+                          const SizedBox(height: 10),
+                          if (skillsCsv.isNotEmpty) ...[
+                            _sectionTitle('SKILLS'),
+                            _bulletsFromCsv(skillsCsv),
+                            const SizedBox(height: 10),
+                          ],
+                          if (tools.isNotEmpty) ...[
+                            _sectionTitle('TOOLS & SOFTWARE'),
+                            _bulletsFromCsv(tools),
+                            const SizedBox(height: 10),
+                          ],
+                          if (languages.isNotEmpty) ...[
+                            _sectionTitle('LANGUAGES'),
+                            _bulletsFromCsv(languages),
+                            const SizedBox(height: 10),
+                          ],
+                          if (hobbies.isNotEmpty) ...[
+                            _sectionTitle('HOBBIES'),
+                            _bulletsFromCsv(hobbies),
+                            const SizedBox(height: 10),
+                          ],
+                          if (references.isNotEmpty) ...[
+                            _sectionTitle('REFERENCES'),
+                            Text(references),
+                          ],
+                        ],
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          header,
+                          const SizedBox(height: 16),
+                          if (isNarrow)
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (email.isNotEmpty)
-                                  _contactRow(Icons.email_outlined, email),
-                                if (phone.isNotEmpty)
-                                  _contactRow(Icons.phone_outlined, phone),
-                                if (portfolio.isNotEmpty)
-                                  _contactRow(Icons.public, portfolio),
-                                if (social.isNotEmpty)
-                                  _contactRow(Icons.link, social),
+                                left(),
+                                const SizedBox(height: 16),
+                                right(),
+                              ],
+                            )
+                          else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(flex: 2, child: left()),
+                                const SizedBox(width: 24),
+                                Expanded(flex: 1, child: right()),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-
-                  Widget left() => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (summary.isNotEmpty) ...[
-                        _sectionTitle('CREATIVE SUMMARY'),
-                        Text(summary),
-                        const SizedBox(height: 12),
-                      ],
-                      _sectionTitle('WORK EXPERIENCE'),
-                      for (final w in work) ...[
-                        _jobBlock(w),
-                        const SizedBox(height: 10),
-                      ],
-                      const SizedBox(height: 10),
-                      _sectionTitle('PROJECTS'),
-                      if ((data['projects'] ?? '').toString().isNotEmpty)
-                        _bulletsFromCsv((data['projects'] ?? '').toString()),
-                    ],
-                  );
-
-                  Widget right() => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sectionTitle('EDUCATION'),
-                      for (final e in edus) ...[
-                        _eduBlock(e),
-                        const SizedBox(height: 10),
-                      ],
-                      const SizedBox(height: 10),
-                      if (skillsCsv.isNotEmpty) ...[
-                        _sectionTitle('SKILLS'),
-                        _bulletsFromCsv(skillsCsv),
-                        const SizedBox(height: 10),
-                      ],
-                      if (tools.isNotEmpty) ...[
-                        _sectionTitle('TOOLS & SOFTWARE'),
-                        _bulletsFromCsv(tools),
-                        const SizedBox(height: 10),
-                      ],
-                      if (languages.isNotEmpty) ...[
-                        _sectionTitle('LANGUAGES'),
-                        _bulletsFromCsv(languages),
-                        const SizedBox(height: 10),
-                      ],
-                      if (hobbies.isNotEmpty) ...[
-                        _sectionTitle('HOBBIES'),
-                        _bulletsFromCsv(hobbies),
-                        const SizedBox(height: 10),
-                      ],
-                      if (references.isNotEmpty) ...[
-                        _sectionTitle('REFERENCES'),
-                        Text(references),
-                      ],
-                    ],
-                  );
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      header,
-                      const SizedBox(height: 16),
-                      if (isNarrow)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            left(),
-                            const SizedBox(height: 16),
-                            right(),
-                          ],
-                        )
-                      else
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(flex: 2, child: left()),
-                            const SizedBox(width: 24),
-                            Expanded(flex: 1, child: right()),
-                          ],
-                        ),
-                    ],
-                  );
-                },
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),

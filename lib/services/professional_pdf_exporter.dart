@@ -75,7 +75,7 @@ class ProfessionalPdfExporter {
 
     // Parse JSON arrays
     List<Map<String, dynamic>> parseJsonArray(String key) {
-      final raw = data[key] ?? data[key + 'Json'];
+      final raw = data[key] ?? data['${key}Json'];
       if (raw == null) return [];
       try {
         final list = jsonDecode(raw.toString()) as List<dynamic>;
@@ -116,7 +116,9 @@ class ProfessionalPdfExporter {
         if (iso.isEmpty) return '';
         final dt = DateTime.tryParse(iso);
         if (dt == null) return '';
-        return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+        final m = dt.month.toString().padLeft(2, '0');
+        final d = dt.day.toString().padLeft(2, '0');
+        return '$m/$d/${dt.year}';
       }
 
       final start = fmt(startIso);
@@ -443,7 +445,7 @@ class ProfessionalPdfExporter {
             pw.SizedBox(height: 1),
             pw.Text(
               fmtRange(startDate, endDate),
-              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
           ],
           if (description.isNotEmpty) ...[
@@ -491,7 +493,7 @@ class ProfessionalPdfExporter {
             pw.SizedBox(height: 1),
             pw.Text(
               fmtRange(startDate, endDate),
-              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
           ],
         ],

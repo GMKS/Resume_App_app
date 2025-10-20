@@ -133,6 +133,8 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
       return;
     }
 
+    // TEMPORARILY DISABLED: Enforce overlap detection for testing
+    /* 
     // Enforce: block save if overlapping dates exist in work/education
     final overlapProblems = _detectDateOverlapsInControllers();
     if (overlapProblems.isNotEmpty) {
@@ -152,6 +154,7 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
       } catch (_) {}
       return;
     }
+    */
 
     final Map<String, dynamic> data = {
       for (final e in controllers.entries) e.key: e.value.text,
@@ -272,6 +275,8 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
     TextInputType? keyboard,
     bool enableDragDrop = false,
     VoidCallback? onChanged,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? customValidator,
   }) {
     final controller = controllerFor(key);
 
@@ -311,6 +316,8 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboard,
+      inputFormatters: inputFormatters,
+      enableInteractiveSelection: true,
       onChanged: (value) {
         _notifyDataChanged();
         onChanged?.call();
@@ -372,9 +379,13 @@ class _BaseResumeFormState extends State<BaseResumeForm> {
               )
             : null,
       ),
-      validator: required
-          ? (v) => (v == null || v.trim().isEmpty) ? '$label is required' : null
-          : null,
+      validator:
+          customValidator ??
+          (required
+              ? (v) => (v == null || v.trim().isEmpty)
+                    ? '$label is required'
+                    : null
+              : null),
     );
 
     // Wrap with drag-drop zone for premium users

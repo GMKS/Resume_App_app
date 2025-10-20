@@ -257,117 +257,144 @@ class OnePagePdfExporter {
               ),
               // Main panel
               pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    // Top banner to more closely match preview styling
-                    pw.Container(
-                      width: double.infinity,
-                      color: PdfColors.lightBlue,
-                      padding: const pw.EdgeInsets.fromLTRB(20, 18, 20, 14),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          if (name.isNotEmpty)
-                            pw.Text(
-                              name.toUpperCase(),
-                              style: pw.TextStyle(
-                                fontSize: 22,
-                                fontWeight: pw.FontWeight.bold,
-                                letterSpacing: 1.0,
-                              ),
-                            )
-                          else
-                            pw.Text(
-                              ((resume.title.isNotEmpty
-                                      ? resume.title
-                                      : 'RESUME'))
-                                  .toUpperCase(),
-                              style: pw.TextStyle(
-                                fontSize: 22,
-                                fontWeight: pw.FontWeight.bold,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                          if (title.isNotEmpty)
-                            pw.Text(
-                              title,
-                              style: const pw.TextStyle(
-                                fontSize: 11,
-                                color: PdfColors.grey700,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (summary.isNotEmpty) ...[
-                      h('Profile'),
-                      pw.Text(summary, style: const pw.TextStyle(fontSize: 10)),
-                      pw.SizedBox(height: 10),
-                    ],
-                    if (work.isNotEmpty) ...[
-                      h('Professional Experience'),
-                      ...work.map((w) {
-                        final role = (w['jobTitle'] ?? w['role'] ?? '')
-                            .toString();
-                        final company = (w['company'] ?? '').toString();
-                        final location = (w['location'] ?? '').toString();
-                        final range = dateRange(w);
-                        final desc = (w['description'] ?? '').toString();
-                        final bullets = (w['achievements'] is List)
-                            ? (w['achievements'] as List)
-                                  .map((e) => e.toString())
-                                  .toList()
-                            : const <String>[];
-
-                        return pw.Padding(
-                          padding: const pw.EdgeInsets.only(bottom: 12),
-                          child: pw.Column(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            children: [
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(0),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      // Top banner to more closely match preview styling
+                      pw.Container(
+                        width: double.infinity,
+                        color: PdfColors.lightBlue,
+                        padding: const pw.EdgeInsets.fromLTRB(20, 24, 20, 18),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            if (name.isNotEmpty)
                               pw.Text(
-                                role.isNotEmpty ? role : company,
+                                name.toUpperCase(),
                                 style: pw.TextStyle(
+                                  fontSize: 24,
                                   fontWeight: pw.FontWeight.bold,
-                                  fontSize: 11,
+                                  letterSpacing: 1.0,
+                                ),
+                              )
+                            else
+                              pw.Text(
+                                ((resume.title.isNotEmpty
+                                        ? resume.title
+                                        : 'RESUME'))
+                                    .toUpperCase(),
+                                style: pw.TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: pw.FontWeight.bold,
+                                  letterSpacing: 1.0,
                                 ),
                               ),
-                              if (company.isNotEmpty ||
-                                  range.isNotEmpty ||
-                                  location.isNotEmpty)
-                                pw.Text(
-                                  [
-                                    if (company.isNotEmpty) company,
-                                    if (location.isNotEmpty) location,
-                                    if (range.isNotEmpty) range,
-                                  ].join(' • '),
+                            if (title.isNotEmpty)
+                              pw.Padding(
+                                padding: const pw.EdgeInsets.only(top: 4),
+                                child: pw.Text(
+                                  title,
                                   style: const pw.TextStyle(
-                                    fontSize: 9,
+                                    fontSize: 12,
                                     color: PdfColors.grey700,
+                                    letterSpacing: 1.2,
                                   ),
                                 ),
-                              if (desc.isNotEmpty)
-                                pw.Padding(
-                                  padding: const pw.EdgeInsets.only(top: 4),
-                                  child: pw.Text(
-                                    desc,
-                                    style: const pw.TextStyle(fontSize: 10),
-                                  ),
-                                ),
-                              if (bullets.isNotEmpty)
-                                ...bullets.map(
-                                  (b) => pw.Bullet(
-                                    text: b,
-                                    style: const pw.TextStyle(fontSize: 10),
-                                  ),
-                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Content area with proper padding
+                      pw.Container(
+                        padding: const pw.EdgeInsets.fromLTRB(20, 16, 20, 16),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            if (summary.isNotEmpty) ...[
+                              h('Profile'),
+                              pw.Text(
+                                summary,
+                                style: const pw.TextStyle(fontSize: 10),
+                              ),
+                              pw.SizedBox(height: 12),
                             ],
-                          ),
-                        );
-                      }),
+                            if (work.isNotEmpty) ...[
+                              h('Professional Experience'),
+                              ...work.map((w) {
+                                final role = (w['jobTitle'] ?? w['role'] ?? '')
+                                    .toString();
+                                final company = (w['company'] ?? '').toString();
+                                final location = (w['location'] ?? '')
+                                    .toString();
+                                final range = dateRange(w);
+                                final desc = (w['description'] ?? '')
+                                    .toString();
+                                final bullets = (w['achievements'] is List)
+                                    ? (w['achievements'] as List)
+                                          .map((e) => e.toString())
+                                          .toList()
+                                    : const <String>[];
+
+                                return pw.Padding(
+                                  padding: const pw.EdgeInsets.only(bottom: 12),
+                                  child: pw.Column(
+                                    crossAxisAlignment:
+                                        pw.CrossAxisAlignment.start,
+                                    children: [
+                                      pw.Text(
+                                        role.isNotEmpty ? role : company,
+                                        style: pw.TextStyle(
+                                          fontWeight: pw.FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                      if (company.isNotEmpty ||
+                                          range.isNotEmpty ||
+                                          location.isNotEmpty)
+                                        pw.Text(
+                                          [
+                                            if (company.isNotEmpty) company,
+                                            if (location.isNotEmpty) location,
+                                            if (range.isNotEmpty) range,
+                                          ].join(' • '),
+                                          style: const pw.TextStyle(
+                                            fontSize: 9,
+                                            color: PdfColors.grey700,
+                                          ),
+                                        ),
+                                      if (desc.isNotEmpty)
+                                        pw.Padding(
+                                          padding: const pw.EdgeInsets.only(
+                                            top: 4,
+                                          ),
+                                          child: pw.Text(
+                                            desc,
+                                            style: const pw.TextStyle(
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ),
+                                      if (bullets.isNotEmpty)
+                                        ...bullets.map(
+                                          (b) => pw.Bullet(
+                                            text: b,
+                                            style: const pw.TextStyle(
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],

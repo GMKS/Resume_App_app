@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/premium_service.dart';
 import '../services/currency_service.dart';
+import '../widgets/upi_payment_widget.dart';
 
 class PremiumUpgradeScreen extends StatefulWidget {
   final String? sourceFeature;
@@ -13,7 +14,7 @@ class PremiumUpgradeScreen extends StatefulWidget {
 
 class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
   bool _isLoading = false;
-  final String _selectedPlan = 'yearly';
+  String _selectedPlan = 'yearly';
 
   @override
   void initState() {
@@ -163,10 +164,12 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
                             price: CurrencyService.formatPrice('monthly'),
                             period: '/month',
                             isPopular: false,
+                            isSelected: _selectedPlan == 'monthly',
                             isLoading: _isLoading,
                             onTap: _isLoading
                                 ? null
-                                : () => _purchasePlan(context, 'monthly'),
+                                : () =>
+                                      setState(() => _selectedPlan = 'monthly'),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -178,10 +181,12 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
                             period: '/year',
                             discount: 'Save 58%',
                             isPopular: true,
+                            isSelected: _selectedPlan == 'yearly',
                             isLoading: _isLoading,
                             onTap: _isLoading
                                 ? null
-                                : () => _purchasePlan(context, 'yearly'),
+                                : () =>
+                                      setState(() => _selectedPlan = 'yearly'),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -193,13 +198,48 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
                             period: 'one-time',
                             discount: 'Best Value',
                             isPopular: false,
+                            isSelected: _selectedPlan == 'lifetime',
                             isLoading: _isLoading,
                             onTap: _isLoading
                                 ? null
-                                : () => _purchasePlan(context, 'lifetime'),
+                                : () => setState(
+                                    () => _selectedPlan = 'lifetime',
+                                  ),
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _purchasePlan(context, _selectedPlan),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.deepPurple,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                'Purchase ${_selectedPlan.toUpperCase()} Plan',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -236,14 +276,83 @@ class _PremiumUpgradeScreenState extends State<PremiumUpgradeScreen> {
   Future<void> _purchasePlan(BuildContext context, String planType) async {
     setState(() => _isLoading = true);
 
-    // Get product ID
-    final productId = planType; // simple id mapping
+    // Show UPI payment dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Upgrade to Premium - ${planType.toUpperCase()}'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: UpiPaymentWidget(
+              planType: planType,
+              amount: _getPlanAmount(planType),
+              onPaymentStart: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Payment started...')),
+                );
+              },
+              onPaymentSuccess: (result) async {
+                Navigator.of(context).pop(); // Close payment dialog
+                Navigator.of(context).pop(); // Close upgrade screen
+
+                await PremiumService.upgradeToPremium();
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      '🎉 Welcome to Premium! All features unlocked!',
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              onPaymentError: (error) {
+                Navigator.of(context).pop(); // Close payment dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Payment failed: $error'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+
+    setState(() => _isLoading = false);
+  }
+
+  double _getPlanAmount(String planType) {
+    switch (planType) {
+      case 'monthly':
+        return 299.0;
+      case 'yearly':
+        return 1999.0;
+      case 'lifetime':
+        return 4999.0;
+      default:
+        return 299.0;
+    }
+  }
+
+  void _oldPurchaseMethod() async {
+    setState(() => _isLoading = true);
 
     try {
-      final success = await PremiumService.purchasePremium(productId);
+      // Old stub method
+      final success = await PremiumService.purchasePremium(_selectedPlan);
 
       if (success && mounted) {
-        Navigator.of(context).pop(); // Close upgrade screen
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('🎉 Welcome to Premium! All features unlocked!'),
@@ -334,6 +443,7 @@ class _PricingCard extends StatelessWidget {
   final String period;
   final String? discount;
   final bool isPopular;
+  final bool isSelected;
   final bool isLoading;
   final VoidCallback? onTap;
 
@@ -343,6 +453,7 @@ class _PricingCard extends StatelessWidget {
     required this.period,
     this.discount,
     required this.isPopular,
+    required this.isSelected,
     required this.isLoading,
     this.onTap,
   });
@@ -354,11 +465,15 @@ class _PricingCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isSelected ? Colors.deepPurple.withOpacity(0.1) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isPopular ? Colors.deepPurple : Colors.grey.shade300,
-            width: isPopular ? 2 : 1,
+            color: isSelected
+                ? Colors.deepPurple
+                : (isPopular
+                      ? Colors.deepPurple.withOpacity(0.5)
+                      : Colors.grey.shade300),
+            width: isSelected ? 3 : (isPopular ? 2 : 1),
           ),
           boxShadow: [
             BoxShadow(
@@ -371,6 +486,14 @@ class _PricingCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (isSelected) ...[
+              const Icon(
+                Icons.check_circle,
+                color: Colors.deepPurple,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
+            ],
             if (discount != null) ...[
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 120),

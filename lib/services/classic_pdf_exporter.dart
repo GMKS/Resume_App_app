@@ -56,7 +56,9 @@ class ClassicPdfExporter {
         if (iso.isEmpty) return '';
         final dt = DateTime.tryParse(iso);
         if (dt == null) return '';
-        return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
+        final m = dt.month.toString().padLeft(2, '0');
+        final d = dt.day.toString().padLeft(2, '0');
+        return '$m/$d/${dt.year}';
       }
 
       final s = fmt(startIso);
@@ -79,6 +81,7 @@ class ClassicPdfExporter {
         ? parseJsonArray('workExperiences')
         : parseJsonArray('workExperiencesJson');
     final edus = parseJsonArray('educations');
+    final customFields = parseJsonArray('customFields');
 
     pw.Widget sectionHeader(String text) => pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -390,6 +393,23 @@ class ClassicPdfExporter {
                     .toList(),
               ),
             );
+          }
+
+          // Custom Fields
+          for (final field in customFields) {
+            final label = (field['label'] ?? '').toString().trim();
+            final content = (field['content'] ?? '').toString().trim();
+            if (label.isEmpty && content.isEmpty) continue;
+            blocks.add(pw.SizedBox(height: 14));
+            if (label.isNotEmpty) {
+              blocks.add(sectionHeader(label));
+              blocks.add(pw.SizedBox(height: 6));
+            }
+            if (content.isNotEmpty) {
+              blocks.add(
+                pw.Text(content, style: const pw.TextStyle(height: 1.3)),
+              );
+            }
           }
 
           return blocks;

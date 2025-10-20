@@ -22,5 +22,17 @@ class AppConfig {
   // Testing Configuration
   static const bool enableTestingMode = false; // Disable for production release
   static const bool bypassPremiumRestrictions =
-      true; // Enable for testing sharing functionality
+      true; // TEMPORARILY ENABLED for testing - Set to false for production
+
+  // API Base URL (override at runtime with --dart-define=API_BASE_URL=...)
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:3000/api',
+  );
+
+  // App version (optionally override with --dart-define=APP_VERSION=...)
+  static const String appVersion = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: '1.0.0',
+  );
 }

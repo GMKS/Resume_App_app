@@ -462,7 +462,7 @@ class _ProfessionalSetupWizardState extends State<ProfessionalSetupWizard> {
               child: Container(
                 width: 16,
                 height: 16,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
                 ),

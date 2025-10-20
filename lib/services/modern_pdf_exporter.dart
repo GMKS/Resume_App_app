@@ -34,6 +34,7 @@ class ModernPdfExporter {
                 d['creativeSummary'] ??
                 '')
             .toString();
+    final jobTitle = (d['jobTitle'] ?? '').toString();
     final skills = _extractSkills(d);
     List<Map<String, dynamic>> work = (d['workExperience'] is List)
         ? List<Map<String, dynamic>>.from(d['workExperience'])
@@ -153,6 +154,17 @@ class ModernPdfExporter {
                           name.isEmpty ? resume.title : name.toUpperCase(),
                           style: h1,
                         ),
+                        if (jobTitle.isNotEmpty) ...[
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            jobTitle,
+                            style: body.copyWith(
+                              fontSize: 11,
+                              color: PdfColors.grey800,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ],
                         if (summary.isNotEmpty) ...[
                           pw.SizedBox(height: 6),
                           pw.Text('PROFESSIONAL SUMMARY', style: h2),
@@ -310,6 +322,13 @@ class ModernPdfExporter {
                                   .map((e) => e.trim())
                                   .where((e) => e.isNotEmpty))
                             bullet(a),
+                          pw.SizedBox(height: 8),
+                        ],
+                        if (d['customFields'] is List &&
+                            (d['customFields'] as List).isNotEmpty) ...[
+                          sectionTitle('ADDITIONAL INFORMATION'),
+                          for (final cf in (d['customFields'] as List))
+                            bullet(cf.toString()),
                           pw.SizedBox(height: 8),
                         ],
                         if (hobbies.isNotEmpty) ...[

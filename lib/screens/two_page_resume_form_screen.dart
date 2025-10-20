@@ -146,6 +146,27 @@ class _TwoPageResumeFormScreenState extends State<TwoPageResumeFormScreen> {
                                   required: true,
                                   keyboard: TextInputType.emailAddress,
                                   enableDragDrop: true,
+                                  customValidator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Email Address is required';
+                                    }
+                                    if (!value.contains('@')) {
+                                      return 'Email must contain @';
+                                    }
+                                    final parts = value.split('@');
+                                    if (parts.length != 2 || parts[1].isEmpty) {
+                                      return 'Invalid email format';
+                                    }
+                                    final domain = parts[1];
+                                    if (!domain.contains('.')) {
+                                      return 'Email must include domain (e.g., gmail.com)';
+                                    }
+                                    final domainParts = domain.split('.');
+                                    if (domainParts.any((p) => p.isEmpty)) {
+                                      return 'Invalid domain format';
+                                    }
+                                    return null;
+                                  },
                                 ) ??
                                 const SizedBox(),
                             formState?.buildTextField(

@@ -188,7 +188,8 @@ class _ModernTemplateSelectionScreenState
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 0.85,
+                  childAspectRatio:
+                      0.75, // Adjusted from 0.85 to give more height
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
@@ -229,8 +230,10 @@ class _ModernTemplateSelectionScreenState
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(12), // Reduced from 16
                         child: Column(
+                          mainAxisSize:
+                              MainAxisSize.min, // Added to prevent overflow
                           children: [
                             // Color Preview
                             Expanded(

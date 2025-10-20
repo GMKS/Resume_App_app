@@ -118,10 +118,17 @@ class ColorfulMinimalPdfExporter {
     PdfColor primaryColor,
     PdfColor backgroundColor,
   ) {
-    final name = resume.data['name'] ?? 'Your Name';
-    final jobTitle = resume.data['jobTitle'] ?? resume.data['title'] ?? '';
-    final email = resume.data['email'] ?? '';
-    final phone = resume.data['phone'] ?? '';
+    // Extract from personalInfo first, then fallback to root
+    final personalInfo =
+        resume.data['personalInfo'] as Map<String, dynamic>? ?? {};
+    final name = (personalInfo['name'] ?? resume.data['name'] ?? 'Your Name')
+        .toString();
+    final jobTitle = (resume.data['jobTitle'] ?? resume.data['title'] ?? '')
+        .toString();
+    final email = (personalInfo['email'] ?? resume.data['email'] ?? '')
+        .toString();
+    final phone = (personalInfo['phone'] ?? resume.data['phone'] ?? '')
+        .toString();
 
     return pw.Container(
       height: 140,
@@ -223,9 +230,18 @@ class ColorfulMinimalPdfExporter {
     PdfColor textColor,
     PdfColor accentColor,
   ) {
-    final linkedin = resume.data['linkedIn'] ?? resume.data['linkedin'] ?? '';
-    final website = resume.data['website'] ?? '';
-    final address = resume.data['address'] ?? '';
+    final personalInfo =
+        resume.data['personalInfo'] as Map<String, dynamic>? ?? {};
+    final linkedin =
+        (personalInfo['linkedin'] ??
+                resume.data['linkedIn'] ??
+                resume.data['linkedin'] ??
+                '')
+            .toString();
+    final website = (personalInfo['website'] ?? resume.data['website'] ?? '')
+        .toString();
+    final address = (personalInfo['address'] ?? resume.data['address'] ?? '')
+        .toString();
 
     final contactItems = <String>[];
     if (linkedin.isNotEmpty) contactItems.add('LinkedIn: $linkedin');
@@ -587,8 +603,27 @@ class ColorfulMinimalPdfExporter {
     final languages = resume.data['languages'] ?? '';
     final hobbies = resume.data['hobbies'] ?? '';
     final certifications = resume.data['certifications'] ?? '';
+    final achievements = resume.data['achievements'] ?? '';
 
-    if (languages.isEmpty && hobbies.isEmpty && certifications.isEmpty) {
+    // Handle custom fields (can be list or string)
+    final customFieldsData = resume.data['customFields'];
+    String customFields = '';
+    if (customFieldsData is List) {
+      customFields = customFieldsData
+          .where((f) => f.toString().trim().isNotEmpty)
+          .join('\n• ');
+      if (customFields.isNotEmpty) {
+        customFields = '• $customFields';
+      }
+    } else if (customFieldsData != null) {
+      customFields = customFieldsData.toString();
+    }
+
+    if (languages.isEmpty &&
+        hobbies.isEmpty &&
+        certifications.isEmpty &&
+        achievements.isEmpty &&
+        customFields.isEmpty) {
       return pw.SizedBox.shrink();
     }
 
@@ -608,10 +643,28 @@ class ColorfulMinimalPdfExporter {
           ),
           pw.SizedBox(height: 16),
         ],
+        if (achievements.isNotEmpty) ...[
+          _buildSimpleSection(
+            'Achievements',
+            achievements,
+            primaryColor,
+            textColor,
+          ),
+          pw.SizedBox(height: 16),
+        ],
         if (hobbies.isNotEmpty) ...[
           _buildSimpleSection(
             'Interests & Hobbies',
             hobbies,
+            primaryColor,
+            textColor,
+          ),
+          pw.SizedBox(height: 16),
+        ],
+        if (customFields.isNotEmpty) ...[
+          _buildSimpleSection(
+            'Additional Information',
+            customFields,
             primaryColor,
             textColor,
           ),

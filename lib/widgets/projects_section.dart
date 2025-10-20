@@ -135,6 +135,7 @@ class _ProjectsSectionState extends State<ProjectsSection> {
                       border: OutlineInputBorder(),
                     ),
                     maxLines: 4,
+                    enableInteractiveSelection: true,
                     onChanged: (value) {
                       _updateProject(
                         index,

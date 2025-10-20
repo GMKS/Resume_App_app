@@ -105,8 +105,18 @@ class _PrewrittenContentScreenState extends State<PrewrittenContentScreen>
         children: [
           // Industry and Experience Level Selectors
           Container(
+            decoration: BoxDecoration(
+              color: Colors.indigo.shade50,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
             padding: const EdgeInsets.all(16),
-            color: Colors.indigo.shade50,
             child: Row(
               children: [
                 Expanded(
@@ -117,6 +127,8 @@ class _PrewrittenContentScreenState extends State<PrewrittenContentScreen>
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
+                    dropdownColor: Colors.white,
+                    isExpanded: true,
                     items: _industries.map((industry) {
                       return DropdownMenuItem(
                         value: industry,
@@ -139,6 +151,8 @@ class _PrewrittenContentScreenState extends State<PrewrittenContentScreen>
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
+                    dropdownColor: Colors.white,
+                    isExpanded: true,
                     items: _experienceLevels.map((level) {
                       return DropdownMenuItem(value: level, child: Text(level));
                     }).toList(),
@@ -152,7 +166,6 @@ class _PrewrittenContentScreenState extends State<PrewrittenContentScreen>
               ],
             ),
           ),
-
           // Content Tabs
           Expanded(
             child: TabBarView(
