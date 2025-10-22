@@ -138,6 +138,22 @@ class MockAuthService {
     return true;
   }
 
+  // Mock GitHub Sign-In
+  Future<bool> signInWithGitHub() async {
+    await Future.delayed(const Duration(seconds: 1));
+
+    const mockEmail = 'user@github.com';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_loggedInKey, mockEmail);
+    await prefs.setString(_loginTypeKey, 'github');
+
+    _email = mockEmail;
+    _loginType = 'github';
+    _mobileNumber = null;
+
+    return true;
+  }
+
   // Logout
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
@@ -169,5 +185,27 @@ class MockAuthService {
     await Future.delayed(const Duration(seconds: 1));
     print('MOCK: Password reset email sent to $email');
     return true;
+  }
+
+  // Complete LinkedIn login with email
+  Future<void> completeLinkedInLogin(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_loggedInKey, email);
+    await prefs.setString(_loginTypeKey, 'linkedin');
+
+    _email = email;
+    _loginType = 'linkedin';
+    _mobileNumber = null;
+  }
+
+  // Complete GitHub login with email
+  Future<void> completeGitHubLogin(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_loggedInKey, email);
+    await prefs.setString(_loginTypeKey, 'github');
+
+    _email = email;
+    _loginType = 'github';
+    _mobileNumber = null;
   }
 }

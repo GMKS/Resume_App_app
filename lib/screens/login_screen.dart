@@ -574,6 +574,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               );
                             },
                           ),
+                          const SizedBox(width: 18),
+                          _socialIconButton(
+                            tooltip: 'Login with GitHub',
+                            color: const Color(0xFF24292E),
+                            icon: Icons.code,
+                            onTap: () async {
+                              final ok = await AuthService.instance
+                                  .signInWithGitHub();
+                              if (!ok) {
+                                _toast('GitHub login failed');
+                              } else {
+                                loggedInNotifier.value = true;
+                              }
+                            },
+                          ),
                         ],
                       ),
                       const SizedBox(height: 24),
