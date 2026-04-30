@@ -1,0 +1,136 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
+import 'package:pdf/pdf.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:resume_builder/core/models/resume_model.dart';
+import 'package:resume_builder/core/services/storage_service.dart';
+import 'package:resume_builder/features/preview/widgets/pdf_templates.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory hiveDir;
+
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    hiveDir = await Directory.systemTemp.createTemp('resume-app-entry-level');
+    Hive.init(hiveDir.path);
+    await StorageService.init();
+  });
+
+  tearDownAll(() async {
+    await Hive.close();
+    if (await hiveDir.exists()) {
+      await hiveDir.delete(recursive: true);
+    }
+  });
+
+  test('generates entry level pdf with the entry level renderer', () async {
+    final now = DateTime(2026, 4, 6);
+    final resume = ResumeModel(
+      id: 'entry-level-pdf-test',
+      title: 'Entry Level Resume',
+      personalInfo: PersonalInfo(
+        fullName: 'John Smith',
+        email: 'john.smith@email.com',
+        phone: '(555) 123-4567',
+        address: 'New York, NY',
+        linkedIn: 'linkedin.com/in/johnsmith',
+        github: 'github.com/johnsmith',
+        website: 'johnsmith.dev',
+        jobTitle: 'Software Engineer',
+      ),
+      objective:
+          'Results-driven professional with expertise in delivering high-quality solutions across web, mobile, and cloud products.',
+      experience: [
+        Experience(
+          id: 'exp-1',
+          company: 'TechCorp',
+          position: 'Senior Developer',
+          location: 'New York, NY',
+          startDate: DateTime(2021, 1, 1),
+          endDate: DateTime(2024, 12, 1),
+          achievements: const [
+            'Led team of 5 to deliver cloud-based platform.',
+            'Built reusable Flutter resume modules for education, projects, and export flows.',
+            'Improved preview accuracy by aligning renderer output with production templates.',
+          ],
+        ),
+        Experience(
+          id: 'exp-2',
+          company: 'Bright Apps',
+          position: 'Software Engineer',
+          location: 'Remote',
+          startDate: DateTime(2019, 6, 1),
+          endDate: DateTime(2020, 12, 1),
+          description:
+              'Delivered responsive product features across mobile and web surfaces.',
+          achievements: const [
+            'Implemented responsive UI patterns and improved accessibility across major screens.',
+            'Collaborated with product and QA teams to ship stable releases on schedule.',
+          ],
+        ),
+      ],
+      education: [
+        Education(
+          id: 'edu-1',
+          institution: 'State University',
+          degree: 'B.Sc.',
+          fieldOfStudy: 'Computer Science Software Engineering',
+          startDate: DateTime(2015, 9, 1),
+          endDate: DateTime(2019, 5, 1),
+        ),
+      ],
+      skills: [
+        Skill(id: 'skill-1', name: 'Flutter'),
+        Skill(id: 'skill-2', name: 'Dart'),
+        Skill(id: 'skill-3', name: 'Firebase'),
+        Skill(id: 'skill-4', name: 'REST APIs'),
+        Skill(id: 'skill-5', name: 'Git'),
+      ],
+      projects: [
+        Project(
+          id: 'project-1',
+          title: 'Portfolio Website',
+          description:
+              'Developed a responsive portfolio site showcasing projects and engineering skills.',
+          url: 'https://portfolio.johnsmith.dev',
+        ),
+        Project(
+          id: 'project-2',
+          title: 'Task Management App',
+          description:
+              'Built a productivity app with task organization, reminders, and collaboration features.',
+          url: 'https://tasks.johnsmith.dev',
+          technologies: ['Flutter', 'Firebase', 'REST'],
+        ),
+      ],
+      certifications: [
+        Certification(
+          id: 'cert-1',
+          name: 'AWS Certified Developer',
+          issuer: 'Amazon',
+        ),
+      ],
+      languages: [
+        Language(id: 'lang-1', name: 'English', proficiency: 'Professional'),
+        Language(id: 'lang-2', name: 'German', proficiency: 'Professional'),
+      ],
+      templateId: 'entry_level',
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await initPdfSettings(resume);
+    final template = PdfTemplateFactory.getTemplate('entry_level');
+    expect(template, isA<EntryLevelResumePdfTemplate>());
+
+    final pdf = await template.generate(resume, PdfColor.fromHex('#7C3AED'));
+    final bytes = await pdf.save();
+
+    expect(bytes, isNotEmpty);
+  });
+}

@@ -1,0 +1,117 @@
+EDUCATION
+MCA Computers
+Holy Jesus and Mary PG College
+2006 - 2009
+BSc Comp.Science
+Computers
+Wesley Degree College
+2000 - 2005
+SKILLS
+Dart
+Java
+GraphQL
+REST APIs
+Unit Testing
+Swift
+SQL
+GMK SEENAI
+HR Consultant
++91 9916750642
+seenaigmk@gmail.com
+Hyderabad, India
+linkedin.com/seenai
+github.com/gmk
+ABOUT ME
+Strategic HR Consultant with expertise in talent management, employee relations, and
+organizational development across diverse industries.
+Proven ability to design and implement HR policies that align with business goals and
+improve workforce performance.
+Experienced in end-to-end recruitment, workforce planning, and onboarding processes to
+enhance talent acquisition efficiency.
+Skilled in performance management systems, driving employee engagement and
+productivity through data-driven HR strategies.
+Strong knowledge of labor laws, compliance, and HR best practices to ensure organizational
+risk mitigation.
+Adept at conflict resolution, employee counseling, and fostering a positive workplace
+culture.
+Expertise in HR analytics, reporting, and decision-making to support leadership with
+actionable insights.
+Demonstrated success in change management initiatives, including organizational
+restructuring and process optimization.
+Proficient in HRIS tools and automation, improving HR operations and reducing manual
+effort.
+Collaborative partner to senior leadership, providing strategic guidance on workforce
+planning and development.
+Worked as Automation Lead.
+EXPERIENCE
+Software Engineer Jan 2022 - Present
+TechNova Solutions | Bangalore, India
+Description:
+Developed scalable web applications using React and Node.js
+Improved API performance by 30% through optimization techniques
+Collaborated with cross-functional teams to deliver new features
+Implemented authentication and security best practices
+Frontend Developer Jun 2020 - Dec 2021
+PixelCraft Labs | Remote
+Description:
+Assisted in developing internal tools using JavaScript
+Fixed bugs and improved application stability
+Learned version control using Git and GitHub
+Participated in agile sprint planning and stand-ups
+Backend Developer Jan 2019 - Feb 2020
+DataBridge Technologies | Hyderabad, India
+Description:
+Developed websites for small businesses and startups
+Customized WordPress themes and plugins
+Improved SEO rankings and website performance
+Delivered projects on time with client satisfaction
+Software Intern Apr 2017 - May 2018
+InnovateX Labs | Pune, India
+Description:
+Designed and developed RESTful APIs using Node.js and Express
+Managed MongoDB database and optimized queries
+Implemented JWT-based authentication and authorization
+Improved server response time by 25%
+PROJECTS
+AI Resume Builder
+Developed a full-stack AI-powered resume builder that allows users to create professional resumes
+instantly.
+Integrated OpenAI APIs for content generation and implemented real-time preview with PDF
+export.
+Improved user experience with dynamic templates and form validation.
+github.com/yourusername/ai-resume-builder
+-commerce Web Application
+Built a scalable e-commerce platform with product listings, cart functionality, and secure checkout.
+Integrated payment gateway and optimized backend APIs, improving response time by 30%.
+Implemented authentication and admin dashboard for inventory a scalable e-commerce platform
+with product listings, cart functionality, and secure checkout.
+Implemented authentication and admin dashboard for inventory management.
+github.com/yourusername/social-dashboard
+management.Built
+CERTIFICATIONS
+ISTQB Certification
+ISTQB Certified Tester Foundation Level
+Issued Apr 2023
+Credential ID: ISTQB-CTFL-2023-45872
+istqb.org/certification-path-root/ctfl.html
+Selenium Certification
+Udemy
+Issued Apr 2023
+Credential ID: UC-SEL-8723645
+udemy.com/certificate/UC-SEL-8723645
+API Testing with Postman Certification
+Postman
+Issued Apr 2026
+Credential ID: POST-API-55678
+academy.postman.com/certificates/POST-API-55678
+AWS Certified Cloud Practitioner
+Amazon Web Services
+Issued Apr 2026
+Credential ID: AWS-CCP-2022-77891
+aws.amazon.com/certification/certified-cloud-practitioner
+LANGUAGES
+Hindi | Professional
+German | Professional
+Danish | Professional
+Norwegian | Professional
+Greek | Professional

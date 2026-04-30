@@ -1,0 +1,8 @@
+{
+  "terminal.integrated.env.windows": {
+    "PATH": "C:\\Flutter\\flutter\\bin;${env:PATH}",
+    "TEMP": "${workspaceFolder}\\.flutter_web_temp",
+    "TMP": "${workspaceFolder}\\.flutter_web_temp"
+  },
+  "dart.flutterSdkPath": "C:\\Flutter\\flutter"
+}

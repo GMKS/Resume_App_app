@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Web (Chrome)",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--web-port=5000"
+      ],
+      "env": {
+        "TEMP": "${workspaceFolder}\\.flutter_web_temp",
+        "TMP": "${workspaceFolder}\\.flutter_web_temp"
+      },
+      "deviceId": "chrome",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "Flutter Android",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "android",
+      "program": "lib/main.dart"
+    }
+  ]
+}

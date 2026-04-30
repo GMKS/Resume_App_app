@@ -1,0 +1,115 @@
+EDUCACION
+MCA Computadoras
+Holy Jesus and Mary PG College
+2006 - 2009
+Licenciatura en Ciencias
+Comp. Computadoras
+Wesley Degree College
+2000 - 2005
+HABILIDADES
+Dart
+Java
+GraphQL
+REST APIs
+Pruebas unitarias
+Swift
+SQL
+GMK SEENAI
+Consultor de RRHH
++91 9916750642
+seenaigmk@gmail.com
+Hyderabad, India
+linkedin.com/seenai
+github.com/gmk
+ABOUT ME
+Consultor estratégico de recursos humanos con experiencia en gestión de talentos,
+relaciones con los empleados y desarrollo organizacional en diversas industrias.
+Capacidad comprobada para diseñar e implementar políticas de recursos humanos que se
+alineen con los objetivos comerciales y mejoren el desempeño de la fuerza laboral.
+Experiencia en procesos de contratación, planificación de la fuerza laboral e incorporación
+de extremo a extremo para mejorar la eficiencia de la adquisición de talento.
+Experto en sistemas de gestión del desempeño, impulsando el compromiso y la
+productividad de los empleados a través de estrategias de recursos humanos basadas en
+datos.
+Sólido conocimiento de las leyes laborales, el cumplimiento y las mejores prácticas de
+recursos humanos para garantizar la mitigación de riesgos organizacionales.
+Experto en resolución de conflictos, asesoramiento a empleados y fomento de una cultura
+laboral positiva.
+Experiencia en análisis, informes y toma de decisiones de recursos humanos para respaldar
+el liderazgo con conocimientos prácticos.
+Éxito demostrado en iniciativas de gestión del cambio, incluida la reestructuración
+organizacional y la optimización de procesos.
+Competente en herramientas y automatización HRIS, mejorando las operaciones de recursos
+humanos y reduciendo el esfuerzo manual.
+Socio colaborador de la alta dirección, que proporciona orientación estratégica sobre la
+planificación y el desarrollo de la fuerza laboral.
+Trabajó como líder de automatización.
+EXPERIENCIA
+Ingeniero de software Jan 2022 - Present
+TechNova Solutions | Bangalore, India
+Descripción: Desarrollé aplicaciones web escalables usando React y Node.js.
+Rendimiento de API mejorado en un 30 % mediante técnicas de optimización Colaboré con equipos
+multifuncionales para ofrecer nuevas funciones.
+Implementación de mejores prácticas de autenticación y seguridad.
+Desarrollador front-end Jun 2020 - Dec 2021
+PixelCraft Labs | Remoto
+Descripción: Asistencia en el desarrollo de herramientas internas utilizando JavaScript.
+Errores corregidos y estabilidad mejorada de la aplicación.
+Control de versiones aprendido usando Git y GitHub Participé en planificación ágil de sprints y
+stand-ups.
+Desarrollador de back-end Jan 2019 - Feb 2020
+DataBridge Technologies | Hyderabad, India
+Descripción: Sitios web desarrollados para pequeñas empresas y nuevas empresas.
+Temas y complementos personalizados de WordPress Clasificación SEO y rendimiento del sitio web
+mejorados Proyectos entregados a tiempo con satisfacción del cliente.
+Pasante de software Apr 2017 - May 2018
+InnovateX Labs | Pune, India
+Descripción: Diseñé y desarrollé API RESTful utilizando Node.js y Express.
+Base de datos MongoDB administrada y consultas optimizadas.
+Se implementó autenticación y autorización basada en JWT.
+Tiempo de respuesta del servidor mejorado en un 25%
+PROYECTOS
+AI Resume Builder
+Desarrollé un creador de currículums completo con tecnología de inteligencia artificial que permite
+a los usuarios crear currículums profesionales al instante.
+API de OpenAI integradas para la generación de contenido y vista previa en tiempo real
+implementada con exportación de PDF.
+Experiencia de usuario mejorada con plantillas dinámicas y validación de formularios.
+github.com/yourusername/ai-resume-builder
+-commerce Web Application
+Creó una plataforma de comercio electrónico escalable con listados de productos, funcionalidad de
+carrito y pago seguro.
+Pasarela de pago integrada y API de backend optimizadas, mejorando el tiempo de respuesta en un
+30%.
+Implementé un panel de administración y autenticación para la gestión de inventario.
+Creé una plataforma de comercio electrónico escalable con listados de productos, funcionalidad de
+carrito y pago seguro.
+Panel de administración y autenticación implementado para la gestión de inventario.
+github.com/yourusername/social-dashboard
+CERTIFICACIONES
+ISTQB Certification
+ISTQB Certified Tester Foundation Level
+Issued Apr 2023
+Credential ID: ISTQB-CTFL-2023-45872
+istqb.org/certification-path-root/ctfl.html
+Selenium Certification
+Udemy
+Issued Apr 2023
+Credential ID: UC-SEL-8723645
+udemy.com/certificate/UC-SEL-8723645
+API Testing with Postman Certification
+Postman
+Issued Apr 2026
+Credential ID: POST-API-55678
+academy.postman.com/certificates/POST-API-55678
+AWS Certified Cloud Practitioner
+Amazon Web Services
+Issued Apr 2026
+Credential ID: AWS-CCP-2022-77891
+aws.amazon.com/certification/certified-cloud-practitioner
+IDIOMAS
+hindi | profesional
+alemán | profesional
+danés | profesional
+noruego | profesional
+griego | profesional

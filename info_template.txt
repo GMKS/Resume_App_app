@@ -1,0 +1,259 @@
+﻿
+> class InfographicTemplate extends PdfTemplate {
+    static const PdfColor _canvas = PdfColor.fromInt(0xFFF5F6F2);
+    static const PdfColor _ink = PdfColor.fromInt(0xFF26485A);
+    static const PdfColor _panel = PdfColor.fromInt(0xFFFFFCF8);
+    static const PdfColor _softPanel = PdfColor.fromInt(0xFFE6F1EA);
+    static const PdfColor _warmPanel = PdfColor.fromInt(0xFFF2E1D3);
+    static const PdfColor _skyPanel = PdfColor.fromInt(0xFFDDECF4);
+    static const PdfColor _line = PdfColor.fromInt(0xFFD7E2E7);
+    static const PdfColor _muted = PdfColor.fromInt(0xFF617785);
+  
+    @override
+    Future<pw.Document> generate(ResumeModel resume, PdfColor accentColor) 
+async {
+      _pdfLang = resume.writingLanguage;
+      await _loadUnicodeFontIfNeeded();
+      final pdf = _buildDocument();
+      final warmAccent =
+        _blend(accentColor, const PdfColor.fromInt(0xFF82B3C1), 0.68);
+      final accentSoft = _blend(warmAccent, PdfColors.white, 0.82);
+      final summaryLines = _splitInfographicLines(resume.objective ?? '');
+      final leadExperiences = resume.experience.take(2).toList(growable: 
+false);
+      final overflowExperiences =
+          resume.experience.skip(2).toList(growable: false);
+      final leadProjects = resume.projects.take(2).toList(growable: false);
+      final overflowProjects = resume.projects.skip(2).toList(growable: false);
+      final leadCertifications =
+          resume.certifications.take(2).toList(growable: false);
+      final overflowCertifications =
+          resume.certifications.skip(2).toList(growable: false);
+      final leadLanguages = resume.languages.take(3).toList(growable: false);
+      final overflowLanguages = resume.languages.skip(3).toList(growable: 
+false);
+      final leadSkills = resume.skills.take(4).toList(growable: false);
+      final overflowSkills = resume.skills.skip(4).toList(growable: false);
+  
+      pdf.addPage(
+        pw.Page(
+          pageTheme: pw.PageTheme(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(18),
+            buildBackground: (context) => pw.Container(color: _canvas),
+          ),
+          build: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.SizedBox(height: 12),
+              _buildInfographicHeader(
+                resume,
+                warmAccent,
+                accentSoft,
+                _warmPanel,
+                summaryLines,
+              ),
+              pw.SizedBox(height: 12),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    flex: 3,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _buildCapabilityPanel(
+                          leadSkills,
+                          leadLanguages,
+                          warmAccent,
+                          accentSoft,
+                        ),
+                        pw.SizedBox(height: 10),
+                        _buildFoundationRail(
+                          resume.education.isNotEmpty
+                              ? resume.education.first
+                              : null,
+                          leadCertifications,
+                          warmAccent,
+                          _warmPanel,
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 10),
+                  pw.Expanded(
+                    flex: 5,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _buildCareerPanel(
+                          leadExperiences,
+                          warmAccent,
+                          accentSoft,
+                        ),
+                        pw.SizedBox(height: 10),
+                        _buildProjectAtlas(
+                          leadProjects,
+                          warmAccent,
+                          accentSoft,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+  
+      if (overflowExperiences.isNotEmpty ||
+          overflowProjects.isNotEmpty ||
+          overflowCertifications.isNotEmpty ||
+          overflowLanguages.isNotEmpty ||
+          overflowSkills.isNotEmpty ||
+          resume.education.length > 1) {
+        final sectionOrder = await _loadPdfSectionOrder(resume);
+        final continuationSections = <String, List<pw.Widget>>{};
+  
+        if (overflowExperiences.isNotEmpty) {
+          continuationSections['experience'] = [
+            _buildContinuationHeader('CAREER PATH', warmAccent),
+            ...overflowExperiences
+                .map((exp) => _buildContinuationExperience(exp, warmAccent)),
+          ];
+        }
+        if (resume.education.length > 1) {
+          continuationSections['education'] = [
+            _buildContinuationHeader('EDUCATION', warmAccent),
+            ...resume.education
+                .skip(1)
+                .map((edu) => _buildContinuationEducation(edu)),
+          ];
+        }
+        if (overflowProjects.isNotEmpty) {
+          continuationSections['projects'] = [
+            _buildContinuationHeader('PROJECT SIGNALS', warmAccent),
+            ...overflowProjects
+                .map((project) => _buildContinuationProject(project)),
+          ];
+        }
+        if (overflowSkills.isNotEmpty) {
+          continuationSections['skills'] = [
+            _buildContinuationHeader('ADDITIONAL SKILLS', warmAccent),
+            _buildContinuationPills(
+              overflowSkills.map((skill) => skill.name).toList(growable: 
+false),
+              accentSoft,
+              warmAccent,
+            ),
+          ];
+        }
+        if (overflowCertifications.isNotEmpty) {
+          continuationSections['certifications'] = [
+            _buildContinuationHeader('CREDENTIALS', warmAccent),
+            ...overflowCertifications.map(
+              (cert) => _buildContinuationLine(
+                '${_sanitizePdfText(cert.name)}${cert.issuer.isNotEmpty ? ' - 
+${_sanitizePdfText(cert.issuer)}' : ''}',
+              ),
+            ),
+          ];
+        }
+        if (overflowLanguages.isNotEmpty) {
+          continuationSections['languages'] = [
+            _buildContinuationHeader('LANGUAGES', warmAccent),
+            _buildContinuationPills(
+              overflowLanguages
+                  .map((lang) => _formatLanguage(lang))
+                  .toList(growable: false),
+              _skyPanel,
+              _ink,
+            ),
+          ];
+        }
+  
+        if (continuationSections.isNotEmpty) {
+          final orderedWidgets =
+              _applyPdfSectionOrder(sectionOrder, continuationSections);
+          pdf.addPage(
+            pw.MultiPage(
+              pageTheme: pw.PageTheme(
+                pageFormat: PdfPageFormat.a4,
+                margin: const pw.EdgeInsets.all(22),
+                buildBackground: (context) => pw.Container(color: _canvas),
+              ),
+              build: (context) => orderedWidgets
+                  .map(
+                    (w) => pw.Wrap(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.only(bottom: 6),
+                          child: w,
+                        ),
+                      ],
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          );
+        }
+      }
+  
+      return pdf;
+    }
+  
+    PdfColor _blend(PdfColor a, PdfColor b, double t) {
+      final clamped = t.clamp(0.0, 1.0);
+      return PdfColor(
+        a.red + (b.red - a.red) * clamped,
+        a.green + (b.green - a.green) * clamped,
+        a.blue + (b.blue - a.blue) * clamped,
+        a.alpha + (b.alpha - a.alpha) * clamped,
+      );
+    }
+  
+    List<String> _splitInfographicLines(String text) {
+      final normalized = _sanitizePdfText(text);
+      final lines = normalized
+          .split(RegExp(r'\n+'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .toList(growable: false);
+  
+      final segments = lines.isNotEmpty
+          ? lines
+          : normalized
+              .split(RegExp(r'(?<=[.!?])\s+'))
+              .map((line) => line.trim())
+              .where((line) => line.isNotEmpty)
+              .toList(growable: false);
+  
+      return segments.take(2).toList(growable: false);
+    }
+  
+    String _buildBaseLocation(ResumeModel resume) {
+      if (resume.personalInfo.address.isNotEmpty) {
+        return _sanitizePdfText(resume.personalInfo.address);
+      }
+      if (resume.personalInfo.email.isNotEmpty) {
+        return _sanitizePdfText(resume.personalInfo.email);
+      }
+      return 'Available Remote';
+    }
+  
+    List<String> _buildContactItems(ResumeModel resume) {
+      return [
+        if (resume.personalInfo.phone.isNotEmpty) resume.personalInfo.phone,
+        if (resume.personalInfo.email.isNotEmpty) resume.personalInfo.email,
+        if ((resume.personalInfo.github ?? '').isNotEmpty)
+          resume.personalInfo.github!,
+        if ((resume.personalInfo.website ?? '').isNotEmpty)
+          resume.personalInfo.website!,
+        if ((resume.personalInfo.linkedIn ?? '').isNotEmpty)
+          resume.personalInfo.linkedIn!,
+      ].map(_sanitizePdfText).toList(growable: false);
+    }
+  
+
+
