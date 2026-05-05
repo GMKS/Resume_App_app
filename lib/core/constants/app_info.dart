@@ -2,7 +2,7 @@ class AppInfo {
   const AppInfo._();
 
   static const String appName = 'Resumix AI';
-  static const String supportEmail = 'support@resumebuilder.app';
+    static const String supportEmail = 'seenaigmk@gmail.com';
   static const String legalEmail = 'legal@resumebuilder.app';
   static const String websiteUrl = 'https://gmks.github.io/Resume_App_app/';
   static const String privacyPolicyUrl =
