@@ -56,10 +56,10 @@ No New Dependencies:      Uses existing `http` & `flutter_animate`
 - [x] Verified code compiles (flutter build apk --debug ✓)
 
 ### Phase 2: Configuration 📋 TODO
-- [ ] Get Twilio credentials (Account SID, Auth Token, Service SID)
-- [ ] Update credentials in `twilio_service.dart`
+- [ ] Configure OTP_SEND_URL and OTP_VERIFY_URL
+- [ ] Keep Twilio credentials only in backend secrets
 - [ ] Add auth route to your router
-- [ ] Test with Twilio demo numbers
+- [ ] Test with local debug OTP or backend sandbox
 - [ ] Test with real phone number
 
 ### Phase 3: Production Deployment 🚀 TODO
@@ -73,12 +73,12 @@ No New Dependencies:      Uses existing `http` & `flutter_animate`
 
 ## Quick Reference
 
-### Credential Update Location
-**File**: `lib/core/services/twilio_service.dart` (Lines 4-7)
-```dart
-static const String _accountSid = 'YOUR_TWILIOSID_HERE';
-static const String _authToken = 'YOUR_TOKEN_HERE';
-static const String _verifyServiceSid = 'YOUR_SERVICE_SID_HERE';
+### OTP Configuration Location
+**File**: `.env`
+```env
+OTP_SEND_URL=https://your-backend.example.com/otp/send
+OTP_VERIFY_URL=https://your-backend.example.com/otp/verify
+OTP_DEBUG_CODE=
 ```
 
 ### Router Integration
@@ -177,13 +177,13 @@ The new auth module integrates with:
 ## Next Steps
 
 **Immediate (Day 1):**
-1. Get Twilio account at https://www.twilio.com
-2. Create Verify Service
-3. Update credentials in code
+1. Deploy backend OTP endpoints
+2. Keep Twilio secrets in backend storage
+3. Set `OTP_SEND_URL` and `OTP_VERIFY_URL`
 4. Add route to router
 
 **Testing (Day 2):**
-1. Test with Twilio demo numbers
+1. Test with local debug OTP
 2. Test with real phone
 3. Verify SMS delivery
 4. Check animations on device

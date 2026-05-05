@@ -408,14 +408,13 @@ User Action
     [x] Code style consistent
     
 [ ] Phase 2: Setup
-    [ ] Get Twilio Account (www.twilio.com)
-    [ ] Create Verify Service
-    [ ] Copy Account SID
-    [ ] Copy Auth Token
-    [ ] Copy Service SID
+       [ ] Deploy backend OTP endpoints
+       [ ] Store Twilio secrets in backend config
+       [ ] Expose send endpoint
+       [ ] Expose verify endpoint
     
 [ ] Phase 3: Configuration
-    [ ] Update twilio_service.dart with credentials
+       [ ] Set OTP_SEND_URL and OTP_VERIFY_URL
     [ ] Add /login route to router
     [ ] Set initialLocation if needed
     [ ] Import auth module in main

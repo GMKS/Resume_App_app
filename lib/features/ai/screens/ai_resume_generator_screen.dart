@@ -428,8 +428,8 @@ class _AIResumeGeneratorScreenState
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'The generated resume will be pre-filled with smart content. '
-                  'You can edit every section in the resume editor.',
+                  'The AI-generated resume will be pre-filled with smart content. '
+                  'Review and edit every section in the resume editor before you use it.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.info),
                 ),
               ),

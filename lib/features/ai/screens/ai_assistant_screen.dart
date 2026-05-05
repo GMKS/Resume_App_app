@@ -183,20 +183,6 @@ class AIAssistantScreen extends ConsumerWidget {
             ).animate().fadeIn(delay: 700.ms).slideX(begin: -0.1, end: 0),
 
             const SizedBox(height: 16),
-
-            _AIFeatureCard(
-              icon: Iconsax.magic_star,
-              title: 'Roast My Resume',
-              description: 'Get a brutally honest AI score and critique of your resume',
-              color: const Color(0xFFEF4444),
-              isLocked: !FreePlanService.canAccessAiTool('resume_roast'),
-              onTap: () => _handleToolTap(
-                context,
-                toolKey: 'resume_roast',
-                route: '/roast-resume',
-              ),
-            ).animate().fadeIn(delay: 775.ms).slideX(begin: -0.1, end: 0),
-            const SizedBox(height: 16),
             _AIFeatureCard(
               icon: Iconsax.magic_star,
               title: 'Resume Auto-Optimization (RAOE 2)',
@@ -204,7 +190,7 @@ class AIAssistantScreen extends ConsumerWidget {
               color: Colors.teal,
               isLocked: false,
               onTap: () => context.push('/raoe2?resumeText=&jobDescription='),
-            ).animate().fadeIn(delay: 850.ms).slideX(begin: -0.1, end: 0),
+            ).animate().fadeIn(delay: 775.ms).slideX(begin: -0.1, end: 0),
           ],
         ),
       ),

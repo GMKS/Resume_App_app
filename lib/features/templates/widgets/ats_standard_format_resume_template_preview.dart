@@ -158,7 +158,7 @@ class AtsStandardFormatResumeTemplatePreview extends StatelessWidget {
         ? entries
         : const [
             AtsStandardProjectEntry(
-              title: 'Resume Builder',
+              title: 'Resumix AI',
               detailLines: [
                 'Built a live preview and export workflow for resume templates.',
               ],

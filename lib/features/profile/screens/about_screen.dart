@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/app_info.dart';
 import '../../../core/theme/app_theme.dart';
 
 class AboutScreen extends StatelessWidget {
@@ -10,13 +11,7 @@ class AboutScreen extends StatelessWidget {
 
   static const String _appVersion = '1.0.0';
   static const String _buildNumber = '1';
-  static const String _appName = 'Resume Builder';
   static const String _developer = 'Seenai GMK';
-  static const String _contactEmail = 'contact@resumebuilder.app';
-  static const String _websiteUrl = 'https://resumebuilder.app';
-  static const String _privacyUrl = 'https://resumebuilder.app/privacy';
-  static const String _playStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.seenaigmk.resumebuilder';
   static const String _linkedinUrl = 'https://linkedin.com';
   static const String _twitterUrl = 'https://twitter.com';
 
@@ -30,8 +25,8 @@ class AboutScreen extends StatelessWidget {
   Future<void> _launchEmail() async {
     final uri = Uri(
       scheme: 'mailto',
-      path: _contactEmail,
-      query: 'subject=Inquiry - Resume Builder App',
+      path: AppInfo.supportEmail,
+      query: 'subject=${Uri.encodeQueryComponent('Inquiry - ${AppInfo.appName} App')}',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -73,7 +68,7 @@ class AboutScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                _appName,
+                AppInfo.appName,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -155,7 +150,7 @@ class AboutScreen extends StatelessWidget {
                                 .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 2),
-                        Text(_contactEmail,
+                        Text(AppInfo.supportEmail,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
@@ -181,9 +176,9 @@ class AboutScreen extends StatelessWidget {
             context,
             icon: Iconsax.global,
             title: 'Visit Website',
-            subtitle: _websiteUrl,
+            subtitle: AppInfo.websiteUrl,
             delay: 350,
-            onTap: () => _launchUrl(_websiteUrl),
+            onTap: () => _launchUrl(AppInfo.websiteUrl),
           ),
           _buildLinkTile(
             context,
@@ -191,7 +186,7 @@ class AboutScreen extends StatelessWidget {
             title: 'Privacy Policy',
             subtitle: 'How we handle your data',
             delay: 400,
-            onTap: () => _launchUrl(_privacyUrl),
+            onTap: () => _launchUrl(AppInfo.privacyPolicyUrl),
           ),
           _buildLinkTile(
             context,
@@ -199,7 +194,7 @@ class AboutScreen extends StatelessWidget {
             title: 'Rate Us on Play Store',
             subtitle: 'Your feedback helps us grow',
             delay: 450,
-            onTap: () => _launchUrl(_playStoreUrl),
+            onTap: () => _launchUrl(AppInfo.playStoreUrl),
           ),
 
           const SizedBox(height: 20),

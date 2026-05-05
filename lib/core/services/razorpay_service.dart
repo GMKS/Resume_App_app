@@ -1,95 +1,75 @@
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-import '../models/subscription_model.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RAZORPAY CONFIGURATION
-// Replace _keyId with your actual Razorpay Key ID from:
-// https://dashboard.razorpay.com/app/keys
-// Use rzp_test_... for testing, rzp_live_... for production.
-// ─────────────────────────────────────────────────────────────────────────────
-const String _razorpayKeyId = 'rzp_test_SLWLwXG99kgVa2';
+import '../constants/app_info.dart';
+import '../models/subscription_pricing.dart';
+import '../models/subscription_model.dart';
+import 'app_config_service.dart';
+
+String _readPaymentConfig(String key) {
+  return AppConfigService.read(key);
+}
+
+final String _razorpayKeyId = _readPaymentConfig('RAZORPAY_KEY_ID');
 
 class RazorpayService {
-  late Razorpay _razorpay;
+  Razorpay? _razorpay;
 
   static bool get supportsNativeCheckout => !kIsWeb;
+  static bool get isConfigured => _razorpayKeyId.isNotEmpty;
 
   static bool get isTestMode => _razorpayKeyId.startsWith('rzp_test_');
+
+  static bool get canUseTestActivationFallback => !kReleaseMode && isTestMode;
 
   // Callbacks set by the screen
   void Function(PaymentSuccessResponse)? onSuccess;
   void Function(PaymentFailureResponse)? onFailure;
   void Function(ExternalWalletResponse)? onExternalWallet;
 
-  // Plan details: amount in paise (INR × 100), display price, description
-  static const Map<SubscriptionPlan, Map<String, dynamic>> planDetails = {
-    SubscriptionPlan.weekly: {
-      'displayName': 'Weekly Pro',
-      'displayPrice': '₹499/week',
-      'amount': 49900, // ₹499 in paise
-      'description': '7 days of full premium access',
-    },
-    SubscriptionPlan.monthly: {
-      'displayName': 'Monthly Pro',
-      'displayPrice': '₹849/month',
-      'amount': 84900, // ₹849 in paise
-      'description': '30 days of full premium access',
-    },
-    SubscriptionPlan.quarterly: {
-      'displayName': 'Quarterly Pro',
-      'displayPrice': '₹2,099/3 months',
-      'amount': 209900, // ₹2,099 in paise
-      'description': '90 days of full premium access',
-    },
-    SubscriptionPlan.yearly: {
-      'displayName': 'Yearly Pro',
-      'displayPrice': '₹6,699/year',
-      'amount': 669900, // ₹6,699 in paise
-      'description': '365 days of full premium access',
-    },
-  };
-
   void initialize() {
-    if (!supportsNativeCheckout) {
-      return;
+    final razorpayKey = _razorpayKeyId;
+    if (razorpayKey.isEmpty) {
+      throw Exception('Razorpay Key ID is not configured.');
     }
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentFailure);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+
+    final razorpay = Razorpay();
+    razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    _razorpay = razorpay;
   }
 
   void dispose() {
     if (!supportsNativeCheckout) {
       return;
     }
-    _razorpay.clear();
+    _razorpay?.clear();
   }
 
   /// Opens Razorpay checkout for the given plan.
   /// [userPhone] should be E.164 format e.g. "+919916750642"
-  void openCheckout({
+  bool openCheckout({
     required SubscriptionPlan plan,
+    required SubscriptionPricingOption pricing,
     String? userPhone,
     String? userEmail,
     String? userName,
   }) {
     if (!supportsNativeCheckout) {
-      return;
+      return false;
     }
 
-    final details = planDetails[plan];
-    if (details == null) {
-      return;
+    if (!RazorpayService.isConfigured) {
+      return false;
     }
 
     final options = {
       'key': _razorpayKeyId,
-      'amount': details['amount'], // Amount in paise
-      'currency': 'INR',
-      'name': 'Resume Builder',
-      'description': details['description'],
+      'amount': pricing.price.amountInMinorUnits,
+      'currency': pricing.price.currencyCode,
+      'name': AppInfo.appName,
+      'description': pricing.checkoutDescription,
       'timeout': 300, // 5 minutes
       'prefill': {
         'contact': userPhone ?? '',
@@ -98,7 +78,9 @@ class RazorpayService {
       },
       'notes': {
         'plan': plan.name,
-        'app': 'resume_builder',
+        'app': AppInfo.playStorePackageId,
+        'display_price': pricing.price.formatCurrent(),
+        'currency_code': pricing.price.currencyCode,
       },
       'theme': {
         'color': '#1565C0',
@@ -111,21 +93,22 @@ class RazorpayService {
     };
 
     try {
-      _razorpay.open(options);
+      _razorpay?.open(options);
+      return true;
     } catch (_) {
-      return;
+      return false;
     }
   }
 
-  void _onPaymentSuccess(PaymentSuccessResponse response) {
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
     onSuccess?.call(response);
   }
 
-  void _onPaymentFailure(PaymentFailureResponse response) {
+  void _handlePaymentError(PaymentFailureResponse response) {
     onFailure?.call(response);
   }
 
-  void _onExternalWallet(ExternalWalletResponse response) {
+  void _handleExternalWallet(ExternalWalletResponse response) {
     onExternalWallet?.call(response);
   }
 

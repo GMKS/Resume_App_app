@@ -9,6 +9,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/constants/app_info.dart';
 import '../../../core/models/subscription_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
@@ -219,7 +220,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         fileName: _resumePdfFileName(resume),
         mimeType: 'application/pdf',
         subject: '${resume.personalInfo.fullName} Resume',
-        text: 'PDF resume export from Resume Builder',
+        text: 'PDF resume export from ${AppInfo.appName}',
         preferPrintingOnWeb: true,
       );
       await FreePlanService.recordPdfExport();
@@ -256,7 +257,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         fileName: export.filename,
         mimeType: export.mimeType,
         subject: '${resume.personalInfo.fullName} Resume',
-        text: 'TXT resume export from Resume Builder',
+        text: 'TXT resume export from ${AppInfo.appName}',
       );
     } catch (e) {
       if (mounted) {
@@ -292,7 +293,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         fileName: export.filename,
         mimeType: export.mimeType,
         subject: '${resume.personalInfo.fullName} Resume',
-        text: 'DOCX resume export from Resume Builder',
+        text: 'DOCX resume export from ${AppInfo.appName}',
       );
     } catch (e) {
       if (mounted) {
@@ -522,7 +523,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         fileName: fileName,
         mimeType: 'application/pdf',
         subject: '${resume.personalInfo.fullName} Resume',
-        text: 'Resume PDF from Resume Builder',
+        text: 'Resume PDF from ${AppInfo.appName}',
         preferPrintingOnWeb: true,
       );
     } catch (e) {
@@ -638,36 +639,6 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
                           blurRadius: 10,
                         ),
                       ],
-                    ),
-                  ),
-                if (FreePlanService.shouldShowWatermark)
-                  IgnorePointer(
-                    child: Center(
-                      child: Transform.rotate(
-                        angle: -0.35,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            'Created with Resume Builder App\nUpgrade for watermark-free resumes',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  color: Colors.black.withValues(alpha: 0.18),
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.4,
-                                ),
-                          ),
-                        ),
-                      ),
                     ),
                   ),
               ],

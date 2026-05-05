@@ -98,7 +98,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'login',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
-          child: const TwilioLoginScreen(),
+          child: TwilioLoginScreen(
+            showLoggedOutState:
+                state.uri.queryParameters['loggedOut'] == 'true',
+          ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
@@ -450,6 +453,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/privacy-security',
         name: 'privacy-security',
+        pageBuilder: (context, state) => _slideTransition(
+          state,
+          const PrivacySecurityScreen(),
+        ),
+      ),
+
+      GoRoute(
+        path: '/privacy',
+        name: 'privacy',
         pageBuilder: (context, state) => _slideTransition(
           state,
           const PrivacySecurityScreen(),

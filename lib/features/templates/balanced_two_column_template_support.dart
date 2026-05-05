@@ -404,7 +404,7 @@ class BalancedTwoColumnTemplateSupport {
           if (name.isEmpty) {
             return '';
           }
-          return proficiency.isNotEmpty ? '$name - $proficiency' : name;
+          return proficiency.isNotEmpty ? '$name  |  $proficiency' : name;
         })
         .where((value) => value.isNotEmpty)
         .toList(growable: false);

@@ -2,6 +2,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/resume_model.dart';
+import '../models/subscription_model.dart';
+import 'resume_version_service.dart';
 import 'supabase_sync_service.dart';
 
 class StorageService {
@@ -45,8 +47,7 @@ class StorageService {
       );
     }
     await _resumeBox.put(resume.id, resume);
-    // Also sync to Supabase (cloud backup).
-    SupabaseSyncService.save(resume);
+    // Removed implicit cloud uploads on local save.
   }
 
   static ResumeModel? getResume(String id) {
@@ -60,6 +61,13 @@ class StorageService {
   static bool isPremiumUser() {
     final planName = _prefs.getString('subscription_plan');
     final expiryStr = _prefs.getString('subscription_expiry');
+    final providerName = _prefs.getString('subscription_provider');
+
+    if (providerName == BillingProvider.googlePlay.name) {
+      return planName != null &&
+          planName != SubscriptionPlan.free.name &&
+          (_prefs.getBool('subscription_active') ?? true);
+    }
 
     if (planName == null || planName == 'free' || expiryStr == null) {
       return false;
@@ -82,6 +90,7 @@ class StorageService {
     await _resumeBox.delete(id);
     // Also delete from Supabase.
     SupabaseSyncService.delete(id);
+    ResumeVersionService.deleteAllVersions(id);
   }
 
   static Future<void> deleteAllResumes() async {

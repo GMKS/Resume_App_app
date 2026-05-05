@@ -146,8 +146,8 @@ lib/
 ## 🚀 Quick Navigation
 
 ### For Setup
-1. Get Twilio credentials → [QUICK_START.md](QUICK_START.md#step-1️⃣-get-twilio-credentials-2-min)
-2. Update code → [QUICK_START.md](QUICK_START.md#step-2️⃣-update-code-1-min)
+1. Configure backend OTP endpoints → [QUICK_START.md](QUICK_START.md#step-1️⃣-configure-otp-backend-2-min)
+2. Set app config → [QUICK_START.md](QUICK_START.md#step-2️⃣-update-code-1-min)
 3. Add route → [QUICK_START.md](QUICK_START.md#step-3️⃣-add-route-1-min)
 4. Test → [README.md](README.md#testing)
 

@@ -598,6 +598,7 @@ void _addUserCustomSections({
       bottomSpacing: bottomSpacing,
       headerBuilder: headerBuilder,
     );
+
     if (sectionWrapper != null) {
       sections[section.id] = [
         sectionWrapper(sectionWidgets),
@@ -5169,13 +5170,13 @@ class ProfessionalTemplate extends PdfTemplate {
 /// Legacy inline stub – kept so that existing code compiling against
 /// [ProfessionalTemplate] still works.  Real logic lives in
 /// [ProfessionalResumePdfTemplate].
+// ignore: unused_element
 class _ProfessionalTemplateInline extends PdfTemplate {
   static const PdfColor _paper = PdfColor.fromInt(0xFFF7F8FC);
   static const PdfColor _card = PdfColor.fromInt(0xFFFFFFFF);
   static const PdfColor _ink = PdfColor.fromInt(0xFF243041);
   static const PdfColor _muted = PdfColor.fromInt(0xFF667085);
   static const PdfColor _line = PdfColor.fromInt(0xFFD9E2EC);
-  static const PdfColor _soft = PdfColor.fromInt(0xFFEEF3F8);
 
   @override
   Future<pw.Document> generate(ResumeModel resume, PdfColor accentColor) async {
@@ -5961,7 +5962,6 @@ class _ProfessionalTemplateInline extends PdfTemplate {
 class ModernAestheticTemplate extends PdfTemplate {
   static const PdfColor _darkBrown = PdfColor(0.384, 0.345, 0.337);
   static const PdfColor _muted = PdfColor.fromInt(0xFF777777);
-  static const PdfColor _line = PdfColor.fromInt(0xFFE2DED8);
 
   @override
   Future<pw.Document> generate(ResumeModel resume, PdfColor accentColor) async {

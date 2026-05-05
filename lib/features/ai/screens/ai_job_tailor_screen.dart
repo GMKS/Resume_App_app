@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
+import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/resume_import_service.dart';
 import '../../../core/services/resume_import_mapper.dart';
@@ -16,6 +16,7 @@ import '../../../core/services/storage_service.dart';
 import '../../../core/services/resume_json.dart';
 import '../../../core/services/resume_version_service.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
+import '../../../shared/widgets/ai_review_notice.dart';
 import '../../home/screens/home_screen.dart' show resumesProvider;
 import '../../editor/screens/resume_editor_screen.dart' show currentResumeProvider;
 import '../services/resume_job_match_service.dart';
@@ -160,8 +161,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
   }
 
   Future<void> _loadApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() => _apiKey = prefs.getString('gemini_api_key') ?? '');
+    final apiKey = await AiApiKeyStorageService.read();
+    setState(() => _apiKey = apiKey);
   }
 
   void _loadResumes() {
@@ -534,8 +535,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             onPressed: () async {
               final key = controller.text.trim();
               if (key.isNotEmpty) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('gemini_api_key', key);
+                await AiApiKeyStorageService.save(key);
                 setState(() => _apiKey = key);
               }
               if (ctx.mounted) Navigator.pop(ctx);
@@ -996,6 +996,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
               ),
           ],
         ).animate().fadeIn(),
+        const SizedBox(height: 12),
+        const AiReviewNotice(),
         const SizedBox(height: 12),
 
         if (matchAssessment.isNotEmpty)

@@ -2,21 +2,20 @@
 
 ## 3-Minute Setup
 
-### Step 1️⃣: Get Twilio Credentials (2 min)
+### Step 1️⃣: Configure OTP Backend (2 min)
 ```
-https://www.twilio.com/console
-├─ Copy "Account SID"
-├─ Copy "Auth Token"
-├─ Go: Messaging → Verify → Services
-└─ Create Service → Copy "Service SID"
+Set OTP_SEND_URL and OTP_VERIFY_URL
+├─ Point them to your backend OTP endpoints
+├─ Keep Twilio credentials on the server only
+└─ Optionally set OTP_DEBUG_CODE for local debug testing
 ```
 
 ### Step 2️⃣: Update Code (1 min)
-**Edit:** `lib/core/services/twilio_service.dart` (Lines 4-7)
-```dart
-static const String _accountSid = 'AC...'; // ← Paste Account SID
-static const String _authToken = '...';    // ← Paste Auth Token
-static const String _verifyServiceSid = 'VA...'; // ← Paste Service SID
+**Set in `.env`:**
+```env
+OTP_SEND_URL=https://your-backend.example.com/otp/send
+OTP_VERIFY_URL=https://your-backend.example.com/otp/verify
+OTP_DEBUG_CODE=
 ```
 
 ### Step 3️⃣: Add Route (1 min)
@@ -36,9 +35,9 @@ GoRoute(
 
 ## Test It Now
 
-### Option A: Twilio Demo Numbers (Instant)
+### Option A: Local Debug OTP (Instant)
 ```
-Phone: +15005550006
+Phone: +15551234567
 Code: 123456
 Result: ✓ Login successful
 ```
@@ -123,10 +122,10 @@ lib/
 
 ## Next Steps
 
-1. ✅ Get Twilio account (5 min)
-2. ✅ Update credentials (1 min)
+1. ✅ Configure backend OTP endpoints (5 min)
+2. ✅ Set app config in `.env` (1 min)
 3. ✅ Add route (1 min)
-4. ✅ Test with demo number (1 min)
+4. ✅ Test with local debug code (1 min)
 5. ✅ Test with real phone (1 min)
 6. Ready to deploy! 🚀
 

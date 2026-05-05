@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/constants/app_info.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -86,7 +87,7 @@ class _SplashScreenState extends State<SplashScreen>
               
               // App Name
               Text(
-                'Resume Builder',
+                AppInfo.appName,
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

@@ -134,4 +134,78 @@ void main() {
     expect(loaded.single.company, 'Acme');
     expect(loaded.single.role, 'QA Engineer');
   });
+
+  test('notifier saveJob merges against persisted jobs when state is stale', () async {
+    await StorageService.prefs.setString('sync_device_id', 'device-a');
+
+    final existing = buildJob(
+      id: '1',
+      company: 'Acme',
+      role: 'Flutter Developer',
+    );
+    await service.persistJobs(<JobApplicationRecord>[existing]);
+
+    final notifier = JobTrackerNotifier(service);
+    final added = buildJob(
+      id: '2',
+      company: 'Globex',
+      role: 'SDET',
+    );
+
+    await notifier.saveJob(added);
+    final loaded = await service.loadJobs();
+
+    expect(loaded, hasLength(2));
+    expect(loaded.map((job) => job.company), containsAll(<String>['Acme', 'Globex']));
+    expect(notifier.state.jobs, hasLength(2));
+  });
+
+  test('mergeByMostRecent keeps the newest version per job id', () {
+    final local = service.buildDraft(
+      userId: 'user-1',
+      existingId: 'job-1',
+      company: 'Acme',
+      role: 'QA Engineer',
+      location: 'Remote',
+      status: JobApplicationStatus.saved,
+      notes: 'local',
+      jobDescription: '',
+      parsedSkills: const <String>[],
+      parsedKeywords: const <String>[],
+      createdAt: DateTime(2024, 1, 1),
+      updatedAt: DateTime(2024, 1, 2),
+    );
+    final cloud = service.buildDraft(
+      userId: 'user-1',
+      existingId: 'job-1',
+      company: 'Acme',
+      role: 'QA Engineer',
+      location: 'Remote',
+      status: JobApplicationStatus.applied,
+      notes: 'cloud',
+      jobDescription: '',
+      parsedSkills: const <String>[],
+      parsedKeywords: const <String>[],
+      createdAt: DateTime(2024, 1, 1),
+      updatedAt: DateTime(2024, 1, 3),
+    );
+    final uniqueCloud = buildJob(
+      id: 'job-2',
+      company: 'Globex',
+      role: 'SDET',
+    );
+
+    final merged = service.mergeByMostRecent(
+      localJobs: <JobApplicationRecord>[local],
+      cloudJobs: <JobApplicationRecord>[cloud, uniqueCloud],
+    );
+
+    expect(merged, hasLength(2));
+    expect(merged.firstWhere((job) => job.jobId == 'job-1').notes, 'cloud');
+    expect(
+      merged.firstWhere((job) => job.jobId == 'job-1').status,
+      JobApplicationStatus.applied,
+    );
+    expect(merged.map((job) => job.jobId), containsAll(<String>['job-1', 'job-2']));
+  });
 }

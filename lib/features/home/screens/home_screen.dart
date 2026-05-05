@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/constants/app_info.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/services/free_plan_service.dart';
@@ -237,7 +238,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Resume Builder',
+                              AppInfo.appName,
                               style: Theme.of(context)
                                   .textTheme
                                   .displaySmall

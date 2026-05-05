@@ -268,7 +268,7 @@ class _PhoneEntryWidgetState extends State<PhoneEntryWidget> {
                   elevation: 4,
                 ).copyWith(
                   overlayColor: WidgetStateProperty.all(
-                    Colors.white.withOpacity(0.2),
+                    Colors.white.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Text(
@@ -280,6 +280,16 @@ class _PhoneEntryWidgetState extends State<PhoneEntryWidget> {
                 ),
               ),
             ).animate().slideY(begin: 0.2, duration: const Duration(milliseconds: 600)),
+
+            const SizedBox(height: 12),
+
+            Text(
+              'Phone number is used only for authentication (OTP) and is not stored or shared as a full number after verification. This device keeps only a masked contact label after sign-in.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade600,
+                    height: 1.5,
+                  ),
+            ).animate().fadeIn(duration: const Duration(milliseconds: 400)),
 
             if (_errorText.isNotEmpty) ...[
               const SizedBox(height: 12),

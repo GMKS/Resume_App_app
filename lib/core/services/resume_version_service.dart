@@ -16,6 +16,19 @@ class ResumeVersionService {
   static const _syncCodeKey = 'sync_account_code';
   static const _maxVersionsPerResume = 10;
 
+  static Future<void> _deleteDocumentsInBatches(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    const batchSize = 400;
+    for (var start = 0; start < docs.length; start += batchSize) {
+      final batch = _db.batch();
+      for (final doc in docs.skip(start).take(batchSize)) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+  }
+
   // ── Key Management (reuses sync code logic) ──
 
   static Future<String?> _getSyncCode() async {
@@ -189,6 +202,23 @@ class ResumeVersionService {
       for (final doc in snapshot.docs) {
         await doc.reference.delete();
       }
+    } catch (_) {}
+  }
+
+  static Future<void> deleteAllCloudData() async {
+    try {
+      await _ensureSignedIn();
+      final key = await _activeKey();
+      final rootDoc = _db.collection(_collection).doc(key);
+      final resumeDocs = await rootDoc.collection('resumes').get();
+
+      for (final resumeDoc in resumeDocs.docs) {
+        final versions = await resumeDoc.reference.collection('versions').get();
+        await _deleteDocumentsInBatches(versions.docs);
+        await resumeDoc.reference.delete();
+      }
+
+      await rootDoc.delete();
     } catch (_) {}
   }
 }

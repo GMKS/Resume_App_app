@@ -26,6 +26,19 @@ class SupabaseSyncService {
   static const _prefKey = 'sync_device_id';
   static const _syncCodeKey = 'sync_account_code';
 
+  static Future<void> _deleteDocumentsInBatches(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    const batchSize = 400;
+    for (var start = 0; start < docs.length; start += batchSize) {
+      final batch = _db.batch();
+      for (final doc in docs.skip(start).take(batchSize)) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+  }
+
   // ── Sync Code (user-set, cross-device) ────────────────────────────────────
 
   /// Returns the current sync code, or null if the user hasn't set one yet.
@@ -97,6 +110,13 @@ class SupabaseSyncService {
         .collection(_collection)
         .doc(key)
         .collection('items');
+  }
+
+  static Future<DocumentReference<Map<String, dynamic>>> _collectionDocRef(
+    String collection,
+  ) async {
+    final key = await _activeKey();
+    return _db.collection(collection).doc(key);
   }
 
   // ── Load ───────────────────────────────────────────────────────────────────
@@ -186,6 +206,68 @@ class SupabaseSyncService {
         .toList();
   }
 
+  static Future<String?> manualBackupJsonList({
+    required String collection,
+    required String field,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    if (!FreePlanService.canUseCloudSync) {
+      return FreePlanService.premiumCloudSyncMessage;
+    }
+    try {
+      await ensureSignedIn();
+      final doc = await _collectionDocRef(collection);
+      await doc.set(<String, dynamic>{
+        field: items,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> manualRestoreJsonList({
+    required String collection,
+    required String field,
+  }) async {
+    if (!FreePlanService.canUseCloudSync) {
+      throw Exception(FreePlanService.premiumCloudSyncMessage);
+    }
+    await ensureSignedIn();
+    final doc = await _collectionDocRef(collection);
+    final snapshot = await doc.get();
+    final data = snapshot.data();
+    final rawItems = data?[field];
+    if (rawItems is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    return rawItems
+        .whereType<Map>()
+        .map(
+          (item) => item.map(
+            (key, value) => MapEntry(key.toString(), value),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   /// Returns the active key (sync code if set, otherwise device UUID).
   static Future<String> get currentUserId async => _activeKey();
+
+  static Future<void> deleteAllCloudData() async {
+    try {
+      await ensureSignedIn();
+
+      final key = await _activeKey();
+      final resumesDoc = _db.collection(_collection).doc(key);
+      final resumeItems = await resumesDoc.collection('items').get();
+      await _deleteDocumentsInBatches(resumeItems.docs);
+      await resumesDoc.delete();
+
+      final jobTrackerDoc = _db.collection('job_tracker').doc(key);
+      await jobTrackerDoc.delete();
+    } catch (_) {}
+  }
 }

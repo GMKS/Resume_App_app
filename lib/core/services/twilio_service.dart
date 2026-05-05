@@ -1,88 +1,57 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import 'app_config_service.dart';
+
 class TwilioService {
-  final String accountSid = _readEnv('TWILIO_ACCOUNT_SID');
-  final String authToken = _readEnv('TWILIO_AUTH_TOKEN');
-  final String verifyServiceSid = _readEnv('TWILIO_VERIFY_SERVICE_SID');
+  final String otpSendUrl = AppConfigService.read('OTP_SEND_URL');
+  final String otpVerifyUrl = AppConfigService.read('OTP_VERIFY_URL');
+  final String otpDebugCode = AppConfigService.read('OTP_DEBUG_CODE');
 
-  // Correct Twilio Verify v2 base URL
-  static const String _verifyBaseUrl = 'https://verify.twilio.com/v2';
+  bool get _hasBackend => otpSendUrl.isNotEmpty && otpVerifyUrl.isNotEmpty;
+  bool get _hasDebugOtp => !kReleaseMode && otpDebugCode.isNotEmpty;
 
-  bool get _hasCredentials =>
-      accountSid.isNotEmpty &&
-      authToken.isNotEmpty &&
-      verifyServiceSid.isNotEmpty;
+  bool get supportsWebOtp => _hasBackend || _hasDebugOtp;
 
-  static String _readEnv(String key) {
-    var value = dotenv.env[key]?.trim() ?? '';
-    if (value.endsWith(';')) {
-      value = value.substring(0, value.length - 1).trimRight();
-    }
-    if (value.length >= 2 &&
-        ((value.startsWith("'") && value.endsWith("'")) ||
-            (value.startsWith('"') && value.endsWith('"')))) {
-      value = value.substring(1, value.length - 1);
-    }
-    return value;
-  }
-
-  /// Send OTP via SMS using Twilio Verify Service
+  /// Sends a verification code using the configured backend, or a local debug
+  /// code in non-release builds.
   Future<Map<String, dynamic>> sendOTP(String phoneNumber) async {
-    // Web browsers block direct Twilio API calls due to CORS
-    if (kIsWeb) {
+    if (_hasDebugOtp) {
       return {
-        'success': false,
+        'success': true,
         'message':
-            'SMS OTP is not supported on web. Please use the mobile app.',
+            'Debug OTP is enabled for this build. Use the configured local test code to continue.',
+        'status': 'pending',
       };
     }
 
-    if (!_hasCredentials) {
+    if (!_hasBackend) {
       return {
         'success': false,
-        'message': 'Twilio credentials are missing. Check your .env file.',
+        'message':
+            'Phone verification is not configured for this build. Add OTP_SEND_URL and OTP_VERIFY_URL for real OTP, or OTP_DEBUG_CODE for local testing.',
       };
     }
 
     try {
-      final url = Uri.parse(
-        '$_verifyBaseUrl/Services/$verifyServiceSid/Verifications',
-      );
-
-      final credentials = base64Encode(utf8.encode('$accountSid:$authToken'));
-
       final response = await http.post(
-        url,
+        Uri.parse(otpSendUrl),
         headers: {
-          'Authorization': 'Basic $credentials',
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: {
-          'To': _formatPhoneNumber(phoneNumber),
-          'Channel': 'sms',
-        },
+        body: jsonEncode(<String, dynamic>{
+          'phoneNumber': _formatPhoneNumber(phoneNumber),
+        }),
       );
 
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        return {
-          'success': true,
-          'message': 'OTP sent successfully',
-          'sid': data['sid'],
-        };
-      } else {
-        final error = jsonDecode(response.body);
-        final errorCode = error['code'];
-        return {
-          'success': false,
-          'message': _getTwilioErrorMessage(errorCode),
-          'error': response.body,
-        };
-      }
+      return _normalizeBackendResponse(
+        response,
+        successMessage: 'OTP sent successfully.',
+        failureMessage: 'Failed to send OTP. Try again.',
+        successStatuses: const <String>{'pending', 'approved'},
+      );
     } catch (_) {
       return {
         'success': false,
@@ -96,64 +65,43 @@ class TwilioService {
     String phoneNumber,
     String otpCode,
   ) async {
-    if (kIsWeb) {
+    if (_hasDebugOtp) {
+      final isVerified = otpCode == otpDebugCode;
       return {
-        'success': false,
-        'message':
-            'SMS OTP is not supported on web. Please use the mobile app.',
+        'success': isVerified,
+        'message': isVerified
+            ? 'Debug OTP verified successfully.'
+            : 'Invalid debug OTP. Please try again.',
+        'status': isVerified ? 'approved' : 'pending',
       };
     }
 
-    if (!_hasCredentials) {
+    if (!_hasBackend) {
       return {
         'success': false,
-        'message': 'Twilio credentials are missing. Check your .env file.',
+        'message':
+            'Phone verification is not configured for this build. Add OTP_SEND_URL and OTP_VERIFY_URL for real OTP, or OTP_DEBUG_CODE for local testing.',
       };
     }
 
     try {
-      final url = Uri.parse(
-        '$_verifyBaseUrl/Services/$verifyServiceSid/VerificationCheck',
-      );
-
-      final credentials = base64Encode(utf8.encode('$accountSid:$authToken'));
-
       final response = await http.post(
-        url,
+        Uri.parse(otpVerifyUrl),
         headers: {
-          'Authorization': 'Basic $credentials',
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: {
-          'To': _formatPhoneNumber(phoneNumber),
-          'Code': otpCode,
-        },
+        body: jsonEncode(<String, dynamic>{
+          'phoneNumber': _formatPhoneNumber(phoneNumber),
+          'code': otpCode,
+        }),
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final isVerified = data['status'] == 'approved';
-
-        if (isVerified) {
-          return {
-            'success': true,
-            'message': 'OTP verified successfully',
-            'status': data['status'],
-          };
-        } else {
-          return {
-            'success': false,
-            'message': 'Invalid OTP. Please try again.',
-            'status': data['status'],
-          };
-        }
-      } else {
-        return {
-          'success': false,
-          'message': 'Failed to verify OTP. Try again.',
-          'error': response.body,
-        };
-      }
+      return _normalizeBackendResponse(
+        response,
+        successMessage: 'OTP verified successfully.',
+        failureMessage: 'Invalid OTP. Please try again.',
+        successStatuses: const <String>{'approved'},
+      );
     } catch (_) {
       return {
         'success': false,
@@ -188,23 +136,49 @@ class TwilioService {
     return sendOTP(phoneNumber);
   }
 
-  /// Convert Twilio error codes to user-friendly messages
-  String _getTwilioErrorMessage(dynamic errorCode) {
-    switch (errorCode) {
-      case 60033:
-        return 'This number is not verified on our Twilio trial account.\n\nTo fix: Go to twilio.com → Phone Numbers → Verified Caller IDs and add your number.';
-      case 60200:
-        return 'Invalid phone number format. Please include country code (e.g. +1 234 567 8900).';
-      case 60203:
-        return 'Too many OTP attempts for this number. Please wait 10 minutes and try again.';
-      case 60212:
-        return 'Too many OTP requests. Please wait a moment before requesting a new code.';
-      case 20003:
-        return 'Authentication error. Please check Twilio credentials.';
-      case 20404:
-        return 'Twilio Verify Service not found. Please check your Service SID.';
-      default:
-        return 'Failed to send OTP (code $errorCode). Please try again.';
+  Map<String, dynamic> _normalizeBackendResponse(
+    http.Response response, {
+    required String successMessage,
+    required String failureMessage,
+    Set<String>? successStatuses,
+  }) {
+    final payload = _decodePayload(response.body);
+    final status = payload['status'];
+    final explicitSuccess = payload['success'];
+    final isHttpSuccess =
+        response.statusCode >= 200 && response.statusCode < 300;
+    final isAllowedStatus =
+      status is String && successStatuses != null
+        ? successStatuses.contains(status)
+        : true;
+    final isSuccess = explicitSuccess is bool
+        ? explicitSuccess
+      : isHttpSuccess && (status == null || isAllowedStatus);
+
+    return <String, dynamic>{
+      'success': isSuccess,
+      'message': (payload['message'] as String?)?.trim().isNotEmpty == true
+          ? payload['message']
+          : (isSuccess ? successMessage : failureMessage),
+      if (status != null) 'status': status,
+      if (payload['sid'] != null) 'sid': payload['sid'],
+      if (!isSuccess && response.body.trim().isNotEmpty) 'error': response.body,
+    };
+  }
+
+  Map<String, dynamic> _decodePayload(String responseBody) {
+    if (responseBody.trim().isEmpty) {
+      return <String, dynamic>{};
+    }
+
+    try {
+      final decoded = jsonDecode(responseBody);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      return <String, dynamic>{'message': decoded.toString()};
+    } catch (_) {
+      return <String, dynamic>{'message': responseBody};
     }
   }
 }

@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/storage_service.dart';
 
@@ -77,8 +77,7 @@ class _ResumeStyleConverterScreenState
         return;
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      final apiKey = prefs.getString('gemini_api_key') ?? '';
+      final apiKey = await AiApiKeyStorageService.read();
 
       final resumeJson = _buildResumeMap(resume);
       final result = await AiResumeService.convertResumeStyle(

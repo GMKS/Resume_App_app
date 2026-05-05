@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/data_deletion_service.dart';
 import '../../../core/theme/app_theme.dart';
 
 class PrivacySecurityScreen extends StatefulWidget {
@@ -42,30 +44,44 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   void _showDeleteAccountDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.red),
             SizedBox(width: 8),
-            Text('Delete Account'),
+            Text('Delete My Data'),
           ],
         ),
         content: const Text(
-            'Are you sure you want to delete your account? This action is permanent and cannot be undone. All your resumes and data will be lost.'),
+          'Users can delete their data anytime. Delete the app data stored on this device and remove any synced backups tied to your current sync code or device? This also signs you out.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await DataDeletionService.deleteUserData();
+              if (!mounted) {
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Your app data has been deleted.'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              context.go('/login');
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Delete Data', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -148,8 +164,8 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
           ),
           _buildActionTile(
             icon: Iconsax.trash,
-            title: 'Delete Account',
-            subtitle: 'Permanently remove your account and data',
+            title: 'Delete My Data',
+            subtitle: 'Clear local data and synced app backups anytime',
             iconColor: Colors.red,
             delay: 450,
             onTap: _showDeleteAccountDialog,
@@ -203,7 +219,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             Switch.adaptive(
               value: value,
               onChanged: onChanged,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
             ),
           ],
         ),

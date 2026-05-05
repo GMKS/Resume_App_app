@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 
+import '../../../core/constants/app_info.dart';
 import '../../../core/theme/app_theme.dart';
 
 class TermsConditionsScreen extends StatelessWidget {
@@ -13,7 +14,7 @@ class TermsConditionsScreen extends StatelessWidget {
     _TermsSection(
       title: '1. Acceptance of Terms',
       content:
-          'By downloading, installing, or using the Resume Builder app ("App"), you agree to be bound by these Terms & Conditions. If you do not agree to these terms, please do not use the App.',
+          'By downloading, installing, or using ${AppInfo.appName} ("App"), you agree to be bound by these Terms & Conditions. If you do not agree to these terms, please do not use the App.',
     ),
     _TermsSection(
       title: '2. Use of the App',
@@ -23,17 +24,17 @@ class TermsConditionsScreen extends StatelessWidget {
     _TermsSection(
       title: '3. User Accounts',
       content:
-          'To access some features, you must register using your phone number. You are responsible for maintaining the confidentiality of your account and for all activities that occur under it. You agree to notify us immediately of any unauthorised use of your account.',
+          'To access some features, you may sign in with a verified phone number or a supported social sign-in provider. You are responsible for maintaining the confidentiality of your account and for activities that occur under it. You agree to notify us immediately of any unauthorised use of your account.',
     ),
     _TermsSection(
       title: '4. Intellectual Property',
       content:
-          'All content within the App, including but not limited to text, graphics, icons, templates, and software, is the property of Resume Builder and is protected by applicable intellectual property laws. You may not reproduce, distribute, or create derivative works without explicit written permission.',
+          'All content within the App, including but not limited to text, graphics, icons, templates, and software, is the property of ${AppInfo.appName} and is protected by applicable intellectual property laws. You may not reproduce, distribute, or create derivative works without explicit written permission.',
     ),
     _TermsSection(
       title: '5. Subscription & Payments',
       content:
-          'Some features are available only with a paid subscription. Subscriptions are billed in advance on a monthly or annual basis. Payments are processed securely through Razorpay. You can cancel your subscription at any time; cancellation takes effect at the end of the current billing period. No refunds are provided for partial billing periods.',
+          'Some features are available only with a paid subscription. Subscriptions are billed in advance on the schedule shown in the app and are processed through the billing platform made available on your device. You can cancel at any time, and cancellation takes effect at the end of the current billing period unless applicable law requires otherwise.',
     ),
     _TermsSection(
       title: '6. User Content',
@@ -53,12 +54,12 @@ class TermsConditionsScreen extends StatelessWidget {
     _TermsSection(
       title: '9. Limitation of Liability',
       content:
-          'To the maximum extent permitted by law, Resume Builder shall not be liable for any indirect, incidental, or consequential damages arising out of your use of the App, including loss of data or revenue.',
+          'To the maximum extent permitted by law, ${AppInfo.appName} shall not be liable for indirect, incidental, or consequential damages arising out of your use of the App, including loss of data or revenue.',
     ),
     _TermsSection(
       title: '10. Termination',
       content:
-          'We reserve the right to suspend or terminate your access to the App at any time if you violate these Terms. You may also delete your account at any time from within the App.',
+          'We reserve the right to suspend or terminate your access to the App at any time if you violate these Terms. You may also delete your app data from within the App at any time.',
     ),
     _TermsSection(
       title: '11. Changes to Terms',
@@ -73,7 +74,7 @@ class TermsConditionsScreen extends StatelessWidget {
     _TermsSection(
       title: '13. Contact',
       content:
-          'If you have any questions regarding these Terms & Conditions, please contact us at: legal@resumebuilder.app',
+          'If you have any questions regarding these Terms & Conditions, please contact us at: ${AppInfo.legalEmail}',
     ),
   ];
 
@@ -128,7 +129,7 @@ class TermsConditionsScreen extends StatelessWidget {
           const SizedBox(height: 16),
 
           Text(
-            'Please read these Terms & Conditions carefully before using the Resume Builder application.',
+            'Please read these Terms & Conditions carefully before using ${AppInfo.appName}.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                   height: 1.5,

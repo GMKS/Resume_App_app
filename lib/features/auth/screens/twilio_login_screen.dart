@@ -4,13 +4,19 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:resume_builder/core/services/twilio_service.dart';
+import 'package:resume_builder/core/services/user_session_service.dart';
 import '../widgets/otp_verification_widget.dart';
 import '../widgets/phone_entry_widget.dart';
 import '../widgets/loading_animation_widget.dart';
 import '../widgets/social_login_buttons.dart';
 
 class TwilioLoginScreen extends StatefulWidget {
-  const TwilioLoginScreen({super.key});
+  const TwilioLoginScreen({
+    super.key,
+    this.showLoggedOutState = false,
+  });
+
+  final bool showLoggedOutState;
 
   @override
   State<TwilioLoginScreen> createState() => _TwilioLoginScreenState();
@@ -40,12 +46,12 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
   Future<void> _checkSavedSession() async {
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
-    final phone = prefs.getString('saved_phone') ?? '';
+    final phone = UserSessionService.readStoredContact(prefs);
     if (!mounted) return;
     if (isLoggedIn && phone.isNotEmpty) {
       setState(() {
         _isFlashLoading = true;
-        _savedPhone = phone;
+        _savedPhone = UserSessionService.formatContactForDisplay(phone);
       });
       // Brief flash, then navigate
       await Future.delayed(const Duration(milliseconds: 1800));
@@ -86,7 +92,9 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('OTP sent to your phone'),
+          content: Text(
+            result['message'] as String? ?? 'OTP sent to your phone',
+          ),
           backgroundColor: Colors.green.shade600,
           duration: const Duration(seconds: 2),
         ),
@@ -147,8 +155,7 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
 
         // Save login session for flash login
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('is_logged_in', true);
-        await prefs.setString('saved_phone', _phone);
+        await UserSessionService.persistPhoneSession(prefs, _phone);
 
         // Navigate to dashboard after success
         await Future.delayed(const Duration(seconds: 1));
@@ -186,7 +193,9 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('New OTP sent to your phone'),
+          content: Text(
+            result['message'] as String? ?? 'New OTP sent to your phone',
+          ),
           backgroundColor: Colors.green.shade600,
           duration: const Duration(seconds: 2),
         ),
@@ -225,8 +234,17 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
       return _buildFlashScreen(isDarkMode);
     }
 
-    // On web, show a skip-to-dashboard option since SMS OTP requires mobile
-    if (kIsWeb) {
+    // On web, show preview guidance since SMS OTP requires mobile.
+    if (kIsWeb && !_twilioService.supportsWebOtp) {
+      final title = widget.showLoggedOutState
+          ? 'Logged Out Successfully'
+          : 'Mobile App Required';
+      final description = widget.showLoggedOutState
+          ? 'Your saved session has been cleared on this device. You can stay signed out, or reopen the dashboard in guest web preview mode.'
+          : 'SMS OTP login requires the mobile app.\nYou are currently on web preview.';
+      final buttonLabel = widget.showLoggedOutState
+          ? 'Open Guest Web Preview'
+          : 'Continue to Dashboard (Web Preview)';
       return Scaffold(
         backgroundColor: backgroundColor,
         body: SafeArea(
@@ -245,12 +263,12 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                       Icon(Icons.phone_android, size: 64, color: Colors.blue.shade600),
                       const SizedBox(height: 20),
                       Text(
-                        'Mobile App Required',
+                        title,
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'SMS OTP login requires the mobile app.\nYou are currently on web preview.',
+                        description,
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
                       ),
@@ -265,7 +283,7 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: Text(
-                            'Continue to Dashboard (Web Preview)',
+                            buttonLabel,
                             style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Colors.white),
                           ),
                         ),
@@ -373,6 +391,7 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                   SocialLoginButtons(
                     onResult: ({required bool success, String? errorMsg}) {
                       if (success) {
+                        final router = GoRouter.of(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: const Row(
@@ -387,7 +406,9 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                           ),
                         );
                         Future.delayed(const Duration(milliseconds: 800), () {
-                          if (mounted) context.go('/dashboard');
+                          if (mounted) {
+                            router.go('/dashboard');
+                          }
                         });
                       } else if (errorMsg != null) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -463,11 +484,6 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
   }
 
   Widget _buildFlashScreen(bool isDarkMode) {
-    // Mask phone: +91XXXXX5678 → +91 ••••• 5678
-    final masked = _savedPhone.length > 4
-        ? '${_savedPhone.substring(0, 3)} ••••• ${_savedPhone.substring(_savedPhone.length - 4)}'
-        : _savedPhone;
-
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -519,7 +535,7 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
               const SizedBox(height: 12),
 
               Text(
-                masked,
+                _savedPhone,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.85),
                   fontSize: 18,

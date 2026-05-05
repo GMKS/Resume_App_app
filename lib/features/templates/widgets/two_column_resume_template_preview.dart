@@ -173,7 +173,7 @@ class TwoColumnResumeTemplatePreview extends StatelessWidget {
     if (values.isEmpty) {
       return const [
         _TwoColumnPreviewProject(
-          title: 'Resume Builder',
+          title: 'Resumix AI',
           description:
               'Live preview and export workflow for template-based resumes.',
           url: 'resumebuilder.dev',

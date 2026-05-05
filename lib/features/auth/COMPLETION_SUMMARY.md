@@ -86,21 +86,17 @@ Your **Resume Builder App** now has a fully functional **SMS OTP login system** 
 
 ## 🚀 Quick Integration (3 Steps)
 
-### Step 1: Get Twilio Credentials
-Visit: https://www.twilio.com/console
-```
-1. Copy Account SID
-2. Copy Auth Token
-3. Create Verify Service → Copy Service SID
+### Step 1: Configure OTP Backend
+Set secure backend endpoints in `.env`:
+```env
+OTP_SEND_URL=https://your-backend.example.com/otp/send
+OTP_VERIFY_URL=https://your-backend.example.com/otp/verify
+OTP_DEBUG_CODE=
 ```
 
-### Step 2: Add Credentials
-Edit `lib/core/services/twilio_service.dart` (lines 4-7):
-```dart
-static const String _accountSid = 'AC...'; // Paste your Account SID
-static const String _authToken = '...';    // Paste your Auth Token
-static const String _verifyServiceSid = 'VA...'; // Paste Service SID
-```
+### Step 2: Keep Provider Secrets Off The Client
+Store Twilio credentials in backend secrets only. The app should never contain
+Account SID, Auth Token, or Verify Service SID values.
 
 ### Step 3: Add to Router
 In `lib/core/router/app_router.dart` (adjust path for your setup):
@@ -259,11 +255,11 @@ return {
 
 ## 🎯 Next Steps
 
-1. ✅ **Get Twilio Account**: https://www.twilio.com (free tier available)
-2. ✅ **Update Credentials**: Copy-paste from Twilio Console
-3. ✅ **Test Login Flow**: Use test phone number
-4. ✅ **Deploy to Production**: Use environment variables
-5. ✅ **Monitor in Twilio Console**: Track OTP delivery rates
+1. ✅ **Deploy OTP Backend**: expose secure send/verify endpoints
+2. ✅ **Set App Config**: add `OTP_SEND_URL` and `OTP_VERIFY_URL`
+3. ✅ **Test Login Flow**: use local debug OTP or backend sandbox
+4. ✅ **Deploy to Production**: keep Twilio secrets in backend only
+5. ✅ **Monitor Delivery**: track OTP results in your backend/provider console
 
 ---
 

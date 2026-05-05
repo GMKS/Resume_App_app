@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:intl/intl.dart';
 
+import '../constants/app_info.dart';
 import '../models/resume_model.dart';
 
 class ResumeExportFile {
@@ -352,8 +353,8 @@ class ResumeExportService {
         'xmlns:dcmitype="http://purl.org/dc/dcmitype/" '
         'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
         '<dc:title>$title</dc:title>'
-        '<dc:creator>Resume Builder</dc:creator>'
-        '<cp:lastModifiedBy>Resume Builder</cp:lastModifiedBy>'
+        '<dc:creator>${AppInfo.appName}</dc:creator>'
+        '<cp:lastModifiedBy>${AppInfo.appName}</cp:lastModifiedBy>'
         '<dcterms:created xsi:type="dcterms:W3CDTF">$now</dcterms:created>'
         '<dcterms:modified xsi:type="dcterms:W3CDTF">$now</dcterms:modified>'
         '</cp:coreProperties>';
@@ -417,6 +418,6 @@ class ResumeExportService {
       '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
       '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
       'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
-      '<Application>Resume Builder</Application>'
+      '<Application>${AppInfo.appName}</Application>'
       '</Properties>';
 }

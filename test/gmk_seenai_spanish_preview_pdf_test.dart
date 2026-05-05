@@ -208,6 +208,8 @@ void main() {
         'Designed and developed RESTful APIs using Node.js and Express.':
             'Disene y desarrolle API RESTful utilizando Node.js y Express.',
         'BSc Comp.Science': 'Licenciatura en Ciencias Comp.',
+        'AI Resume Builder': 'Constructor de curriculums con IA',
+        'E-commerce Web Application': 'Aplicacion web de comercio electronico',
         'Unit Testing': 'Pruebas unitarias',
         'ISTQB Certification': 'Certificacion ISTQB',
         'Selenium Certification': 'Certificacion de Selenium',

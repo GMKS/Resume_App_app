@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/constants/app_info.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/data_deletion_service.dart';
+import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_sync_service.dart';
+import '../../../core/services/sync_status_service.dart';
 import '../../../core/utils/cloud_resume_sync.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/feature_gate.dart';
+import '../../career_tools/models/job_tracker_models.dart';
+import '../../career_tools/services/job_tracker_service.dart';
 import '../../home/screens/home_screen.dart' show resumesProvider;
 
 // Theme Mode Provider
@@ -57,7 +63,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final String _appVersion = '1.0.0';
+  final String _appVersion = '1.0.1';
   int _resumeCount = 0;
 
   @override
@@ -175,7 +181,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showDeleteAllDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
@@ -185,21 +191,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
         content: const Text(
-            'Are you sure you want to delete all resumes? This action cannot be undone.'),
+          'Users can delete their data anytime. Delete your resumes, job tracker entries, saved settings, AI preferences, and any synced cloud backup for this app? You will be signed out on this device.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
-              StorageService.deleteAllResumes();
-              Navigator.pop(context);
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await DataDeletionService.deleteUserData();
+              if (!mounted) {
+                return;
+              }
               setState(() => _resumeCount = 0);
+              ref.read(resumesProvider.notifier).loadResumes();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                    content: Text('All data deleted'),
+                    content: Text('Your app data has been deleted.'),
                     backgroundColor: AppColors.success),
               );
+              context.go('/login');
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Delete All'),
@@ -231,7 +242,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   color: Colors.white, size: 40),
             ),
             const SizedBox(height: 16),
-            Text('Resume Builder',
+            Text(AppInfo.appName,
                 style: Theme.of(context)
                     .textTheme
                     .headlineSmall
@@ -241,7 +252,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: const TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 16),
             const Text(
-              'Create professional resumes with ease. Choose from beautiful templates, customize colors, and export to PDF.',
+              'Build polished, ATS-aware resumes with AI assistance, premium templates, and export tools.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary),
             ),
@@ -250,13 +261,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildSocialButton(
-                    Iconsax.global, 'Website', 'https://example.com'),
+                    Iconsax.global, 'Website', AppInfo.websiteUrl),
                 const SizedBox(width: 16),
                 _buildSocialButton(
-                    Iconsax.instagram, 'Instagram', 'https://instagram.com'),
+                    Iconsax.shield_tick, 'Privacy', AppInfo.privacyPolicyUrl),
                 const SizedBox(width: 16),
                 _buildSocialButton(
-                    Iconsax.message, 'Support', 'mailto:support@example.com'),
+                    Iconsax.message,
+                    'Support',
+                    'mailto:${AppInfo.supportEmail}',
+                  ),
               ],
             ),
             const SizedBox(height: 24),
@@ -315,11 +329,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       (
         'Is my data saved automatically?',
-        'Yes, all changes are saved automatically to your device. Data is stored locally and not uploaded to any server.'
+        'Yes, all changes are saved automatically to your device. Resume and job data stay local unless you manually use Backup & Sync or use a feature that clearly requires network processing, such as OTP or AI generation.'
       ),
       (
         'Will I lose my data if I reinstall?',
-        'Yes — reinstalling the app clears all app data. Use "Backup & Sync" (coming soon) to protect your resumes.'
+        'Yes — reinstalling the app clears all app data. Use "Backup & Sync" to protect your resumes and tracked jobs.'
       ),
       (
         'How do I delete a resume?',
@@ -412,33 +426,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            const Text('Last updated: January 2025',
+            const Text('Last updated: February 2026',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 16),
             ...[
               (
-                'Data Collection',
-                'Resume Builder does not collect or transmit any personal data. All resume information you enter is stored locally on your device only.'
+                'Data We Process',
+                'The app stores resume content, portfolio items, job tracker entries, settings, and subscription state locally on your device. Resume and job data stay on this device unless you manually use Backup & Sync. Cloud backup is optional and is not uploaded automatically when you edit a resume.'
               ),
               (
-                'Local Storage',
-                'Your resumes and preferences are saved in your device\'s internal storage using Hive (a local NoSQL database). No data is sent to external servers.'
+                'Cloud Backup Consent',
+                'Resumes are not stored in the cloud without your action. Tapping Backup to Cloud is the explicit action that uploads your current resume and job-tracker data snapshot for cross-device restore.'
               ),
               (
-                'Permissions',
-                'The app may request storage access to export PDF resumes, camera/gallery access for profile photos, and internet access only for optional features like sharing.'
+                'Sign-In And Verification',
+                'Phone numbers are sent to the configured verification provider only to send and verify OTP codes. Phone number is used only for authentication (OTP) and is not stored or shared as a full number after verification. Social sign-in providers may return profile data such as your email, display name, and profile photo. Limited session details such as a masked contact label may be stored locally so you can stay signed in.'
               ),
               (
-                'Third Parties',
-                'We do not sell, trade, or share your personal data with any third parties.'
+                'Data Safety Summary',
+                'Data collected: Phone number\nPurpose: Authentication\nSharing: Not shared\nSecurity: Encrypted in transit'
+              ),
+              (
+                'AI Features',
+                'When you use AI-powered tools, the text you submit can be sent to the configured AI provider so the app can generate suggestions or rewritten content. AI-generated content should always be reviewed before use. The app does not promise interviews, job offers, or guaranteed resume success.'
+              ),
+              (
+                'Permissions And Network Access',
+                'The app may request camera or gallery access for profile photos, file access for import and export actions, and internet access for OTP, AI requests, cloud sync, sign-in, and sharing features.'
+              ),
+              (
+                'Third-Party Services',
+                'The app integrates with a configured OTP delivery provider, Firebase for authentication and cloud sync, optional AI providers for content generation, and platform billing or app-store services for subscriptions. We do not sell your data.'
               ),
               (
                 'Data Deletion',
-                'You can delete all your data at any time via Settings → Delete All Data. Uninstalling the app also removes all stored data.'
+                'Users can delete their data anytime. Use Settings → Delete All Data to remove local app data and request deletion of synced backups tied to your current device or sync code. Uninstalling the app removes local data stored on the device.'
               ),
               (
                 'Contact',
-                'For privacy concerns, contact us at support@example.com'
+                'For privacy concerns, contact us at ${AppInfo.supportEmail}'
               ),
             ].map((item) => Padding(
                   padding: const EdgeInsets.only(bottom: 16),
@@ -457,6 +483,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ],
                   ),
                 )),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.parse(AppInfo.privacyPolicyUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                icon: const Icon(Iconsax.export_1),
+                label: const Text('Open Full Privacy Policy'),
+              ),
+            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -497,13 +537,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            const Text('Effective: January 2025',
+            const Text('Effective: February 2026',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 16),
             ...[
               (
                 'Acceptance',
-                'By using Resume Builder, you agree to these terms. If you do not agree, please uninstall the app.'
+                'By using ${AppInfo.appName}, you agree to these terms. If you do not agree, please stop using the app.'
               ),
               (
                 'License',
@@ -529,7 +569,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 'Changes',
                 'We may update these terms at any time. Continued use of the app constitutes acceptance of updated terms.'
               ),
-              ('Contact', 'Questions? Email us at support@example.com'),
+              ('Contact', 'Questions? Email us at ${AppInfo.supportEmail}'),
             ].map((item) => Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Column(
@@ -612,7 +652,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Iconsax.cloud,
               title: 'Backup & Sync',
               subtitle: FreePlanService.canUseCloudSync
-                  ? 'Back up & restore your resumes'
+                  ? 'Back up & restore resumes and job tracker data'
                   : 'Premium cloud backup across devices',
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -630,7 +670,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Iconsax.trash,
               iconColor: AppColors.error,
               title: 'Delete All Data',
-              subtitle: 'Remove all resumes and settings',
+              subtitle: 'Clear local data and synced app backups',
               onTap: _showDeleteAllDialog,
             ),
 
@@ -641,10 +681,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: 'Rate App',
               subtitle: 'Love the app? Give us 5 stars!',
               onTap: () async {
-                // Opens Play Store page for the app
-                const storeUrl =
-                    'https://play.google.com/store/apps/details?id=com.resumebuilder.app';
-                final uri = Uri.parse(storeUrl);
+                final uri = Uri.parse(AppInfo.playStoreUrl);
                 final messenger = ScaffoldMessenger.of(context);
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -697,7 +734,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: 'We\'re here to help',
               onTap: () async {
                 final uri = Uri.parse(
-                    'mailto:support@example.com?subject=Resume%20Builder%20Support');
+                    'mailto:${AppInfo.supportEmail}?subject=${Uri.encodeComponent('${AppInfo.appName} Support')}');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri);
                 }
@@ -709,8 +746,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: 'Tell your friends about us',
               onTap: () {
                 Share.share(
-                  'Check out this awesome Resume Builder app!\nhttps://play.google.com/store/apps/details?id=com.resumebuilder.app',
-                  subject: 'Resume Builder App',
+                  'Check out ${AppInfo.appName}: smart resume building with AI tools and premium templates.\n${AppInfo.playStoreUrl}',
+                  subject: '${AppInfo.appName} App',
                 );
               },
             ),
@@ -818,6 +855,10 @@ class _BackupSyncSheet extends StatefulWidget {
 }
 
 class _BackupSyncSheetState extends State<_BackupSyncSheet> {
+  static const JobTrackerService _jobTrackerService = JobTrackerService();
+  static const String _jobTrackerCollection = 'job_tracker';
+  static const String _jobTrackerField = 'jobs';
+
   String? _statusMessage;
   bool _inProgress = false;
 
@@ -826,6 +867,9 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
   String? _currentCode; // what's saved in prefs
   String? _deviceId; // per-device fallback UUID
   bool _editingCode = false;
+  String? _lastSyncSummary;
+  DateTime? _lastBackupAt;
+  DateTime? _lastRestoreAt;
 
   @override
   void initState() {
@@ -836,13 +880,36 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
   Future<void> _loadSyncInfo() async {
     final code = await SupabaseSyncService.getSyncCode();
     final deviceId = await SupabaseSyncService.getDeviceId();
+    final syncStatus = await SyncStatusService.load();
     if (mounted) {
       setState(() {
         _currentCode = code;
         _deviceId = deviceId;
+        _lastSyncSummary = syncStatus.lastSummary;
+        _lastBackupAt = syncStatus.lastBackupAt;
+        _lastRestoreAt = syncStatus.lastRestoreAt;
         if (code != null) _codeController.text = code;
       });
     }
+  }
+
+  String _formatSyncTimestamp(DateTime? timestamp) {
+    if (timestamp == null) {
+      return 'Never';
+    }
+    return DateFormat('dd MMM yyyy, hh:mm a').format(timestamp);
+  }
+
+  DateTime? get _lastSyncedAt {
+    final backupAt = _lastBackupAt;
+    final restoreAt = _lastRestoreAt;
+    if (backupAt == null) {
+      return restoreAt;
+    }
+    if (restoreAt == null) {
+      return backupAt;
+    }
+    return backupAt.isAfter(restoreAt) ? backupAt : restoreAt;
   }
 
   @override
@@ -880,13 +947,61 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                     Text('Backup & Sync',
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18)),
-                    Text('Keep your resumes safe across all devices',
+                    Text('Manual cloud sync for resumes and job tracker across devices',
                         style: TextStyle(
                             color: AppColors.textSecondary, fontSize: 13)),
                   ],
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.info.withValues(alpha: 0.18),
+              ),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'How sync works',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '1. Set the same Sync Code on every device you want to connect.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                ),
+                Text(
+                  '2. On the device with your latest changes, tap Backup to Cloud.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                ),
+                Text(
+                  '3. On the other device, tap Restore from Cloud to pull that data down.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                ),
+                Text(
+                  '4. Repeat Backup whenever you make changes. Restore whenever another device needs the newest copy.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Cloud backup and restore are manual. Resume restore is also checked on app launch, but uploads are never pushed automatically in the background.',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.info, height: 1.5),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Resumes stay on this device unless you tap Backup to Cloud. Restore keeps the most recently updated local or cloud version to avoid overwriting newer edits.',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.info, height: 1.5),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -1087,6 +1202,46 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
           ),
           const SizedBox(height: 16),
 
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sync Status',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 10),
+                _buildStatusRow('Last synced', _formatSyncTimestamp(_lastSyncedAt)),
+                const SizedBox(height: 8),
+                _buildStatusRow('Last cloud backup', _formatSyncTimestamp(_lastBackupAt)),
+                const SizedBox(height: 8),
+                _buildStatusRow('Last restore', _formatSyncTimestamp(_lastRestoreAt)),
+                if (_lastSyncSummary != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _lastSyncSummary!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // ── Status message ────────────────────────────────────────────────
           if (_statusMessage != null) ...[
             Container(
@@ -1131,7 +1286,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Iconsax.cloud_add),
-              label: Text(_inProgress ? 'Processing...' : 'Backup to Cloud'),
+              label: Text(_inProgress ? 'Processing...' : 'Manual Backup to Cloud'),
             ),
           ),
           const SizedBox(height: 10),
@@ -1151,27 +1306,88 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
     );
   }
 
+  Widget _buildStatusRow(String label, String value) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _doBackup() async {
     setState(() {
       _inProgress = true;
       _statusMessage = null;
     });
     final resumes = StorageService.getAllResumes();
-    if (resumes.isEmpty) {
+    final jobs = await _jobTrackerService.loadJobs();
+    if (resumes.isEmpty && jobs.isEmpty) {
       setState(() {
         _inProgress = false;
-        _statusMessage = 'ℹ️ No resumes to back up.';
+        _statusMessage = 'ℹ️ No resumes or tracked jobs to back up.';
       });
       return;
     }
-    final error = await SupabaseSyncService.manualBackupAll(resumes);
+
+    final resumeError = resumes.isEmpty
+        ? null
+        : await SupabaseSyncService.manualBackupAll(resumes);
+    final jobError = jobs.isEmpty
+        ? null
+        : await SupabaseSyncService.manualBackupJsonList(
+            collection: _jobTrackerCollection,
+            field: _jobTrackerField,
+            items: jobs.map((job) => job.toMap()).toList(growable: false),
+          );
+
     if (!mounted) return;
     final label = _currentCode != null ? 'code "$_currentCode"' : 'this device';
+    final backedUp = <String>[
+      if (resumeError == null && resumes.isNotEmpty) '${resumes.length} resume(s)',
+      if (jobError == null && jobs.isNotEmpty) '${jobs.length} tracked job(s)',
+    ];
+    final failures = <String>[
+      if (resumeError != null) 'Resumes: $resumeError',
+      if (jobError != null) 'Job tracker: $jobError',
+    ];
+    final nextStatusMessage = failures.isEmpty
+        ? '✅ Backed up ${backedUp.join(' and ')} to $label.'
+        : backedUp.isEmpty
+            ? '❌ ${failures.join('\n')}'
+            : '✅ Backed up ${backedUp.join(' and ')} to $label.\n${failures.join('\n')}';
+    final backupRecordedAt = DateTime.now();
+
+    if (failures.isEmpty || backedUp.isNotEmpty) {
+      await SyncStatusService.recordBackup(
+        nextStatusMessage,
+        at: backupRecordedAt,
+      );
+    } else {
+      await SyncStatusService.recordStatus(nextStatusMessage);
+    }
+
     setState(() {
       _inProgress = false;
-      _statusMessage = error == null
-          ? '✅ ${resumes.length} resume(s) backed up to $label!'
-          : '❌ Backup failed: $error';
+      _statusMessage = nextStatusMessage;
+      _lastSyncSummary = nextStatusMessage;
+      if (failures.isEmpty || backedUp.isNotEmpty) {
+        _lastBackupAt = backupRecordedAt;
+      }
     });
   }
 
@@ -1184,12 +1400,14 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
       final cloudResumes = await SupabaseSyncService.manualRestoreAll();
       int created = 0;
       int updated = 0;
+      int keptLocalResumes = 0;
       for (final resume in cloudResumes) {
         final local = StorageService.getResume(resume.id);
         if (!shouldApplyCloudResume(
           localResume: local,
           cloudResume: resume,
         )) {
+          keptLocalResumes++;
           continue;
         }
 
@@ -1200,28 +1418,83 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
           updated++;
         }
       }
+
+      final cloudJobMaps = await SupabaseSyncService.manualRestoreJsonList(
+        collection: _jobTrackerCollection,
+        field: _jobTrackerField,
+      );
+      final cloudJobs = cloudJobMaps
+          .map(JobApplicationRecord.fromMap)
+          .toList(growable: false);
+      final localJobs = await _jobTrackerService.loadJobs();
+      final localJobsById = <String, JobApplicationRecord>{
+        for (final job in localJobs) job.jobId: job,
+      };
+
+      int createdJobs = 0;
+      int updatedJobs = 0;
+      int keptLocalJobs = 0;
+      for (final job in cloudJobs) {
+        final local = localJobsById[job.jobId];
+        if (local == null) {
+          createdJobs++;
+        } else if (job.updatedAt.isAfter(local.updatedAt)) {
+          updatedJobs++;
+        } else {
+          keptLocalJobs++;
+        }
+      }
+
+      if (cloudJobs.isNotEmpty) {
+        final mergedJobs = _jobTrackerService.mergeByMostRecent(
+          localJobs: localJobs,
+          cloudJobs: cloudJobs,
+        );
+        await _jobTrackerService.persistJobs(mergedJobs);
+      }
+
       widget.onRestored?.call();
       final hint = _currentCode == null
           ? ' TIP: Set a Sync Code to access data from other devices.'
           : '';
+      final summaries = <String>[
+        if (cloudResumes.isNotEmpty)
+          created == 0 && updated == 0
+              ? keptLocalResumes > 0
+                  ? 'resumes: kept $keptLocalResumes newer local version(s)'
+                  : 'resumes already up to date'
+              : 'resumes: $created new, $updated updated${keptLocalResumes > 0 ? ', $keptLocalResumes kept local' : ''}',
+        if (cloudJobs.isNotEmpty)
+          createdJobs == 0 && updatedJobs == 0
+              ? keptLocalJobs > 0
+                  ? 'job tracker: kept $keptLocalJobs newer local item(s)'
+                  : 'job tracker already up to date'
+              : 'job tracker: $createdJobs new, $updatedJobs updated${keptLocalJobs > 0 ? ', $keptLocalJobs kept local' : ''}',
+      ];
+      final nextStatusMessage = summaries.isEmpty
+          ? 'ℹ️ No backups found.$hint'
+          : '✅ Restore complete: ${summaries.join(' • ')}.';
+      final restoreRecordedAt = DateTime.now();
+      await SyncStatusService.recordRestore(
+        nextStatusMessage,
+        at: restoreRecordedAt,
+      );
+
       if (!mounted) return;
       setState(() {
         _inProgress = false;
-        _statusMessage = cloudResumes.isEmpty
-            ? 'ℹ️ No backups found.$hint'
-            : created == 0 && updated == 0
-                ? 'ℹ️ All ${cloudResumes.length} cloud resume(s) are already up to date locally.'
-                : updated == 0
-                    ? '✅ Restored $created new resume(s) from cloud (${cloudResumes.length} total found).'
-                    : created == 0
-                        ? '✅ Updated $updated existing resume(s) from cloud (${cloudResumes.length} total found).'
-                        : '✅ Restored $created new and updated $updated existing resume(s) from cloud (${cloudResumes.length} total found).';
+        _statusMessage = nextStatusMessage;
+        _lastSyncSummary = nextStatusMessage;
+        _lastRestoreAt = restoreRecordedAt;
       });
     } catch (e) {
+      final nextStatusMessage = '❌ Restore failed: $e';
+      await SyncStatusService.recordStatus(nextStatusMessage);
       if (!mounted) return;
       setState(() {
         _inProgress = false;
-        _statusMessage = '❌ Restore failed: $e';
+        _statusMessage = nextStatusMessage;
+        _lastSyncSummary = nextStatusMessage;
       });
     }
   }
@@ -1249,8 +1522,7 @@ class _AiApiKeySheetState extends State<_AiApiKeySheet> {
   }
 
   Future<void> _loadKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = prefs.getString('gemini_api_key') ?? '';
+    final key = await AiApiKeyStorageService.read();
     if (!mounted) return;
     setState(() => _controller.text = key);
   }
@@ -1280,16 +1552,14 @@ class _AiApiKeySheetState extends State<_AiApiKeySheet> {
       );
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('gemini_api_key', key);
+    await AiApiKeyStorageService.save(key);
     setState(() => _saved = true);
     await Future.delayed(const Duration(milliseconds: 800));
     if (mounted) Navigator.pop(context);
   }
 
   Future<void> _clearKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('gemini_api_key');
+    await AiApiKeyStorageService.clear();
     setState(() {
       _controller.clear();
       _saved = false;

@@ -162,7 +162,7 @@ class CreativeResumeTemplatePreview extends StatelessWidget {
     if (values.isEmpty) {
       return const [
         _CreativePreviewProject(
-          title: 'Resume Builder',
+          title: 'Resumix AI',
           description: 'Cross-platform editor with live preview and export.',
         ),
       ];

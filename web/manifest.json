@@ -1,11 +1,11 @@
 {
-    "name": "resume_builder",
-    "short_name": "resume_builder",
+    "name": "Resumix AI",
+    "short_name": "Resumix AI",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#f4f7ff",
+    "theme_color": "#4f67f6",
+    "description": "AI-powered resume building, premium templates, and career tools from Resumix AI.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

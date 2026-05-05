@@ -190,7 +190,7 @@ class SalesAndMarketingResumeTemplatePreview extends StatelessWidget {
     if (values.isEmpty) {
       return const [
         _SalesPreviewProject(
-          title: 'Resume Builder Platform',
+          title: 'Resumix AI Platform',
           description:
               'Developed a full resume workflow spanning editing, preview, and export.',
         ),

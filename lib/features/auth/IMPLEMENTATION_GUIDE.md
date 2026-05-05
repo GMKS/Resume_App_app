@@ -21,20 +21,16 @@ Your Resume App now has a **production-ready Twilio SMS OTP login system** with 
 
 ## 🎯 Quick Start (3 Steps)
 
-### Step 1: Get Twilio Credentials
+### Step 1: Configure Backend OTP Endpoints
 ```
-1. Sign up at https://www.twilio.com
-2. Get Account SID & Auth Token from https://console.twilio.com
-3. Create Twilio Verify Service → copy Service SID
+1. Deploy a backend that talks to Twilio Verify
+2. Expose POST /otp/send and POST /otp/verify endpoints
+3. Set OTP_SEND_URL and OTP_VERIFY_URL in .env or --dart-define
 ```
 
-### Step 2: Update Credentials
-Edit [`lib/core/services/twilio_service.dart`](../../../lib/core/services/twilio_service.dart#L4-L7):
-```dart
-static const String _accountSid = 'YOUR_ACCOUNT_SID_HERE';
-static const String _authToken = 'YOUR_AUTH_TOKEN_HERE';
-static const String _verifyServiceSid = 'YOUR_SERVICE_SID_HERE';
-```
+### Step 2: Optional Local Debug OTP
+For local-only testing, set `OTP_DEBUG_CODE` in `.env` and use that code to
+complete the OTP flow on debug builds.
 
 ### Step 3: Add to Router
 Add to your `lib/core/router/app_router.dart`:
@@ -91,12 +87,12 @@ TwilioLoginScreen (Stateful)
 ## 🔐 Security Checklist
 
 - ✅ Phone number validation (E.164 format)
-- ✅ Twilio Verify Service (industry-standard OTP)
+- ✅ Server-backed OTP flow with provider credentials kept off-device
 - ✅ Network error handling
 - ✅ Rate limiting (via Twilio)
 
 **TODO for Production:**
-- [ ] Move credentials to Firebase Cloud Functions (see README.md)
+- [ ] Keep Twilio credentials only in backend secrets
 - [ ] Implement backend OTP verification
 - [ ] Add SSL pinning for API calls
 - [ ] Implement IP-based rate limiting
@@ -164,9 +160,8 @@ Twilio Test Numbers:
 ### Environment Variables Setup
 ```bash
 flutter build apk --release \
-  --dart-define=TWILIO_ACCOUNT_SID=YOUR_SID \
-  --dart-define=TWILIO_AUTH_TOKEN=YOUR_TOKEN \
-  --dart-define=TWILIO_VERIFY_SERVICE_SID=YOUR_SERVICE_SID
+  --dart-define=OTP_SEND_URL=https://your-backend.example.com/otp/send \
+  --dart-define=OTP_VERIFY_URL=https://your-backend.example.com/otp/verify
 ```
 
 ### Firebase Cloud Function (Recommended)
@@ -241,10 +236,10 @@ bool isValidPhoneNumber(String phone)
 
 ## 📞 Next Steps
 
-1. **Get Twilio account**: https://www.twilio.com/console
-2. **Update credentials** in `twilio_service.dart`
+1. **Deploy backend OTP endpoints** that keep Twilio secrets server-side
+2. **Set `OTP_SEND_URL` and `OTP_VERIFY_URL`** in the app config
 3. **Add route** to your router
-4. **Test with phone number** or Twilio test numbers
+4. **Test with phone number** or local debug OTP
 5. **Deploy to production** with environment variables
 
 ---

@@ -355,6 +355,26 @@ class JobTrackerService {
     return updatedJobs;
   }
 
+  List<JobApplicationRecord> mergeByMostRecent({
+    required List<JobApplicationRecord> localJobs,
+    required List<JobApplicationRecord> cloudJobs,
+  }) {
+    final merged = <String, JobApplicationRecord>{
+      for (final job in localJobs) job.jobId: job,
+    };
+
+    for (final job in cloudJobs) {
+      final existing = merged[job.jobId];
+      if (existing == null || job.updatedAt.isAfter(existing.updatedAt)) {
+        merged[job.jobId] = job;
+      }
+    }
+
+    final jobs = merged.values.toList(growable: false)
+      ..sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
+    return jobs;
+  }
+
   JobDescriptionInsights parseJobDescription(String input) {
     final text = input.trim();
     if (text.isEmpty) {
@@ -630,6 +650,11 @@ class JobTrackerNotifier extends StateNotifier<JobTrackerState> {
 
   final JobTrackerService _service;
 
+  Future<List<JobApplicationRecord>> _latestJobs() async {
+    final persisted = await _service.loadJobs();
+    return persisted.isEmpty ? state.jobs : persisted;
+  }
+
   Future<void> load() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -644,20 +669,23 @@ class JobTrackerNotifier extends StateNotifier<JobTrackerState> {
   }
 
   Future<void> saveJob(JobApplicationRecord draft) async {
-    final updated = _service.insertOrUpdate(jobs: state.jobs, candidate: draft);
+    final currentJobs = await _latestJobs();
+    final updated = _service.insertOrUpdate(jobs: currentJobs, candidate: draft);
     await _service.persistJobs(updated);
     state = state.copyWith(jobs: updated, clearError: true);
   }
 
   Future<void> deleteJob(String jobId) async {
-    final updated = _service.deleteJob(jobs: state.jobs, jobId: jobId);
+    final currentJobs = await _latestJobs();
+    final updated = _service.deleteJob(jobs: currentJobs, jobId: jobId);
     await _service.persistJobs(updated);
     state = state.copyWith(jobs: updated, clearError: true);
   }
 
   Future<void> moveJob(String jobId, JobApplicationStatus status) async {
+    final currentJobs = await _latestJobs();
     final updated = _service.updateStatus(
-      jobs: state.jobs,
+      jobs: currentJobs,
       jobId: jobId,
       nextStatus: status,
     );
@@ -666,7 +694,12 @@ class JobTrackerNotifier extends StateNotifier<JobTrackerState> {
   }
 
   Future<void> addNote({required String jobId, required String note}) async {
-    final updated = _service.addNote(jobs: state.jobs, jobId: jobId, note: note);
+    final currentJobs = await _latestJobs();
+    final updated = _service.addNote(
+      jobs: currentJobs,
+      jobId: jobId,
+      note: note,
+    );
     await _service.persistJobs(updated);
     state = state.copyWith(jobs: updated, clearError: true);
   }

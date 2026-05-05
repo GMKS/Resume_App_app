@@ -52,7 +52,7 @@ class TranslationService {
     'Spanish': {
       'Computers': 'Informatica',
       'Computer Science': 'Informatica',
-      'AI Resume Builder': 'Constructor de curriculums con IA',
+      'Resumix AI': 'Resumix AI',
       'E-commerce Web Application': 'Aplicacion web de comercio electronico',
     },
   };

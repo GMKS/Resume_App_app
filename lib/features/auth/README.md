@@ -40,29 +40,26 @@ lib/core/services/
 
 ## Setup Instructions
 
-### 1. Get Twilio Credentials
+### 1. Configure OTP Backend
 
-1. Go to [Twilio Console](https://www.twilio.com/console)
-2. Create an account or sign in
-3. Find your **Account SID** and **Auth Token** (Keep these secret!)
-4. Create a **Twilio Verify Service**:
-   - Navigate to: **Messaging** → **Verify** → **Services**
-   - Click "Create a Service"
-   - Name it (e.g., "Resume Builder OTP")
-   - Copy the **Service SID**
+1. Deploy server-side OTP endpoints that keep Twilio credentials off the client.
+2. Expose a send endpoint and a verify endpoint.
+3. Set `OTP_SEND_URL` and `OTP_VERIFY_URL` in `.env` or with `--dart-define`.
+4. For local-only debug testing, optionally set `OTP_DEBUG_CODE` to a fixed code.
 
-### 2. Update Twilio Credentials
+This repo now includes matching Supabase Edge Function scaffolding in
+`supabase/functions/` for `send-otp` and `verify-otp`.
 
-Edit `lib/core/services/twilio_service.dart` and replace:
+### 2. Keep Secrets Off The Client
 
-```dart
-static const String _accountSid = 'YOUR_TWILIO_ACCOUNT_SID';
-static const String _authToken = 'YOUR_TWILIO_AUTH_TOKEN';
-static const String _twilioPhoneNumber = 'YOUR_TWILIO_PHONE_NUMBER'; // Optional
-static const String _verifyServiceSid = 'YOUR_TWILIO_VERIFY_SERVICE_SID';
+Do not place Twilio Account SID, Auth Token, or Verify Service SID in the app.
+The mobile and web clients should only know the backend endpoints:
+
+```env
+OTP_SEND_URL=https://your-backend.example.com/otp/send
+OTP_VERIFY_URL=https://your-backend.example.com/otp/verify
+OTP_DEBUG_CODE=
 ```
-
-**Security Best Practice:** Store these in environment variables or secure Firebase Cloud Functions instead of hardcoding!
 
 ### 3. Add Route to Navigation
 
@@ -221,11 +218,10 @@ List.generate(4, (_) => TextEditingController()) // For 4-digit OTP
 
 ## Testing
 
-### Test Phone Numbers (Twilio Verify)
+### Backend Test Mode
 
-Use these numbers during development:
-- `+15005550006` - Approved OTP: `123456`
-- `+15005550007` - Failed OTP verification
+For local development, set `OTP_DEBUG_CODE=123456` in `.env` and use `123456`
+to complete the flow on mobile or Chrome debug builds.
 
 ### Mock Testing
 
@@ -256,15 +252,9 @@ class MockTwilioService extends TwilioService {
 
 ⚠️ **IMPORTANT:**
 
-1. **Never commit credentials** - Use environment variables:
-   ```dart
-   // Instead of hardcoding:
-   static const String _accountSid = String.fromEnvironment('TWILIO_ACCOUNT_SID');
-   static const String _authToken = String.fromEnvironment('TWILIO_AUTH_TOKEN');
-   static const String _verifyServiceSid = String.fromEnvironment('TWILIO_VERIFY_SERVICE_SID');
-   ```
+1. **Never commit provider credentials** - keep Twilio secrets server-side only.
 
-2. **Use Firebase Cloud Functions** for server-side OTP handling:
+2. **Use Firebase Cloud Functions or any secure backend** for server-side OTP handling:
    ```javascript
    // functions/index.js
    exports.sendOTP = functions.https.onCall(async (data, context) => {
@@ -274,7 +264,7 @@ class MockTwilioService extends TwilioService {
    });
    ```
 
-3. **Implement Rate Limiting** - Twilio provides built-in rate limiting
+3. **Implement Rate Limiting** - your provider can still enforce delivery limits
 4. **HTTPS Only** - Always use secure connections
 5. **Validate on Backend** - Never trust client-side OTP verification alone
 
@@ -325,8 +315,8 @@ Validates phone number format.
 
 | Issue | Solution |
 |-------|----------|
-| "OTP not received" | Check Twilio Verify Service is active; test number is valid |
-| "Invalid credentials" | Verify Account SID, Auth Token, Service SID in Twilio Console |
+| "OTP not received" | Check your backend send endpoint, provider status, and test number |
+| "Invalid credentials" | Verify backend-held provider credentials and endpoint auth |
 | "Phone number rejected" | Use E.164 format with country code; check carrier support |
 | "Rate limit exceeded" | Wait before resending; Twilio throttles excessive requests |
 | "Animation stuttering" | Reduce animation duration; check device performance |

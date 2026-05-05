@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/models/resume_model.dart';
+import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/resume_version_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -78,12 +78,12 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
   }
 
   Future<void> _loadApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
+    final apiKey = await AiApiKeyStorageService.read();
     if (!mounted) {
       return;
     }
     setState(() {
-      _apiKey = prefs.getString('gemini_api_key') ?? '';
+      _apiKey = apiKey;
     });
   }
 
@@ -385,8 +385,7 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
             onPressed: () async {
               final key = controller.text.trim();
               if (key.isNotEmpty) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('gemini_api_key', key);
+                await AiApiKeyStorageService.save(key);
                 if (mounted) {
                   setState(() {
                     _apiKey = key;

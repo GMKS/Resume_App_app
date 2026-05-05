@@ -5,14 +5,46 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/user_session_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/subscription_service.dart';
 
-class ProfileTabScreen extends ConsumerWidget {
+class _ProfileIdentity {
+  const _ProfileIdentity({
+    required this.displayName,
+    required this.contact,
+    this.photoUrl,
+  });
+
+  final String displayName;
+  final String contact;
+  final String? photoUrl;
+}
+
+class ProfileTabScreen extends ConsumerStatefulWidget {
   const ProfileTabScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileTabScreen> createState() => _ProfileTabScreenState();
+}
+
+class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
+  late Future<_ProfileIdentity> _profileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = _loadProfileIdentity();
+  }
+
+  void _refreshProfile() {
+    setState(() {
+      _profileFuture = _loadProfileIdentity();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final subscription = ref.watch(subscriptionProvider);
 
     return Scaffold(
@@ -26,38 +58,52 @@ class ProfileTabScreen extends ConsumerWidget {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    child: const Icon(
-                      Iconsax.user,
-                      size: 40,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'John Doe',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'john.doe@example.com',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Iconsax.edit, size: 18),
-                    label: const Text('Edit Profile'),
-                  ),
-                ],
+              child: FutureBuilder<_ProfileIdentity>(
+                future: _profileFuture,
+                builder: (context, snapshot) {
+                  final profile = snapshot.data ??
+                      const _ProfileIdentity(
+                        displayName: 'User',
+                        contact: 'Not signed in',
+                      );
+
+                  return Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                        backgroundImage: _profileImageProvider(profile.photoUrl),
+                        child: profile.photoUrl == null || profile.photoUrl!.isEmpty
+                            ? const Icon(
+                                Iconsax.user,
+                                size: 40,
+                                color: AppColors.primary,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        profile.displayName,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        profile.contact,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () => _showEditProfileSheet(profile),
+                        icon: const Icon(Iconsax.edit, size: 18),
+                        label: const Text('Edit Profile'),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1, end: 0),
@@ -106,7 +152,11 @@ class ProfileTabScreen extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(
                             subscription.isPremium()
-                                ? 'Expires ${_formatDate(subscription.expiryDate!)}'
+                              ? subscription.isStoreManaged
+                                ? 'Managed in Google Play'
+                                : subscription.cancelAtPeriodEnd
+                                    ? 'Cancels ${_formatDate(subscription.expiryDate!)}'
+                                    : 'Expires ${_formatDate(subscription.expiryDate!)}'
                                 : 'Upgrade to unlock premium features',
                             style:
                                 Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -222,6 +272,101 @@ class ProfileTabScreen extends ConsumerWidget {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  Future<_ProfileIdentity> _loadProfileIdentity() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawDisplayName = prefs.getString('display_name')?.trim() ?? '';
+    final rawContact =
+        UserSessionService.formatContactForDisplay(
+          UserSessionService.readStoredContact(prefs),
+        );
+    final rawPhotoUrl = prefs.getString('photo_url')?.trim() ?? '';
+
+    final displayName = rawDisplayName.isNotEmpty
+        ? rawDisplayName
+        : _fallbackDisplayName(rawContact);
+
+    final contact = rawContact.isNotEmpty ? rawContact : 'Not signed in';
+
+    return _ProfileIdentity(
+      displayName: displayName,
+      contact: contact,
+      photoUrl: rawPhotoUrl.isNotEmpty ? rawPhotoUrl : null,
+    );
+  }
+
+  String _fallbackDisplayName(String contact) {
+    if (contact.isEmpty) {
+      return 'User';
+    }
+
+    if (contact.contains('•')) {
+      return 'User';
+    }
+
+    if (contact.contains('@')) {
+      final localPart = contact.split('@').first.trim();
+      if (localPart.isEmpty) {
+        return contact;
+      }
+
+      return localPart
+          .split(RegExp(r'[._-]+'))
+          .where((part) => part.isNotEmpty)
+          .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+          .join(' ');
+    }
+
+    return contact;
+  }
+
+  ImageProvider<Object>? _profileImageProvider(String? photoUrl) {
+    if (photoUrl == null || photoUrl.isEmpty) {
+      return null;
+    }
+
+    return NetworkImage(photoUrl);
+  }
+
+  Future<void> _showEditProfileSheet(_ProfileIdentity profile) async {
+    final savedName = await showModalBottomSheet<String?>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => _EditProfileSheet(
+        currentDisplayName: profile.displayName,
+        contact: profile.contact,
+      ),
+    );
+
+    if (savedName == null) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final trimmed = savedName.trim();
+    if (trimmed.isEmpty) {
+      await prefs.remove('display_name');
+    } else {
+      await prefs.setString('display_name', trimmed);
+    }
+
+    _refreshProfile();
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Profile updated'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _showLogoutDialog(BuildContext outerContext) {
     showDialog(
       context: outerContext,
@@ -246,9 +391,12 @@ class ProfileTabScreen extends ConsumerWidget {
               // Clear saved session
               final prefs = await SharedPreferences.getInstance();
               await prefs.setBool('is_logged_in', false);
-              await prefs.remove('saved_phone');
+              await UserSessionService.clearStoredContact(prefs);
+              await prefs.remove('display_name');
+              await prefs.remove('photo_url');
+              await prefs.remove('auth_provider');
               if (outerContext.mounted) {
-                outerContext.go('/login');
+                outerContext.go('/login?loggedOut=true');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -256,6 +404,128 @@ class ProfileTabScreen extends ConsumerWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Logout', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet({
+    required this.currentDisplayName,
+    required this.contact,
+  });
+
+  final String currentDisplayName;
+  final String contact;
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _displayNameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayNameController =
+        TextEditingController(text: widget.currentDisplayName);
+  }
+
+  @override
+  void dispose() {
+    _displayNameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        8,
+        24,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Edit Profile',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Leave the name blank if you want the profile card to fall back to your login phone or email automatically.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _displayNameController,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              labelText: 'Display name',
+              hintText: 'Enter your name',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.16),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Login contact',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.contact,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(
+                    context,
+                    _displayNameController.text,
+                  ),
+                  child: const Text('Save'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

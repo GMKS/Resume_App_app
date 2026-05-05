@@ -5,6 +5,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_config_service.dart';
+import 'user_session_service.dart';
+
 /// Result object returned by every social sign-in method.
 class SocialAuthResult {
   final bool success;
@@ -21,6 +24,12 @@ class SocialAuthResult {
 /// Handles Google, Facebook, Twitter/X and LinkedIn sign-in via Firebase Auth.
 class SocialAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  static bool get isFacebookSignInEnabled =>
+      AppConfigService.readBool('ENABLE_FACEBOOK_AUTH');
+
+  static const String facebookDisabledMessage =
+      'Facebook sign-in is disabled for this build until the Android Facebook App ID and client token are configured and ENABLE_FACEBOOK_AUTH=true is passed at build time.';
 
   // ──────────────────────────────────────────────────────────────────
   // Google Sign-In
@@ -62,6 +71,13 @@ class SocialAuthService {
   // Facebook Sign-In
   // ──────────────────────────────────────────────────────────────────
   Future<SocialAuthResult> signInWithFacebook() async {
+    if (!isFacebookSignInEnabled) {
+      return const SocialAuthResult(
+        success: false,
+        message: facebookDisabledMessage,
+      );
+    }
+
     try {
       UserCredential userCredential;
 
@@ -183,7 +199,7 @@ class SocialAuthService {
     if (user == null) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_logged_in', true);
-    await prefs.setString('saved_phone', user.email ?? user.uid);
+    await UserSessionService.persistSocialContact(prefs, user.email ?? user.uid);
     await prefs.setString('auth_provider', provider);
     await prefs.setString('display_name', user.displayName ?? '');
     await prefs.setString('photo_url', user.photoURL ?? '');

@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/app_info.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/feature_gate.dart';
@@ -35,25 +36,26 @@ class HelpSupportScreen extends ConsumerWidget {
     _FAQ(
       question: 'How do I cancel my subscription?',
       answer:
-          'Go to Profile → Monthly Pro → and tap "Cancel Subscription". Your premium access will continue until the current billing period ends.',
+          'Go to Profile, open your current plan, and tap "Cancel Subscription". Your premium access will continue until the current billing period ends.',
     ),
     _FAQ(
       question: 'Is my data secure?',
       answer:
-          'Yes. Your data is stored securely on your device and optionally synced via encrypted cloud storage. We never sell your personal data.',
+          'Yes. Your data is stored securely on your device and is only uploaded to cloud storage when you use manual Backup & Sync. Phone numbers are used only for OTP authentication, and we never sell your personal data.',
     ),
     _FAQ(
       question: 'How does the AI content enhancer work?',
       answer:
-          'Our AI analyses your existing resume content and suggests improvements for clarity, impact, and keyword optimisation based on industry standards.',
+          'Our AI analyses your existing resume content and suggests improvements for clarity, impact, and keyword optimisation based on industry standards. AI-generated content should be reviewed before use.',
     ),
   ];
 
   Future<void> _launchEmail() async {
     final uri = Uri(
       scheme: 'mailto',
-      path: 'support@resumebuilder.app',
-      query: 'subject=Support Request&body=Hi Support Team,',
+      path: AppInfo.supportEmail,
+      query:
+          'subject=${Uri.encodeQueryComponent('${AppInfo.appName} Support Request')}&body=Hi Support Team,',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -132,7 +134,7 @@ class HelpSupportScreen extends ConsumerWidget {
             title: 'User Guide',
             subtitle: 'Full documentation and how-to guides',
             delay: 250,
-            onTap: () => _launchUrl('https://resumebuilder.app/guide'),
+            onTap: () => _launchUrl(AppInfo.userGuideUrl),
           ),
           _buildLinkTile(
             context,
@@ -156,8 +158,7 @@ class HelpSupportScreen extends ConsumerWidget {
             title: 'Rate the App',
             subtitle: 'Help us by leaving a review',
             delay: 400,
-            onTap: () => _launchUrl(
-                'https://play.google.com/store/apps/details?id=com.seenaigmk.resumebuilder'),
+            onTap: () => _launchUrl(AppInfo.playStoreUrl),
           ),
           const SizedBox(height: 20),
 

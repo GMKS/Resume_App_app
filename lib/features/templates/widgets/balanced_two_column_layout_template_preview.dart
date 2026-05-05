@@ -353,7 +353,7 @@ class BalancedTwoColumnLayoutTemplatePreview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle(title.isEmpty ? 'CUSTOM SECTION' : title),
+        _sectionTitle(title.isEmpty ? 'CUSTOM SECTION' : title.toUpperCase()),
         const SizedBox(height: 1.2),
         ...itemBlocks,
       ],
@@ -484,7 +484,7 @@ class BalancedTwoColumnLayoutTemplatePreview extends StatelessWidget {
         ? projectEntries
         : const [
             BalancedTwoColumnProjectEntry(
-              title: 'Resume Builder',
+              title: 'Resumix AI',
               detailLines: [
                 'Live preview, export, and configurable resume sections for multi-template workflows.',
               ],

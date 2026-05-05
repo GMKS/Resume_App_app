@@ -7,43 +7,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:884039901207:android:c96820fb0582f5a1f67c52",
-        "android_client_info": {
-          "package_name": "com.example.resume_builder"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "884039901207-l5qha1paubd8t2oqokdp5p71824t84t0.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.resume_builder",
-            "certificate_hash": "b125678ca93c37205fda605820e433c398400157"
-          }
-        },
-        {
-          "client_id": "884039901207-ar7oaa8i511u7tqqh3is7h3pbstu82r1.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCkVCab7a8ILrPHX2V6Ku914iq5i3q4gOU"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "884039901207-ar7oaa8i511u7tqqh3is7h3pbstu82r1.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:884039901207:android:0bf55ccf7c041b70f67c52",
         "android_client_info": {
           "package_name": "com.seenaigmk.resumebuilder"

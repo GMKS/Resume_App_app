@@ -127,7 +127,7 @@ class ClassicTempResumeTemplatePreview extends StatelessWidget {
 
     return const [
       ClassicTempProjectEntry(
-        title: 'Resume Builder',
+        title: 'Resumix AI',
         detailLines: [
           'Maintains preview and export parity for resume layouts.'
         ],

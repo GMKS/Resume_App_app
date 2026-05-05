@@ -88,6 +88,8 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
               icon: FontAwesomeIcons.facebookF,
               color: const Color(0xFF1877F2),
               label: 'Facebook',
+              enabled: SocialAuthService.isFacebookSignInEnabled,
+              disabledMessage: SocialAuthService.facebookDisabledMessage,
               loading: _activeProvider == 'facebook',
               onTap: () => _handleSocial(
                 'facebook',
@@ -141,6 +143,8 @@ class _SocialCircleButton extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String label;
+  final bool enabled;
+  final String? disabledMessage;
   final bool loading;
   final VoidCallback onTap;
 
@@ -148,6 +152,8 @@ class _SocialCircleButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.label,
+    this.enabled = true,
+    this.disabledMessage,
     required this.loading,
     required this.onTap,
   });
@@ -155,30 +161,33 @@ class _SocialCircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AdaptiveTooltip(
-      message: label,
+      message: enabled ? label : (disabledMessage ?? '$label is unavailable'),
       button: true,
-      child: Material(
-        color: color,
-        shape: const CircleBorder(),
-        elevation: 3,
-        child: InkWell(
-          onTap: loading ? null : onTap,
-          customBorder: const CircleBorder(),
-          splashColor: Colors.white24,
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: Center(
-              child: loading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : FaIcon(icon, color: Colors.white, size: 20),
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: Material(
+          color: color,
+          shape: const CircleBorder(),
+          elevation: 3,
+          child: InkWell(
+            onTap: loading || !enabled ? null : onTap,
+            customBorder: const CircleBorder(),
+            splashColor: Colors.white24,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(
+                child: loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : FaIcon(icon, color: Colors.white, size: 20),
+              ),
             ),
           ),
         ),

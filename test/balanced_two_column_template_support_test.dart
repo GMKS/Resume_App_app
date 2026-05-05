@@ -382,7 +382,7 @@ void main() {
           id: 'user_custom_projects',
           title: 'Volunteer Work',
           order: 0,
-          items: const [
+          items: [
             CustomSectionItem(
               id: 'vol-1',
               title: '',

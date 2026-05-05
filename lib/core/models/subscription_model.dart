@@ -30,17 +30,55 @@ enum SubscriptionPlan {
   yearly,
 }
 
+enum BillingProvider {
+  local,
+  googlePlay,
+}
+
 class SubscriptionModel {
   final SubscriptionPlan plan;
   final DateTime? expiryDate;
   final bool isActive;
   final List<String> features;
+  final bool cancelAtPeriodEnd;
+  final BillingProvider billingProvider;
+
+  static const List<String> _freeFeatures = <String>[
+    SubscriptionFeatures.createResume,
+    SubscriptionFeatures.basicTemplates,
+    SubscriptionFeatures.exportPdf,
+    SubscriptionFeatures.aiAssistant,
+  ];
+
+  static const List<String> _premiumFeatures = <String>[
+    SubscriptionFeatures.createResume,
+    SubscriptionFeatures.allTemplates,
+    SubscriptionFeatures.exportPdf,
+    SubscriptionFeatures.exportDocx,
+    SubscriptionFeatures.exportTxt,
+    SubscriptionFeatures.aiAssistant,
+    SubscriptionFeatures.atsOptimization,
+    SubscriptionFeatures.coverLetterGenerator,
+    SubscriptionFeatures.jobTracker,
+    SubscriptionFeatures.portfolio,
+    SubscriptionFeatures.unlimitedExports,
+    SubscriptionFeatures.prioritySupport,
+    SubscriptionFeatures.interviewPrep,
+    SubscriptionFeatures.skillAnalyzer,
+    SubscriptionFeatures.careerPath,
+    SubscriptionFeatures.premiumSections,
+    SubscriptionFeatures.mediaSupport,
+    SubscriptionFeatures.signatureSupport,
+    SubscriptionFeatures.cloudSync,
+  ];
 
   const SubscriptionModel({
     required this.plan,
     this.expiryDate,
     required this.isActive,
     required this.features,
+    this.cancelAtPeriodEnd = false,
+    this.billingProvider = BillingProvider.local,
   });
 
   bool hasFeature(String featureName) {
@@ -51,132 +89,115 @@ class SubscriptionModel {
     return plan != SubscriptionPlan.free;
   }
 
+  bool get isStoreManaged => billingProvider != BillingProvider.local;
+
+  static SubscriptionModel forPlan(
+    SubscriptionPlan plan, {
+    DateTime? expiryDate,
+    bool cancelAtPeriodEnd = false,
+    BillingProvider billingProvider = BillingProvider.local,
+  }) {
+    switch (plan) {
+      case SubscriptionPlan.weekly:
+        return SubscriptionModel.weekly(
+          expiryDate: expiryDate,
+          cancelAtPeriodEnd: cancelAtPeriodEnd,
+          billingProvider: billingProvider,
+        );
+      case SubscriptionPlan.monthly:
+        return SubscriptionModel.monthly(
+          expiryDate: expiryDate,
+          cancelAtPeriodEnd: cancelAtPeriodEnd,
+          billingProvider: billingProvider,
+        );
+      case SubscriptionPlan.quarterly:
+        return SubscriptionModel.quarterly(
+          expiryDate: expiryDate,
+          cancelAtPeriodEnd: cancelAtPeriodEnd,
+          billingProvider: billingProvider,
+        );
+      case SubscriptionPlan.yearly:
+        return SubscriptionModel.yearly(
+          expiryDate: expiryDate,
+          cancelAtPeriodEnd: cancelAtPeriodEnd,
+          billingProvider: billingProvider,
+        );
+      case SubscriptionPlan.free:
+        return SubscriptionModel.free();
+    }
+  }
+
   factory SubscriptionModel.free() {
     return const SubscriptionModel(
       plan: SubscriptionPlan.free,
       isActive: true,
-      features: [
-        'create_resume',
-        'basic_templates',
-        'export_pdf',
-        'ai_assistant',
-      ],
+      features: _freeFeatures,
     );
   }
 
-  factory SubscriptionModel.weekly() {
+  factory SubscriptionModel.weekly({
+    DateTime? expiryDate,
+    bool cancelAtPeriodEnd = false,
+    BillingProvider billingProvider = BillingProvider.local,
+  }) {
     return SubscriptionModel(
       plan: SubscriptionPlan.weekly,
-      expiryDate: DateTime.now().add(const Duration(days: 7)),
+      expiryDate: expiryDate ?? DateTime.now().add(const Duration(days: 7)),
       isActive: true,
-      features: [
-        SubscriptionFeatures.createResume,
-        SubscriptionFeatures.allTemplates,
-        SubscriptionFeatures.exportPdf,
-        SubscriptionFeatures.exportDocx,
-        SubscriptionFeatures.exportTxt,
-        SubscriptionFeatures.aiAssistant,
-        SubscriptionFeatures.atsOptimization,
-        SubscriptionFeatures.coverLetterGenerator,
-        SubscriptionFeatures.jobTracker,
-        SubscriptionFeatures.portfolio,
-        SubscriptionFeatures.unlimitedExports,
-        SubscriptionFeatures.premiumSections,
-        SubscriptionFeatures.mediaSupport,
-        SubscriptionFeatures.signatureSupport,
-        SubscriptionFeatures.cloudSync,
-        SubscriptionFeatures.prioritySupport,
-        SubscriptionFeatures.interviewPrep,
-        SubscriptionFeatures.skillAnalyzer,
-        SubscriptionFeatures.careerPath,
-      ],
+      features: _premiumFeatures,
+      cancelAtPeriodEnd: cancelAtPeriodEnd,
+      billingProvider: billingProvider,
     );
   }
 
-  factory SubscriptionModel.monthly() {
+  factory SubscriptionModel.monthly({
+    DateTime? expiryDate,
+    bool cancelAtPeriodEnd = false,
+    BillingProvider billingProvider = BillingProvider.local,
+  }) {
     return SubscriptionModel(
       plan: SubscriptionPlan.monthly,
-      expiryDate: DateTime.now().add(const Duration(days: 30)),
+      expiryDate: expiryDate ??
+          (billingProvider == BillingProvider.googlePlay
+              ? null
+              : DateTime.now().add(const Duration(days: 30))),
       isActive: true,
-      features: [
-        SubscriptionFeatures.createResume,
-        SubscriptionFeatures.allTemplates,
-        SubscriptionFeatures.exportPdf,
-        SubscriptionFeatures.exportDocx,
-        SubscriptionFeatures.exportTxt,
-        SubscriptionFeatures.aiAssistant,
-        SubscriptionFeatures.atsOptimization,
-        SubscriptionFeatures.coverLetterGenerator,
-        SubscriptionFeatures.jobTracker,
-        SubscriptionFeatures.portfolio,
-        SubscriptionFeatures.unlimitedExports,
-        SubscriptionFeatures.premiumSections,
-        SubscriptionFeatures.mediaSupport,
-        SubscriptionFeatures.signatureSupport,
-        SubscriptionFeatures.cloudSync,
-        SubscriptionFeatures.prioritySupport,
-        SubscriptionFeatures.interviewPrep,
-        SubscriptionFeatures.skillAnalyzer,
-        SubscriptionFeatures.careerPath,
-      ],
+      features: _premiumFeatures,
+      cancelAtPeriodEnd: cancelAtPeriodEnd,
+      billingProvider: billingProvider,
     );
   }
 
-  factory SubscriptionModel.quarterly() {
+  factory SubscriptionModel.quarterly({
+    DateTime? expiryDate,
+    bool cancelAtPeriodEnd = false,
+    BillingProvider billingProvider = BillingProvider.local,
+  }) {
     return SubscriptionModel(
       plan: SubscriptionPlan.quarterly,
-      expiryDate: DateTime.now().add(const Duration(days: 90)),
+      expiryDate: expiryDate ?? DateTime.now().add(const Duration(days: 90)),
       isActive: true,
-      features: [
-        SubscriptionFeatures.createResume,
-        SubscriptionFeatures.allTemplates,
-        SubscriptionFeatures.exportPdf,
-        SubscriptionFeatures.exportDocx,
-        SubscriptionFeatures.exportTxt,
-        SubscriptionFeatures.aiAssistant,
-        SubscriptionFeatures.atsOptimization,
-        SubscriptionFeatures.coverLetterGenerator,
-        SubscriptionFeatures.jobTracker,
-        SubscriptionFeatures.portfolio,
-        SubscriptionFeatures.unlimitedExports,
-        SubscriptionFeatures.prioritySupport,
-        SubscriptionFeatures.premiumSections,
-        SubscriptionFeatures.mediaSupport,
-        SubscriptionFeatures.signatureSupport,
-        SubscriptionFeatures.cloudSync,
-        SubscriptionFeatures.interviewPrep,
-        SubscriptionFeatures.skillAnalyzer,
-        SubscriptionFeatures.careerPath,
-      ],
+      features: _premiumFeatures,
+      cancelAtPeriodEnd: cancelAtPeriodEnd,
+      billingProvider: billingProvider,
     );
   }
 
-  factory SubscriptionModel.yearly() {
+  factory SubscriptionModel.yearly({
+    DateTime? expiryDate,
+    bool cancelAtPeriodEnd = false,
+    BillingProvider billingProvider = BillingProvider.local,
+  }) {
     return SubscriptionModel(
       plan: SubscriptionPlan.yearly,
-      expiryDate: DateTime.now().add(const Duration(days: 365)),
+      expiryDate: expiryDate ??
+          (billingProvider == BillingProvider.googlePlay
+              ? null
+              : DateTime.now().add(const Duration(days: 365))),
       isActive: true,
-      features: [
-        SubscriptionFeatures.createResume,
-        SubscriptionFeatures.allTemplates,
-        SubscriptionFeatures.exportPdf,
-        SubscriptionFeatures.exportDocx,
-        SubscriptionFeatures.exportTxt,
-        SubscriptionFeatures.aiAssistant,
-        SubscriptionFeatures.atsOptimization,
-        SubscriptionFeatures.coverLetterGenerator,
-        SubscriptionFeatures.jobTracker,
-        SubscriptionFeatures.portfolio,
-        SubscriptionFeatures.unlimitedExports,
-        SubscriptionFeatures.prioritySupport,
-        SubscriptionFeatures.premiumSections,
-        SubscriptionFeatures.mediaSupport,
-        SubscriptionFeatures.signatureSupport,
-        SubscriptionFeatures.cloudSync,
-        SubscriptionFeatures.interviewPrep,
-        SubscriptionFeatures.skillAnalyzer,
-        SubscriptionFeatures.careerPath,
-      ],
+      features: _premiumFeatures,
+      cancelAtPeriodEnd: cancelAtPeriodEnd,
+      billingProvider: billingProvider,
     );
   }
 
@@ -200,13 +221,13 @@ class SubscriptionModel {
       case SubscriptionPlan.free:
         return '\$0';
       case SubscriptionPlan.weekly:
-        return '\$4.99/week';
+        return '\$3.99/week';
       case SubscriptionPlan.monthly:
-        return '\$9.99/month';
+        return '\$12.99/month';
       case SubscriptionPlan.quarterly:
-        return '\$24.99/quarter';
+        return '\$29.99/3 months';
       case SubscriptionPlan.yearly:
-        return '\$79.99/year';
+        return '\$59.99/year';
     }
   }
 }

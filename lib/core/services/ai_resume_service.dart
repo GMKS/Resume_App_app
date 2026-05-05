@@ -1,8 +1,9 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'ai_api_key_storage_service.dart';
 
 /// AI Resume Service using Groq API (completely free, no credit card required)
 /// Provides AI-powered resume content generation and job tailoring
@@ -1727,15 +1728,13 @@ class AiResponseException extends AiException {
 
 /// Provider for AI settings (API key storage)
 final aiApiKeyProvider = FutureProvider<String>((ref) async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getString('gemini_api_key') ?? '';
+  return AiApiKeyStorageService.read();
 });
 
 /// Provider to save AI API key
 final saveAiApiKeyProvider = Provider<Future<void> Function(String)>((ref) {
   return (String apiKey) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('gemini_api_key', apiKey);
+    await AiApiKeyStorageService.save(apiKey);
     ref.invalidate(aiApiKeyProvider);
   };
 });

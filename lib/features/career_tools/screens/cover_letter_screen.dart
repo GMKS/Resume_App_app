@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/constants/app_info.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/subscription_model.dart';
 import '../../../core/utils/shareable_export_file.dart';
@@ -25,6 +26,7 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
   final _jobTitleController = TextEditingController();
   final _companyController = TextEditingController();
   final _jobDescriptionController = TextEditingController();
+  final _nameController = TextEditingController();
   
   String _selectedTone = 'Professional';
   String _selectedLength = 'Medium';
@@ -40,6 +42,7 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
     _jobTitleController.dispose();
     _companyController.dispose();
     _jobDescriptionController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -143,6 +146,17 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
                 ),
                 maxLines: 5,
               ),
+              const SizedBox(height: 16),
+
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Your Name',
+                  hintText: 'e.g. John Doe',
+                  prefixIcon: Icon(Iconsax.user),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               const SizedBox(height: 24),
 
@@ -308,10 +322,12 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
   }
 
   void _generateLetter() {
-    if (_jobTitleController.text.isEmpty || _companyController.text.isEmpty) {
+    if (_jobTitleController.text.isEmpty ||
+        _companyController.text.isEmpty ||
+        _nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill in job title and company name'),
+          content: Text('Please fill in job title, company name, and your name'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -334,7 +350,8 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
   String _generateSampleLetter() {
     final jobTitle = _jobTitleController.text;
     final company = _companyController.text;
-    
+    final name = _nameController.text.trim();
+
     return '''Dear Hiring Manager,
 
 I am writing to express my strong interest in the $jobTitle position at $company. With my proven track record and passion for innovation, I am confident that I would be a valuable addition to your team.
@@ -348,7 +365,7 @@ I have attached my resume for your review and would welcome the opportunity to d
 I look forward to the possibility of contributing to your team.
 
 Sincerely,
-[Your Name]''';
+$name''';
   }
 
   Future<void> _copyToClipboard() async {
@@ -389,7 +406,7 @@ Sincerely,
       await Share.shareXFiles(
         [file],
         subject: _buildExportSubject(),
-        text: 'Cover letter export from Resume Builder',
+        text: 'Cover letter export from ${AppInfo.appName}',
       );
     } catch (e) {
       if (!mounted) {

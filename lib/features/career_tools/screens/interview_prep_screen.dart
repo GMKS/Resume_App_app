@@ -10,11 +10,13 @@ import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/feature_gate.dart';
 
 class InterviewQuestion {
+  final String category;
   final String question;
   final String? sampleAnswer;
   final List<String> tips;
 
-  InterviewQuestion({
+  const InterviewQuestion({
+    required this.category,
     required this.question,
     this.sampleAnswer,
     required this.tips,
@@ -22,8 +24,9 @@ class InterviewQuestion {
 }
 
 final interviewQuestionsProvider = Provider<List<InterviewQuestion>>((ref) {
-  return [
+  return const [
     InterviewQuestion(
+      category: 'Common',
       question: 'Tell me about yourself',
       sampleAnswer:
           'I\'m a software engineer with 5 years of experience in mobile development. I\'ve led teams in building scalable applications and I\'m passionate about creating user-friendly experiences.',
@@ -34,6 +37,7 @@ final interviewQuestionsProvider = Provider<List<InterviewQuestion>>((ref) {
       ],
     ),
     InterviewQuestion(
+      category: 'Common',
       question: 'What are your greatest strengths?',
       sampleAnswer:
           'My greatest strength is problem-solving. I excel at breaking down complex challenges and finding innovative solutions.',
@@ -44,6 +48,18 @@ final interviewQuestionsProvider = Provider<List<InterviewQuestion>>((ref) {
       ],
     ),
     InterviewQuestion(
+      category: 'Common',
+      question: 'What is one weakness you are improving right now?',
+      sampleAnswer:
+          'I used to take on too much work myself instead of delegating early. I now break work into smaller ownership areas and communicate expectations sooner, which has improved delivery and team collaboration.',
+      tips: [
+        'Choose a real but manageable weakness',
+        'Show the concrete action you are taking',
+        'End with measurable improvement',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Common',
       question: 'Where do you see yourself in 5 years?',
       tips: [
         'Show career ambition',
@@ -52,6 +68,7 @@ final interviewQuestionsProvider = Provider<List<InterviewQuestion>>((ref) {
       ],
     ),
     InterviewQuestion(
+      category: 'Common',
       question: 'Why do you want to work here?',
       tips: [
         'Research the company',
@@ -60,11 +77,185 @@ final interviewQuestionsProvider = Provider<List<InterviewQuestion>>((ref) {
       ],
     ),
     InterviewQuestion(
+      category: 'Common',
+      question: 'Why should we hire you?',
+      tips: [
+        'Match your strengths to the role',
+        'Mention business impact, not just effort',
+        'Keep the answer direct and specific',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Common',
+      question: 'What motivates you in your work?',
+      tips: [
+        'Talk about meaningful work and growth',
+        'Avoid generic answers only about salary',
+        'Tie motivation to the role you want',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Common',
+      question: 'Why are you leaving your current role?',
+      tips: [
+        'Stay positive and professional',
+        'Focus on growth, scope, or fit',
+        'Do not criticize your current employer',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Common',
+      question: 'What salary range are you targeting?',
+      tips: [
+        'Show that you researched the market',
+        'Give a realistic range instead of one exact number',
+        'Keep flexibility for total compensation and scope',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Behavioral',
       question: 'Describe a challenging situation you faced',
       tips: [
         'Use STAR method',
         'Be specific',
         'Focus on positive outcome',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Behavioral',
+      question: 'How do you handle tight deadlines?',
+      tips: [
+        'Prioritize tasks effectively',
+        'Communicate with your team',
+        'Stay calm and focused',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Behavioral',
+      question: 'Tell me about a time you missed a target or deadline',
+      tips: [
+        'Take accountability without overexplaining',
+        'Explain what you changed afterward',
+        'Show better planning or communication next time',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Behavioral',
+      question: 'How do you handle conflicts in a team?',
+      tips: [
+        'Stay professional and calm',
+        'Focus on finding a solution',
+        'Communicate openly and listen actively',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Behavioral',
+      question: 'Describe a time you had to learn something quickly',
+      tips: [
+        'Describe the urgency and constraints',
+        'Explain how you ramped up fast',
+        'Show the business result',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Behavioral',
+      question: 'Tell me about a time you received difficult feedback',
+      tips: [
+        'Show maturity and coachability',
+        'Explain what changed after the feedback',
+        'Demonstrate measurable improvement',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Technical',
+      question: 'How do you test a feature before release?',
+      sampleAnswer:
+          'I start by clarifying the risk areas, then cover happy path, edge cases, and failure states. I combine unit, integration, and manual exploratory testing, and I verify analytics, logging, and rollback readiness before release.',
+      tips: [
+        'Mention risk-based testing',
+        'Cover automation and manual validation',
+        'Include production readiness checks',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Technical',
+      question: 'Describe a bug you diagnosed end-to-end',
+      tips: [
+        'Explain how you reproduced it',
+        'Show how you narrowed the root cause',
+        'Mention the fix and prevention step',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Technical',
+      question: 'How would you improve application performance?',
+      tips: [
+        'Start with measurement and profiling',
+        'Prioritize the biggest bottlenecks',
+        'Balance speed with maintainability',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Technical',
+      question: 'How do you design stable API contracts between teams?',
+      tips: [
+        'Discuss versioning and backward compatibility',
+        'Mention schema validation and contract testing',
+        'Show how you handle change management',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Technical',
+      question: 'How do you debug an issue you cannot reproduce locally?',
+      tips: [
+        'Start with logs, telemetry, and environment differences',
+        'Reduce the problem with targeted hypotheses',
+        'Add temporary instrumentation if needed',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Leadership',
+      question: 'Can you give an example of a time you showed leadership?',
+      tips: [
+        'Describe the situation clearly',
+        'Explain your role and actions',
+        'Highlight the positive outcome',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Leadership',
+      question: 'How do you mentor junior teammates?',
+      tips: [
+        'Mention structured feedback and pairing',
+        'Show how you build confidence over time',
+        'Connect mentoring to team outcomes',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Leadership',
+      question: 'How do you prioritize across multiple projects?',
+      tips: [
+        'Talk about impact, urgency, and dependencies',
+        'Explain how you communicate tradeoffs',
+        'Show how you revisit priorities regularly',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Leadership',
+      question: 'Tell me about a time you influenced without authority',
+      tips: [
+        'Show how you built alignment',
+        'Use evidence instead of title-based influence',
+        'Highlight the result for the team or product',
+      ],
+    ),
+    InterviewQuestion(
+      category: 'Leadership',
+      question: 'How do you handle underperformance on a team?',
+      tips: [
+        'Start with clarity and direct feedback',
+        'Offer support and a concrete improvement plan',
+        'Balance empathy with accountability',
       ],
     ),
   ];
@@ -86,12 +277,14 @@ class _InterviewPrepScreenState extends ConsumerState<InterviewPrepScreen> {
     'Behavioral',
     'Technical',
     'Leadership',
-    'Situational',
   ];
 
   @override
   Widget build(BuildContext context) {
-    final questions = ref.watch(interviewQuestionsProvider);
+    final allQuestions = ref.watch(interviewQuestionsProvider);
+    final questions = allQuestions
+        .where((question) => question.category == _selectedCategory)
+        .toList(growable: false);
 
     return FeatureGate(
       featureName: SubscriptionFeatures.interviewPrep,
@@ -135,7 +328,10 @@ class _InterviewPrepScreenState extends ConsumerState<InterviewPrepScreen> {
                     label: Text(category),
                     selected: isSelected,
                     onSelected: (selected) {
-                      setState(() => _selectedCategory = category);
+                      setState(() {
+                        _selectedCategory = category;
+                        _expandedIndex = null;
+                      });
                     },
                     selectedColor: AppColors.primary,
                     backgroundColor: Colors.grey[100],

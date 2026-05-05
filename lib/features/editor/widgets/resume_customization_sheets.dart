@@ -18,6 +18,65 @@ const kResumeFonts = <String, String>{
   'Poppins': 'Round & approachable, startup-friendly',
 };
 
+TextStyle _resumeFontTextStyle(
+  String fontFamily, {
+  double? fontSize,
+  FontWeight? fontWeight,
+  Color? color,
+}) {
+  switch (fontFamily) {
+    case 'Open Sans':
+      return GoogleFonts.openSans(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+    case 'Lato':
+      return GoogleFonts.lato(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+    case 'Montserrat':
+      return GoogleFonts.montserrat(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+    case 'Playfair Display':
+      return GoogleFonts.playfairDisplay(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+    case 'Merriweather':
+      return GoogleFonts.merriweather(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+    case 'Raleway':
+      return GoogleFonts.raleway(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+    case 'Poppins':
+      return GoogleFonts.poppins(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+    case 'Roboto':
+    default:
+      return GoogleFonts.roboto(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+  }
+}
+
 /// Available color themes with index → (name, color) mapping.
 const kResumeColorThemes = <int, ({String name, Color color})>{
   0: (name: 'Indigo', color: Color(0xFF6366F1)),
@@ -411,7 +470,7 @@ void showFontPicker({
                       ),
                       child: Center(
                           child: Text('Aa',
-                              style: GoogleFonts.getFont(entry.key,
+                            style: _resumeFontTextStyle(entry.key,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   color: selected
@@ -419,7 +478,7 @@ void showFontPicker({
                                       : AppColors.textSecondary))),
                     ),
                     title: Text(entry.key,
-                        style: GoogleFonts.getFont(entry.key,
+                        style: _resumeFontTextStyle(entry.key,
                             fontWeight:
                                 selected ? FontWeight.w700 : FontWeight.w500)),
                     subtitle: Text(entry.value,
