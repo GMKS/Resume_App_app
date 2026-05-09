@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../debug/store_screenshot_seed.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/onboarding/screens/splash_screen.dart';
 import '../../features/dashboard/main_dashboard.dart';
@@ -56,7 +57,7 @@ final onboardingCompleteProvider = FutureProvider<bool>((ref) async {
 // Router provider
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: kStoreScreenshotMode ? '/dashboard' : '/',
     routes: [
       GoRoute(
         path: '/raoe2',

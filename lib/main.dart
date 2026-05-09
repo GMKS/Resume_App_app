@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/constants/app_info.dart';
+import 'core/debug/store_screenshot_seed.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/services/storage_service.dart';
@@ -37,6 +38,7 @@ void main() async {
   // Initialize Hive for local storage
   await Hive.initFlutter();
   await StorageService.init();
+  await ensureStoreScreenshotSeedData();
 
   // Set system UI style
   SystemChrome.setSystemUIOverlayStyle(

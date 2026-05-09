@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/constants/app_info.dart';
+import '../../../core/debug/store_screenshot_seed.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/services/free_plan_service.dart';
@@ -114,9 +115,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     // Restore from Supabase cloud on startup (handles reinstall / cache clear).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(resumesProvider.notifier).restoreFromCloud();
-    });
+    if (!kStoreScreenshotMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(resumesProvider.notifier).restoreFromCloud();
+      });
+    }
   }
 
   @override

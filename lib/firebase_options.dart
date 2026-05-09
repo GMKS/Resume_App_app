@@ -41,10 +41,10 @@ class DefaultFirebaseOptions {
   // ── Replace with your Firebase Android config (if needed) ─────────────────
   static const FirebaseOptions android = FirebaseOptions(
     apiKey:            'AIzaSyCkVCab7a8ILrPHX2V6Ku914iq5i3q4gOU',
-    appId:             '1:884039901207:android:c96820fb0582f5a1f67c52',
+    appId:             '1:884039901207:android:1de65ec897aee7c9f67c52',
     messagingSenderId: '884039901207',
     projectId:         'resumeapplatest',
-    storageBucket:     'resumeapplatest.appspot.com',
+    storageBucket:     'resumeapplatest.firebasestorage.app',
   );
 
   // ── Replace with your Firebase iOS config (if needed) ─────────────────────
