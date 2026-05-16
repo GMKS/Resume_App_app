@@ -64,14 +64,20 @@ export async function parseTwilioResponse(response: Response): Promise<Record<st
 
 export function twilioErrorMessage(code: unknown, fallback: string): string {
   switch (code) {
+    case 21608:
+      return 'Twilio trial accounts can only send OTP to verified numbers. Verify this phone number in Twilio, or upgrade the Twilio account to send OTP to any real user.';
     case 60033:
       return 'This number is not verified on the current Twilio trial account.';
+    case 21211:
+      return 'Invalid phone number. Enter the full mobile number with the correct country code.';
     case 60200:
       return 'Invalid phone number format. Use E.164 format with country code.';
     case 60203:
       return 'Too many OTP attempts for this number. Please wait and try again.';
     case 60212:
       return 'Too many OTP requests. Please wait a moment before requesting again.';
+    case 21408:
+      return 'Twilio messaging is not enabled for the destination region. Enable India SMS permissions in Twilio for this account.';
     case 20003:
       return 'Twilio authentication failed. Check backend secrets.';
     case 20404:

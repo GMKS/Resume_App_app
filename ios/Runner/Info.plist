@@ -47,11 +47,11 @@
 	<true/>
 
 	<!-- ── Facebook SDK ─────────────────────────────────────────── -->
-	<!-- TODO: Replace YOUR_FACEBOOK_APP_ID and YOUR_FACEBOOK_CLIENT_TOKEN -->
+	<!-- App ID is set; replace YOUR_FACEBOOK_CLIENT_TOKEN with the Meta client token before using iOS Facebook login. -->
 	<key>FacebookAppID</key>
-	<string>YOUR_FACEBOOK_APP_ID</string>
+	<string>1356510139873051</string>
 	<key>FacebookClientToken</key>
-	<string>YOUR_FACEBOOK_CLIENT_TOKEN</string>
+	<string>6496c12f4b54f981007ed168466630a8</string>
 	<key>FacebookDisplayName</key>
 	<string>Resume Builder</string>
 	<key>LSApplicationQueriesSchemes</key>
@@ -67,7 +67,7 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>fbYOUR_FACEBOOK_APP_ID</string>
+				<string>fb1356510139873051</string>
 			</array>
 		</dict>
 		<!-- Google Sign-In callback URL scheme (reversed client ID from GoogleService-Info.plist) -->

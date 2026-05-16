@@ -8,6 +8,7 @@ import 'core/constants/app_info.dart';
 import 'core/debug/store_screenshot_seed.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/services/app_config_service.dart';
 import 'core/services/storage_service.dart';
 import 'features/settings/screens/settings_screen.dart';
 import 'firebase_options.dart';
@@ -34,6 +35,8 @@ void main() async {
       ),
     );
   }
+
+  await AppConfigService.initialize();
 
   // Initialize Hive for local storage
   await Hive.initFlutter();

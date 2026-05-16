@@ -88,11 +88,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "884039901207-udnjeut14ruokcsd6mfu3pkg0lmjt4l2.apps.googleusercontent.com",
+          "client_id": "884039901207-c8e041uk1ncvu3o75e15m1nh83a6j557.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.seenaigmk.resumebuilderai",
-            "certificate_hash": "57bafd53d72f57b2f06784b54c05635f180d4f3d"
+            "certificate_hash": "69af4d27b5fdf632f5b99a28d90723f412fa762f"
           }
         },
         {

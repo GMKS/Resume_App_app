@@ -10,9 +10,21 @@ plugins {
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+val dotEnvProperties = Properties()
+val dotEnvPropertiesFile = rootProject.file("../.env")
 
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use(keystoreProperties::load)
+}
+
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use(localProperties::load)
+}
+
+if (dotEnvPropertiesFile.exists()) {
+    dotEnvPropertiesFile.inputStream().use(dotEnvProperties::load)
 }
 
 fun signingValue(propertyKey: String, envKey: String): String? {
@@ -20,10 +32,71 @@ fun signingValue(propertyKey: String, envKey: String): String? {
     return value?.trim()?.takeIf { it.isNotEmpty() }
 }
 
+fun configValue(propertyKey: String, envKey: String = propertyKey): String? {
+    val gradleValue = project.findProperty(propertyKey)?.toString()
+    val localValue = localProperties.getProperty(propertyKey)
+    val envValue = System.getenv(envKey)
+    val dotEnvValue = dotEnvProperties.getProperty(propertyKey)
+    return listOf(gradleValue, localValue, envValue, dotEnvValue)
+        .firstOrNull { !it.isNullOrBlank() }
+        ?.trim()
+}
+
+fun joinUrl(baseUrl: String, path: String): String {
+    val trimmedBase = baseUrl.trim().trimEnd('/')
+    val trimmedPath = path.trim().trimStart('/')
+    if (trimmedBase.isEmpty()) {
+        return trimmedPath
+    }
+    if (trimmedPath.isEmpty()) {
+        return trimmedBase
+    }
+    return "$trimmedBase/$trimmedPath"
+}
+
+fun deriveOtpUrl(explicitValue: String?, otpBaseUrl: String, path: String): String {
+    val normalizedExplicit = explicitValue?.trim().orEmpty()
+    if (normalizedExplicit.isNotEmpty()) {
+        return normalizedExplicit
+    }
+
+    if (otpBaseUrl.isEmpty()) {
+        return ""
+    }
+
+    return joinUrl(otpBaseUrl, path)
+}
+
+fun parseBooleanFlag(value: String?): Boolean? {
+    return when (value?.trim()?.lowercase()) {
+        "1", "true", "yes", "on" -> true
+        "0", "false", "no", "off" -> false
+        else -> null
+    }
+}
+
 val releaseStoreFile = signingValue("storeFile", "ANDROID_KEYSTORE_FILE")
 val releaseStorePassword = signingValue("storePassword", "ANDROID_KEYSTORE_PASSWORD")
 val releaseKeyAlias = signingValue("keyAlias", "ANDROID_KEY_ALIAS")
 val releaseKeyPassword = signingValue("keyPassword", "ANDROID_KEY_PASSWORD")
+val facebookAppId = configValue("FACEBOOK_APP_ID") ?: "YOUR_FACEBOOK_APP_ID"
+val facebookClientToken = configValue("FACEBOOK_CLIENT_TOKEN") ?: "YOUR_FACEBOOK_CLIENT_TOKEN"
+val linkedInProviderId = configValue("LINKEDIN_PROVIDER_ID") ?: "oidc.linkedin"
+val defaultOtpBaseUrl = "https://bnxdoumofrzfzubsivgs.supabase.co/functions/v1"
+val configuredOtpBaseUrl = configValue("OTP_BASE_URL")
+val configuredOtpSendUrl = configValue("OTP_SEND_URL")
+val configuredOtpVerifyUrl = configValue("OTP_VERIFY_URL")
+val otpBaseUrl = when {
+    !configuredOtpBaseUrl.isNullOrBlank() -> configuredOtpBaseUrl.trim()
+    configuredOtpSendUrl.isNullOrBlank() && configuredOtpVerifyUrl.isNullOrBlank() -> defaultOtpBaseUrl
+    else -> ""
+}
+val otpSendUrl = deriveOtpUrl(configuredOtpSendUrl, otpBaseUrl, "send-otp")
+val otpVerifyUrl = deriveOtpUrl(configuredOtpVerifyUrl, otpBaseUrl, "verify-otp")
+val otpDebugCode = configValue("OTP_DEBUG_CODE") ?: ""
+val facebookAuthEnabled = parseBooleanFlag(configValue("ENABLE_FACEBOOK_AUTH"))
+    ?: (facebookAppId != "YOUR_FACEBOOK_APP_ID" &&
+        facebookClientToken != "YOUR_FACEBOOK_CLIENT_TOKEN")
 val hasReleaseSigning = listOf(
     releaseStoreFile,
     releaseStorePassword,
@@ -64,6 +137,15 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        resValue("string", "facebook_app_id", facebookAppId)
+        resValue("string", "facebook_client_token", facebookClientToken)
+        resValue("string", "facebook_auth_enabled", facebookAuthEnabled.toString())
+        resValue("string", "fb_login_protocol_scheme", "fb$facebookAppId")
+        resValue("string", "linkedin_provider_id", linkedInProviderId)
+        resValue("string", "otp_base_url", otpBaseUrl)
+        resValue("string", "otp_send_url", otpSendUrl)
+        resValue("string", "otp_verify_url", otpVerifyUrl)
+        resValue("string", "otp_debug_code", otpDebugCode)
 
         ndk {
             abiFilters += setOf("armeabi-v7a", "arm64-v8a")

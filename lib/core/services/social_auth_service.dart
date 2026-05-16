@@ -24,12 +24,30 @@ class SocialAuthResult {
 /// Handles Google, Facebook, Twitter/X and LinkedIn sign-in via Firebase Auth.
 class SocialAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  static const String _facebookPackageName = 'com.seenaigmk.resumebuilderai';
+  static const String _facebookActivityName =
+      'com.seenaigmk.resumebuilderai.MainActivity';
+  static const String _linkedInIssuer = 'https://www.linkedin.com/oauth';
+
+  static bool get _hasFacebookNativeConfig =>
+      AppConfigService.read('FACEBOOK_APP_ID').isNotEmpty &&
+      AppConfigService.read('FACEBOOK_CLIENT_TOKEN').isNotEmpty;
+
+  static String get _linkedInProviderId {
+    final configured = AppConfigService.read('LINKEDIN_PROVIDER_ID');
+    return configured.isNotEmpty ? configured : 'oidc.linkedin';
+  }
 
   static bool get isFacebookSignInEnabled =>
-      AppConfigService.readBool('ENABLE_FACEBOOK_AUTH');
+      AppConfigService.readBool(
+        'ENABLE_FACEBOOK_AUTH',
+        defaultValue: !kIsWeb || _hasFacebookNativeConfig,
+      );
+
+  static bool get canAttemptFacebookSignIn => true;
 
   static const String facebookDisabledMessage =
-      'Facebook sign-in is disabled for this build until the Android Facebook App ID and client token are configured and ENABLE_FACEBOOK_AUTH=true is passed at build time.';
+      'Facebook sign-in is disabled for this build until the Android Facebook App ID and client token are configured.';
 
   // ──────────────────────────────────────────────────────────────────
   // Google Sign-In
@@ -71,7 +89,7 @@ class SocialAuthService {
   // Facebook Sign-In
   // ──────────────────────────────────────────────────────────────────
   Future<SocialAuthResult> signInWithFacebook() async {
-    if (!isFacebookSignInEnabled) {
+    if (kIsWeb && !isFacebookSignInEnabled) {
       return const SocialAuthResult(
         success: false,
         message: facebookDisabledMessage,
@@ -85,8 +103,10 @@ class SocialAuthService {
         final provider = FacebookAuthProvider()..addScope('email');
         userCredential = await _auth.signInWithPopup(provider);
       } else {
-        final result =
-            await FacebookAuth.instance.login(permissions: ['email', 'public_profile']);
+        final result = await FacebookAuth.instance.login(
+          permissions: ['email', 'public_profile'],
+          loginBehavior: LoginBehavior.webOnly,
+        );
 
         if (result.status == LoginStatus.cancelled) {
           return const SocialAuthResult(
@@ -103,6 +123,20 @@ class SocialAuthService {
                   'Please replace YOUR_FACEBOOK_APP_ID in\n'
                   'android/app/src/main/res/values/strings.xml\n'
                   'with your real Facebook App ID from developers.facebook.com.',
+            );
+          }
+          if (_isFacebookInactiveAppError(msg)) {
+            return const SocialAuthResult(
+              success: false,
+              message: 'Facebook sign-in is blocked because the Meta app is inactive.\n'
+                  'In Meta Developers, switch the app to Live mode or add your Facebook account as a Developer/Tester for this app, then try again.',
+            );
+          }
+          if (_isFacebookNativePlatformError(msg)) {
+            return const SocialAuthResult(
+              success: false,
+              message: 'Facebook sign-in is misconfigured in Meta Developers.\n'
+                  'Add an Android platform for package com.seenaigmk.resumebuilderai, set the default activity to com.seenaigmk.resumebuilderai.MainActivity, and register the app signing key hashes in the Facebook app settings.',
             );
           }
           return SocialAuthResult(
@@ -160,9 +194,11 @@ class SocialAuthService {
   // ──────────────────────────────────────────────────────────────────
   Future<SocialAuthResult> signInWithLinkedIn() async {
     try {
-      final provider = OAuthProvider('linkedin.com')
-        ..addScope('r_emailaddress')
-        ..addScope('r_liteprofile');
+      final provider = OAuthProvider(_linkedInProviderId)
+        // Keep LinkedIn mobile sign-in on the minimum OIDC scope. Some
+        // LinkedIn app setups reject the optional profile/email scopes with
+        // invalid_scope_error even though the app can tolerate missing claims.
+        ..addScope('openid');
 
       late UserCredential userCredential;
 
@@ -176,17 +212,26 @@ class SocialAuthService {
       return SocialAuthResult(success: true, user: userCredential.user);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'operation-not-allowed') {
-        return const SocialAuthResult(
+        return SocialAuthResult(
           success: false,
-          message: 'LinkedIn sign-in is not enabled yet.\n'
-              'To enable it:\n'
-              '1. Go to Firebase Console -> Authentication -> Sign-in method\n'
-              '2. Add LinkedIn as a custom OAuth provider\n'
-              '   (Get Client ID & Secret from linkedin.com/developers)',
+          message: 'LinkedIn sign-in is not available for provider "$_linkedInProviderId".\n'
+              'In Firebase Console -> Authentication -> Sign-in method, confirm the LinkedIn OIDC provider ID matches exactly, then rebuild the app if you changed it.',
+        );
+      }
+      if (_isLinkedInIssuerError(e.message ?? '')) {
+        return SocialAuthResult(
+          success: false,
+          message: _linkedInIssuerMessage(e.message ?? ''),
         );
       }
       return SocialAuthResult(success: false, message: _parseError(e));
     } catch (e) {
+      if (_isLinkedInIssuerError(e.toString())) {
+        return SocialAuthResult(
+          success: false,
+          message: _linkedInIssuerMessage(e.toString()),
+        );
+      }
       return SocialAuthResult(success: false, message: _parseError(e));
     }
   }
@@ -205,10 +250,138 @@ class SocialAuthService {
     await prefs.setString('photo_url', user.photoURL ?? '');
   }
 
+  bool _isLinkedInIssuerError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('error connecting to the given credential\'s issuer') ||
+        (normalized.contains('auth/invalid-credential') &&
+            normalized.contains('issuer'));
+  }
+
+  bool _isLinkedInInvalidScopeError(String message) {
+    final normalized = message.toLowerCase();
+    final oauthError = _readOAuthQueryField(message, 'error').toLowerCase();
+    final oauthDescription =
+        _readOAuthQueryField(message, 'error_description').toLowerCase();
+    return normalized.contains('invalid_scope_error') ||
+        normalized.contains('requested permission scope is not valid') ||
+        oauthError == 'invalid_scope_error' ||
+        oauthDescription.contains('requested permission scope is not valid');
+  }
+
+  String _linkedInInvalidScopeMessage() {
+    return 'LinkedIn sign-in is misconfigured outside the app.\n'
+        'LinkedIn is rejecting the requested OIDC scope for provider "$_linkedInProviderId".\n\n'
+        'Fix this in configuration:\n'
+        '1. LinkedIn Developer Portal -> Products -> enable "Sign In with LinkedIn using OpenID Connect" for the LinkedIn app.\n'
+        '2. LinkedIn Developer Portal -> Auth -> add the redirect URL https://resumeapplatest.firebaseapp.com/__/auth/handler.\n'
+        '3. Firebase Console -> Authentication -> Sign-in method -> OpenID Connect provider "$_linkedInProviderId" -> issuer must be $_linkedInIssuer, and the LinkedIn client ID / secret must match the same LinkedIn app.\n'
+        '4. Rebuild and reinstall the app after saving those provider changes.';
+  }
+
+  String _linkedInIssuerMessage([String technicalDetail = '']) {
+    final buffer = StringBuffer()
+      ..writeln(
+        'LinkedIn sign-in is misconfigured outside the app for provider "$_linkedInProviderId".',
+      )
+      ..writeln()
+      ..writeln('Verify these values together:')
+      ..writeln(
+        '1. Firebase Console -> Authentication -> Sign-in method -> OpenID Connect provider "$_linkedInProviderId"',
+      )
+      ..writeln('   Issuer: $_linkedInIssuer')
+      ..writeln(
+        '   Client ID and Client secret: must match the same LinkedIn app',
+      )
+      ..writeln(
+        '2. LinkedIn Developer Portal -> Products -> enable "Sign In with LinkedIn using OpenID Connect"',
+      )
+      ..writeln(
+        '3. LinkedIn Developer Portal -> Auth -> add redirect URL https://resumeapplatest.firebaseapp.com/__/auth/handler',
+      )
+      ..write('4. Rebuild and reinstall the app after saving those provider changes.');
+
+    final normalizedDetail = technicalDetail.trim();
+    if (normalizedDetail.isNotEmpty) {
+      buffer
+        ..writeln()
+        ..writeln()
+        ..write('Technical details: $normalizedDetail');
+    }
+
+    return buffer.toString();
+  }
+
+  String _readOAuthQueryField(String message, String field) {
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    final candidates = <String>[];
+    final queryIndex = trimmed.indexOf('?');
+    if (queryIndex >= 0 && queryIndex + 1 < trimmed.length) {
+      candidates.add(trimmed.substring(queryIndex + 1));
+    }
+    candidates.add(trimmed);
+
+    for (final candidate in candidates) {
+      if (!candidate.contains('$field=')) {
+        continue;
+      }
+      try {
+        final parsed = Uri.splitQueryString(candidate);
+        final value = parsed[field];
+        if (value != null && value.isNotEmpty) {
+          return value;
+        }
+      } catch (_) {
+        // Fall through to the regex-based extraction below.
+      }
+
+      final match = RegExp('(?:^|[?&])${RegExp.escape(field)}=([^&]+)')
+          .firstMatch(candidate);
+      if (match != null) {
+        return Uri.decodeQueryComponent(match.group(1)!);
+      }
+    }
+
+    return '';
+  }
+
+  bool _isFacebookInactiveAppError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('app not active') ||
+        normalized.contains('this app is not accessible right now') ||
+        (normalized.contains('app is inactive') &&
+            normalized.contains('facebook'));
+  }
+
+  bool _isFacebookNativePlatformError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('given url is not allowed by the application configuration') ||
+        normalized.contains('add a valid native platform') ||
+        (normalized.contains('not allowed by the app\'s settings') &&
+            normalized.contains('facebook'));
+  }
+
   String _parseError(dynamic e) {
     // ── FirebaseAuthException ──────────────────────────────────────
     if (e is FirebaseAuthException) {
       final msg = e.message ?? '';
+      if (_isLinkedInIssuerError(msg)) {
+        return _linkedInIssuerMessage(msg);
+      }
+      if (_isLinkedInInvalidScopeError(msg)) {
+        return _linkedInInvalidScopeMessage();
+      }
+      if (_isFacebookInactiveAppError(msg)) {
+        return 'Facebook sign-in is blocked because the Meta app is inactive.\n'
+            'In Meta Developers, switch the app to Live mode or add your Facebook account as a Developer/Tester for this app, then try again.';
+      }
+      if (_isFacebookNativePlatformError(msg)) {
+        return 'Facebook sign-in is misconfigured in Meta Developers.\n'
+            'Add an Android platform for package $_facebookPackageName, set the default activity to $_facebookActivityName, and register the app signing key hashes in the Facebook app settings.';
+      }
       switch (e.code) {
         case 'account-exists-with-different-credential':
           return 'An account already exists with a different sign-in method.';
@@ -239,15 +412,36 @@ class SocialAuthService {
       final code   = e.code;
       final detail = e.details?.toString() ?? e.message ?? '';
 
+      if (_isLinkedInIssuerError(detail)) {
+        return _linkedInIssuerMessage(detail);
+      }
+      if (_isLinkedInInvalidScopeError(detail)) {
+        return _linkedInInvalidScopeMessage();
+      }
+
+      if (_isFacebookInactiveAppError(detail)) {
+        return 'Facebook sign-in is blocked because the Meta app is inactive.\n'
+        'In Meta Developers, switch the app to Live mode or add your Facebook account as a Developer/Tester for this app, then try again.';
+      }
+
+      if (_isFacebookNativePlatformError(detail)) {
+        return 'Facebook sign-in is misconfigured in Meta Developers.\n'
+            'Add an Android platform for package $_facebookPackageName, set the default activity to $_facebookActivityName, and register the app signing key hashes in the Facebook app settings.';
+      }
+
       if (code == 'sign_in_failed') {
         // ApiException: 10  → DEVELOPER_ERROR
         // The debug/release SHA-1 fingerprint is not registered in Firebase
         // Console or Google Cloud OAuth client.
         if (detail.contains('ApiException: 10') || detail.contains('10:')) {
           return 'Google Sign-In is not fully configured.\n'
-              'Add your debug SHA-1 fingerprint\n'
-              'B1:25:67:8C:A9:3C:37:20:5F:DA:60:58:20:E4:33:C3:98:40:01:57\n'
-              'to Firebase Console → Project Settings → Your Android App → SHA certificate fingerprints.';
+              'Firebase must contain the correct SHA-1/SHA-256 for package\n'
+              'com.seenaigmk.resumebuilderai.\n\n'
+              'For local debug installs, add:\n'
+              'B1:25:67:8C:A9:3C:37:20:5F:DA:60:58:20:E4:33:C3:98:40:01:57\n\n'
+              'For Play internal testing or production, also add the Play App Signing\n'
+              'SHA-1/SHA-256 in Firebase Console → Project Settings → Your Android app,\n'
+              'then download a fresh android/app/google-services.json.';
         }
         if (detail.contains('ApiException: 7')) {
           return 'No internet connection. Please try again.';
@@ -270,6 +464,20 @@ class SocialAuthService {
     }
 
     final raw = e.toString();
+    if (_isLinkedInIssuerError(raw)) {
+      return _linkedInIssuerMessage(raw);
+    }
+    if (_isLinkedInInvalidScopeError(raw)) {
+      return _linkedInInvalidScopeMessage();
+    }
+    if (_isFacebookInactiveAppError(raw)) {
+      return 'Facebook sign-in is blocked because the Meta app is inactive.\n'
+          'In Meta Developers, switch the app to Live mode or add your Facebook account as a Developer/Tester for this app, then try again.';
+    }
+    if (_isFacebookNativePlatformError(raw)) {
+      return 'Facebook sign-in is misconfigured in Meta Developers.\n'
+          'Add an Android platform for package $_facebookPackageName, set the default activity to $_facebookActivityName, and register the app signing key hashes in the Facebook app settings.';
+    }
     if (raw.contains('INVALID_APP_ID')) {
       return 'This sign-in provider is not configured in Firebase Console yet.\n'
           'Enable it under Authentication → Sign-in method.';

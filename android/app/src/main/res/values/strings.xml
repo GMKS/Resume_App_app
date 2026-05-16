@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        TODO: Replace with your actual Facebook App credentials.
+        Facebook Android resources are now injected from build config.
         1. Go to https://developers.facebook.com/apps and create or open your app.
-        2. Settings → Basic → copy "App ID" → paste in facebook_app_id below.
-        3. Settings → Basic → copy "App Secret" → paste in facebook_client_token below.
-        4. Also add YOUR_PACKAGE_NAME to "Android" platform in Facebook App settings,
+        2. Copy the Facebook App ID and Client Token into either:
+           - environment variables FACEBOOK_APP_ID and FACEBOOK_CLIENT_TOKEN, or
+           - entries with those names in local.properties.
+        3. Also add YOUR_PACKAGE_NAME to "Android" platform in Facebook App settings,
            and add your debug/release key hash (run the keytool command shown in the
            flutter_facebook_auth docs to get your hash).
     -->
-    <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
-    <string name="facebook_client_token">YOUR_FACEBOOK_CLIENT_TOKEN</string>
-    <string name="fb_login_protocol_scheme">fbYOUR_FACEBOOK_APP_ID</string>
 </resources>

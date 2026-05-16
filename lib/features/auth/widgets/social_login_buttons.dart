@@ -88,7 +88,7 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
               icon: FontAwesomeIcons.facebookF,
               color: const Color(0xFF1877F2),
               label: 'Facebook',
-              enabled: SocialAuthService.isFacebookSignInEnabled,
+              enabled: SocialAuthService.canAttemptFacebookSignIn,
               disabledMessage: SocialAuthService.facebookDisabledMessage,
               loading: _activeProvider == 'facebook',
               onTap: () => _handleSocial(

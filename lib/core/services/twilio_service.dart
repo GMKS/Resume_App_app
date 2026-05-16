@@ -1,22 +1,31 @@
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import 'app_config_service.dart';
 
 class TwilioService {
-  final String otpSendUrl = AppConfigService.read('OTP_SEND_URL');
-  final String otpVerifyUrl = AppConfigService.read('OTP_VERIFY_URL');
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final String otpDebugCode = AppConfigService.read('OTP_DEBUG_CODE');
+  final String _otpSendUrl = AppConfigService.read('OTP_SEND_URL');
+  final String _otpVerifyUrl = AppConfigService.read('OTP_VERIFY_URL');
+  String? _verificationId;
+  int? _forceResendingToken;
+  String? _pendingPhoneNumber;
+  String? _activeOtpProvider;
 
-  bool get _hasBackend => otpSendUrl.isNotEmpty && otpVerifyUrl.isNotEmpty;
   bool get _hasDebugOtp => !kReleaseMode && otpDebugCode.isNotEmpty;
 
-  bool get supportsWebOtp => _hasBackend || _hasDebugOtp;
+  bool get _hasBackendOtp =>
+      _otpSendUrl.isNotEmpty && _otpVerifyUrl.isNotEmpty;
 
-  /// Sends a verification code using the configured backend, or a local debug
-  /// code in non-release builds.
+  bool get supportsWebOtp => !kIsWeb || _hasDebugOtp || _hasBackendOtp;
+
+  /// Sends a verification code using Firebase Phone Auth on mobile first,
+  /// then falls back to the configured backend when available.
   Future<Map<String, dynamic>> sendOTP(String phoneNumber) async {
     if (_hasDebugOtp) {
       return {
@@ -27,37 +36,31 @@ class TwilioService {
       };
     }
 
-    if (!_hasBackend) {
+    final formattedPhone = _formatPhoneNumber(phoneNumber);
+
+    if (!kIsWeb) {
+      final firebaseResult = await _sendOtpViaFirebase(formattedPhone);
+      if (firebaseResult['success'] == true || !_hasBackendOtp) {
+        return firebaseResult;
+      }
+    }
+
+    if (_hasBackendOtp) {
+      return _sendOtpViaBackend(formattedPhone);
+    }
+
+    if (kIsWeb) {
       return {
         'success': false,
         'message':
-            'Phone verification is not configured for this build. Add OTP_SEND_URL and OTP_VERIFY_URL for real OTP, or OTP_DEBUG_CODE for local testing.',
+            'Phone verification is available only in the mobile app for this build.',
       };
     }
 
-    try {
-      final response = await http.post(
-        Uri.parse(otpSendUrl),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(<String, dynamic>{
-          'phoneNumber': _formatPhoneNumber(phoneNumber),
-        }),
-      );
-
-      return _normalizeBackendResponse(
-        response,
-        successMessage: 'OTP sent successfully.',
-        failureMessage: 'Failed to send OTP. Try again.',
-        successStatuses: const <String>{'pending', 'approved'},
-      );
-    } catch (_) {
-      return {
-        'success': false,
-        'message': 'Network error. Please check your connection.',
-      };
-    }
+    return {
+      'success': false,
+      'message': 'Could not start phone verification. Please try again.',
+    };
   }
 
   /// Verify OTP entered by user
@@ -76,38 +79,47 @@ class TwilioService {
       };
     }
 
-    if (!_hasBackend) {
+    final formattedPhone = _formatPhoneNumber(phoneNumber);
+
+    if (_activeOtpProvider == 'backend') {
+      if (_pendingPhoneNumber != null && _pendingPhoneNumber != formattedPhone) {
+        return {
+          'success': false,
+          'message': 'Please request a new OTP and try again.',
+        };
+      }
+
+      return _verifyOtpViaBackend(formattedPhone, otpCode);
+    }
+
+    if (!kIsWeb) {
+      final hasFirebaseSession =
+          _verificationId != null && _pendingPhoneNumber == formattedPhone;
+      if (_activeOtpProvider == 'firebase' || hasFirebaseSession || !_hasBackendOtp) {
+        return _verifyOtpViaFirebase(formattedPhone, otpCode);
+      }
+    }
+
+    if (_hasBackendOtp) {
+      if (_pendingPhoneNumber != null && _pendingPhoneNumber != formattedPhone) {
+        return {
+          'success': false,
+          'message': 'Please request a new OTP and try again.',
+        };
+      }
+
+      return _verifyOtpViaBackend(formattedPhone, otpCode);
+    }
+
+    if (kIsWeb) {
       return {
         'success': false,
         'message':
-            'Phone verification is not configured for this build. Add OTP_SEND_URL and OTP_VERIFY_URL for real OTP, or OTP_DEBUG_CODE for local testing.',
+            'Phone verification is available only in the mobile app for this build.',
       };
     }
 
-    try {
-      final response = await http.post(
-        Uri.parse(otpVerifyUrl),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(<String, dynamic>{
-          'phoneNumber': _formatPhoneNumber(phoneNumber),
-          'code': otpCode,
-        }),
-      );
-
-      return _normalizeBackendResponse(
-        response,
-        successMessage: 'OTP verified successfully.',
-        failureMessage: 'Invalid OTP. Please try again.',
-        successStatuses: const <String>{'approved'},
-      );
-    } catch (_) {
-      return {
-        'success': false,
-        'message': 'Network error. Please check your connection.',
-      };
-    }
+    return _verifyOtpViaFirebase(formattedPhone, otpCode);
   }
 
   /// Format phone number to E.164 format (+CountryCodeNumber)
@@ -115,8 +127,8 @@ class TwilioService {
     String cleaned = phone.replaceAll(RegExp(r'[^\d+]'), '');
 
     if (!cleaned.startsWith('+')) {
-      if (cleaned.length == 10) {
-        cleaned = '+1$cleaned'; // Default to US
+      if (cleaned.startsWith('00')) {
+        cleaned = '+${cleaned.substring(2)}';
       } else {
         cleaned = '+$cleaned';
       }
@@ -136,49 +148,264 @@ class TwilioService {
     return sendOTP(phoneNumber);
   }
 
-  Map<String, dynamic> _normalizeBackendResponse(
-    http.Response response, {
-    required String successMessage,
-    required String failureMessage,
-    Set<String>? successStatuses,
-  }) {
-    final payload = _decodePayload(response.body);
-    final status = payload['status'];
-    final explicitSuccess = payload['success'];
-    final isHttpSuccess =
-        response.statusCode >= 200 && response.statusCode < 300;
-    final isAllowedStatus =
-      status is String && successStatuses != null
-        ? successStatuses.contains(status)
-        : true;
-    final isSuccess = explicitSuccess is bool
-        ? explicitSuccess
-      : isHttpSuccess && (status == null || isAllowedStatus);
+  Future<Map<String, dynamic>> _sendOtpViaFirebase(String phoneNumber) async {
+    final completer = Completer<Map<String, dynamic>>();
+    var completed = false;
 
-    return <String, dynamic>{
-      'success': isSuccess,
-      'message': (payload['message'] as String?)?.trim().isNotEmpty == true
-          ? payload['message']
-          : (isSuccess ? successMessage : failureMessage),
-      if (status != null) 'status': status,
-      if (payload['sid'] != null) 'sid': payload['sid'],
-      if (!isSuccess && response.body.trim().isNotEmpty) 'error': response.body,
-    };
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        forceResendingToken:
+            _pendingPhoneNumber == phoneNumber ? _forceResendingToken : null,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          if (completed) {
+            return;
+          }
+
+          try {
+            await _auth.signInWithCredential(credential);
+            _activeOtpProvider = 'firebase';
+            _clearPendingVerification();
+            completed = true;
+            completer.complete(<String, dynamic>{
+              'success': true,
+              'message': 'Phone number verified automatically.',
+              'status': 'approved',
+            });
+          } on FirebaseAuthException catch (error) {
+            completed = true;
+            completer.complete(<String, dynamic>{
+              'success': false,
+              'message': _parseFirebaseAuthError(error),
+            });
+          }
+        },
+        verificationFailed: (FirebaseAuthException error) {
+          if (completed) {
+            return;
+          }
+
+          completed = true;
+          completer.complete(<String, dynamic>{
+            'success': false,
+            'message': _parseFirebaseAuthError(error),
+          });
+        },
+        codeSent: (String verificationId, int? forceResendingToken) {
+          _verificationId = verificationId;
+          _forceResendingToken = forceResendingToken;
+          _pendingPhoneNumber = phoneNumber;
+          _activeOtpProvider = 'firebase';
+
+          if (completed) {
+            return;
+          }
+
+          completed = true;
+          completer.complete(<String, dynamic>{
+            'success': true,
+            'message': 'OTP sent successfully.',
+            'status': 'pending',
+          });
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          _verificationId = verificationId;
+        },
+      );
+
+      return completer.future.timeout(
+        const Duration(seconds: 75),
+        onTimeout: () => <String, dynamic>{
+          'success': false,
+          'message': 'Timed out while sending OTP. Please try again.',
+        },
+      );
+    } on FirebaseAuthException catch (error) {
+      return {
+        'success': false,
+        'message': _parseFirebaseAuthError(error),
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Could not start phone verification. Please try again.',
+      };
+    }
   }
 
-  Map<String, dynamic> _decodePayload(String responseBody) {
-    if (responseBody.trim().isEmpty) {
-      return <String, dynamic>{};
+  Future<Map<String, dynamic>> _verifyOtpViaFirebase(
+    String phoneNumber,
+    String otpCode,
+  ) async {
+    final verificationId = _verificationId;
+    if (verificationId == null || _pendingPhoneNumber != phoneNumber) {
+      return {
+        'success': false,
+        'message': 'Please request a new OTP and try again.',
+      };
     }
 
     try {
-      final decoded = jsonDecode(responseBody);
-      if (decoded is Map<String, dynamic>) {
-        return decoded;
-      }
-      return <String, dynamic>{'message': decoded.toString()};
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: otpCode,
+      );
+      await _auth.signInWithCredential(credential);
+      _clearPendingVerification();
+
+      return {
+        'success': true,
+        'message': 'OTP verified successfully.',
+        'status': 'approved',
+      };
+    } on FirebaseAuthException catch (error) {
+      return {
+        'success': false,
+        'message': _parseFirebaseAuthError(error),
+      };
     } catch (_) {
-      return <String, dynamic>{'message': responseBody};
+      return {
+        'success': false,
+        'message': 'Could not verify OTP. Please try again.',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> _sendOtpViaBackend(String phoneNumber) async {
+    try {
+      final response = await http.post(
+        Uri.parse(_otpSendUrl),
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(<String, String>{'phoneNumber': phoneNumber}),
+      );
+
+      final result = _parseBackendResult(
+        response,
+        fallbackMessage: 'Could not send OTP. Please try again.',
+      );
+
+      if (result['success'] == true) {
+        _verificationId = null;
+        _forceResendingToken = null;
+        _pendingPhoneNumber = phoneNumber;
+        _activeOtpProvider = 'backend';
+      }
+
+      return result;
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Could not reach the OTP service. Please try again.',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> _verifyOtpViaBackend(
+    String phoneNumber,
+    String otpCode,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse(_otpVerifyUrl),
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(<String, String>{
+          'phoneNumber': phoneNumber,
+          'code': otpCode.trim(),
+        }),
+      );
+
+      final result = _parseBackendResult(
+        response,
+        fallbackMessage: 'Could not verify OTP. Please try again.',
+      );
+
+      if (result['success'] == true) {
+        _clearPendingVerification();
+      }
+
+      return result;
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Could not reach the OTP service. Please try again.',
+      };
+    }
+  }
+
+  Map<String, dynamic> _parseBackendResult(
+    http.Response response, {
+    required String fallbackMessage,
+  }) {
+    Map<String, dynamic> body = <String, dynamic>{};
+    final rawBody = response.body.trim();
+
+    if (rawBody.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawBody);
+        if (decoded is Map<String, dynamic>) {
+          body = decoded;
+        } else if (decoded is Map) {
+          body = decoded.map(
+            (key, value) => MapEntry(key.toString(), value),
+          );
+        }
+      } catch (_) {
+        // Fall back to the HTTP status and generic message below.
+      }
+    }
+
+    final success = body['success'] == true ||
+        (response.statusCode >= 200 && response.statusCode < 300 && body['success'] != false);
+    final message = body['message']?.toString().trim();
+    final status = body['status']?.toString().trim();
+
+    return {
+      'success': success,
+      'message': message != null && message.isNotEmpty
+          ? message
+          : fallbackMessage,
+      if (status != null && status.isNotEmpty) 'status': status,
+    };
+  }
+
+  void _clearPendingVerification() {
+    _verificationId = null;
+    _forceResendingToken = null;
+    _pendingPhoneNumber = null;
+    _activeOtpProvider = null;
+  }
+
+  String _parseFirebaseAuthError(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'invalid-phone-number':
+        return 'Invalid phone number. Please check and try again.';
+      case 'missing-phone-number':
+        return 'Please enter a phone number.';
+      case 'quota-exceeded':
+        return 'Firebase phone verification quota has been exceeded. Please try again later.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait a bit before trying again.';
+      case 'session-expired':
+        return 'The OTP has expired. Please request a new code.';
+      case 'invalid-verification-code':
+        return 'Invalid OTP. Please try again.';
+      case 'invalid-verification-id':
+        return 'Verification session expired. Please request a new OTP.';
+      case 'network-request-failed':
+        return 'Network error. Please check your connection.';
+      case 'captcha-check-failed':
+        return 'Phone verification could not be completed. Please try again.';
+      case 'operation-not-allowed':
+        return 'Phone sign-in is not enabled in Firebase Authentication.';
+      default:
+        return (error.message ?? 'Phone verification failed.').trim();
     }
   }
 }

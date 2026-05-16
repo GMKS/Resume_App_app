@@ -36,6 +36,40 @@ builds, subscription checkout uses Google Play Billing and requires matching
 subscription product IDs in Play Console. Razorpay remains the fallback for
 non-Android distributions.
 
+You can configure OTP with either exact endpoint URLs or a shared base URL:
+
+```powershell
+$env:OTP_BASE_URL="https://your-project-ref.supabase.co/functions/v1"
+```
+
+When `OTP_SEND_URL` and `OTP_VERIFY_URL` are not passed, the app derives them
+from `OTP_BASE_URL` as `/send-otp` and `/verify-otp`.
+
+## Google Login And Internal Testing Access
+
+The Android app already supports Google sign-in through Firebase Auth. For a
+Play-installed build to let users sign in with Gmail successfully, keep these
+items aligned:
+
+1. In Firebase Console -> Authentication -> Sign-in method, enable Google.
+2. In Firebase Console -> Project Settings -> Your Android app, register both
+	the upload-key SHA fingerprints and the Play App Signing SHA fingerprints
+	for package `com.seenaigmk.resumebuilderai`.
+3. After changing fingerprints, download a fresh
+	`android/app/google-services.json` from Firebase.
+
+For Google Play internal testing access, the install itself is controlled by
+Play Console, not by app code:
+
+1. Add each tester Gmail address under Play Console -> Testing -> Internal
+	testing -> Testers.
+2. Share the internal-test opt-in link with those testers.
+3. Testers must sign in to the Google Play Store on the device with the same
+	Gmail address that was added to the tester list before opening the opt-in
+	link and installing the app.
+4. After installation, the user can sign in inside the app with Google using
+	the Firebase-enabled account flow.
+
 The app now reads Play product IDs from either `.env` or `--dart-define`, so
 you can keep using `.env` during local testing and set the same values in your
 release pipeline.
