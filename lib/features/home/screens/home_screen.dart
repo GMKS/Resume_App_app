@@ -13,9 +13,12 @@ import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_sync_service.dart';
 import '../../../core/utils/cloud_resume_sync.dart';
+import '../../../core/utils/validation_feedback.dart';
 import '../widgets/stats_card.dart';
 import '../../../core/providers/navigation_providers.dart';
 import '../../../shared/widgets/feature_gate.dart';
+import '../../../shared/widgets/adaptive_tooltip.dart';
+import '../../../shared/widgets/responsive_content.dart';
 
 // Provider for resumes list
 final resumesProvider =
@@ -133,20 +136,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: const Text('New Resume'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Give your resume a name:', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const Text('Give your resume a name:',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             const SizedBox(height: 12),
             TextField(
               controller: nameController,
               autofocus: true,
               decoration: InputDecoration(
                 hintText: 'e.g., Software Engineer, Product Manager...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
               onSubmitted: (_) => _submitNewResume(nameController.text, ctx),
             ),
@@ -162,7 +169,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Create'),
           ),
@@ -174,14 +182,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _submitNewResume(String name, BuildContext dialogContext) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a resume name')),
+      showMissingFieldsSnackBar(
+        context,
+        const ['Resume Name'],
+        prefix: 'Add the missing field before creating a resume:',
       );
       return;
     }
-    
+
     Navigator.pop(dialogContext);
-    
+
     final resume = ResumeModel(
       id: const Uuid().v4(),
       title: trimmedName,
@@ -203,7 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
       return;
     }
-    
+
     if (mounted) {
       context.go('/editor/${resume.id}');
     }
@@ -215,263 +225,283 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return Scaffold(
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Header
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Hello! 👋',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              AppInfo.appName,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .displaySmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => context.push('/settings'),
-                              style: IconButton.styleFrom(
-                                backgroundColor:
-                                    AppColors.primary.withValues(alpha: 0.1),
-                              ),
-                              icon: const Icon(
-                                Iconsax.setting_2,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    )
-                        .animate()
-                        .fadeIn(duration: 500.ms)
-                        .slideX(begin: -0.1, end: 0),
-
-                    const SizedBox(height: 24),
-
-                    // Stats Cards
-                    Row(
-                      children: [
-                        Expanded(
-                          child: StatsCard(
-                            icon: Iconsax.document_text_1,
-                            title: '${resumes.length}',
-                            subtitle: 'Total Resumes',
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: StatsCard(
-                            icon: Iconsax.tick_circle,
-                            title:
-                                '${resumes.where((r) => r.completionPercentage == 100).length}',
-                            subtitle: 'Completed',
-                            color: AppColors.success,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: StatsCard(
-                            icon: Iconsax.edit_2,
-                            title:
-                                '${resumes.where((r) => r.completionPercentage < 100).length}',
-                            subtitle: 'In Progress',
-                            color: AppColors.warning,
-                          ),
-                        ),
-                      ],
-                    )
-                        .animate()
-                        .fadeIn(delay: 200.ms, duration: 500.ms)
-                        .slideY(begin: 0.2, end: 0),
-
-                    const SizedBox(height: 24),
-
-                    // My Resumes Summary Card — tap to go to Resumes tab
-                    GestureDetector(
-                      onTap: () =>
-                          ref.read(currentTabProvider.notifier).state = 1,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: AppColors.primary.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Iconsax.document_text_1,
-                                  color: AppColors.primary),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'My Resumes',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                            fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                    resumes.isEmpty
-                                        ? 'No resumes yet — create one!'
-                                        : '${resumes.length} resume${resumes.length == 1 ? '' : 's'} saved',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                            color: AppColors.textSecondary),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(Iconsax.arrow_right_3,
-                                color: AppColors.primary),
-                          ],
-                        ),
-                      ),
-                    ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
-                  ],
-                ),
-              ),
-            ),
-
-            // AI Tools Section
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'AI Tools',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        TextButton(
-                          onPressed: () => context.push('/ai-assistant'),
-                          child: const Text('See all'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+        child: ResponsiveContent(
+          child: CustomScrollView(
+            slivers: [
+              // Header
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _AiQuickCard(
-                            icon: Iconsax.refresh_2,
-                            label: 'Resume\nRewrite',
-                            color: const Color(0xFF8B5CF6),
-                            onTap: () => context.push('/ai-resume-rewrite'),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Hello! 👋',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                AppInfo.appName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .displaySmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 10),
-                          _AiQuickCard(
-                            icon: Iconsax.search_normal_1,
-                            label: 'Job\nTailor',
-                            color: AppColors.info,
-                            onTap: () => context.push('/ai-job-tailor'),
+                          Row(
+                            children: [
+                              AdaptiveTooltip(
+                                message: 'Open settings',
+                                button: true,
+                                child: IconButton(
+                                  onPressed: () => context.push('/settings'),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: AppColors.primary
+                                        .withValues(alpha: 0.1),
+                                  ),
+                                  icon: const Icon(
+                                    Iconsax.setting_2,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 10),
-                          _AiQuickCard(
-                            icon: Iconsax.edit_2,
-                            label: 'Content\nEnhancer',
-                            color: AppColors.warning,
-                            onTap: () => context.push('/ai-content-enhancer'),
-                          ),
-                          const SizedBox(width: 10),
-                          _AiQuickCard(
-                            icon: Iconsax.document_text_1,
-                            label: 'Resume\nGenerator',
-                            color: AppColors.primary,
-                            onTap: () => context.push('/ai-resume-generator'),
-                          ),
-                          const SizedBox(width: 10),
-                          _AiQuickCard(
-                            icon: Iconsax.document_text,
-                            label: 'Cover\nLetter',
-                            color: AppColors.secondary,
-                            onTap: () => context.push('/cover-letter'),
-                          ),
-                          const SizedBox(width: 20),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
-            ),
+                      )
+                          .animate()
+                          .fadeIn(duration: 500.ms)
+                          .slideX(begin: -0.1, end: 0),
 
-            // Create Resume Button
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: _createNewResume,
-                    icon: const Icon(Iconsax.add),
-                    label: const Text('Create New Resume'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 2,
-                    ),
+                      const SizedBox(height: 24),
+
+                      // Stats Cards
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isCompact = constraints.maxWidth < 680;
+                          final cardWidth = isCompact
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth - 24) / 3;
+
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              SizedBox(
+                                width: cardWidth,
+                                child: StatsCard(
+                                  icon: Iconsax.document_text_1,
+                                  title: '${resumes.length}',
+                                  subtitle: 'Total Resumes',
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              SizedBox(
+                                width: cardWidth,
+                                child: StatsCard(
+                                  icon: Iconsax.tick_circle,
+                                  title:
+                                      '${resumes.where((r) => r.completionPercentage == 100).length}',
+                                  subtitle: 'Completed',
+                                  color: AppColors.success,
+                                ),
+                              ),
+                              SizedBox(
+                                width: cardWidth,
+                                child: StatsCard(
+                                  icon: Iconsax.edit_2,
+                                  title:
+                                      '${resumes.where((r) => r.completionPercentage < 100).length}',
+                                  subtitle: 'In Progress',
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      )
+                          .animate()
+                          .fadeIn(delay: 200.ms, duration: 500.ms)
+                          .slideY(begin: 0.2, end: 0),
+
+                      const SizedBox(height: 24),
+
+                      // My Resumes Summary Card — tap to go to Resumes tab
+                      GestureDetector(
+                        onTap: () =>
+                            ref.read(currentTabProvider.notifier).state = 1,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Iconsax.document_text_1,
+                                    color: AppColors.primary),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'My Resumes',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      resumes.isEmpty
+                                          ? 'No resumes yet — create one!'
+                                          : '${resumes.length} resume${resumes.length == 1 ? '' : 's'} saved',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                              color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Iconsax.arrow_right_3,
+                                  color: AppColors.primary),
+                            ],
+                          ),
+                        ),
+                      ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
+                    ],
                   ),
                 ),
-              ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2, end: 0),
-            ),
-          ],
+              ),
+
+              // AI Tools Section
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'AI Tools',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          TextButton(
+                            onPressed: () => context.push('/ai-assistant'),
+                            child: const Text('See all'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        clipBehavior: Clip.none,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _AiQuickCard(
+                              icon: Iconsax.refresh_2,
+                              label: 'Resume\nRewrite',
+                              color: const Color(0xFF8B5CF6),
+                              onTap: () => context.push('/ai-resume-rewrite'),
+                            ),
+                            const SizedBox(width: 10),
+                            _AiQuickCard(
+                              icon: Iconsax.search_normal_1,
+                              label: 'Job\nTailor',
+                              color: AppColors.info,
+                              onTap: () => context.push('/ai-job-tailor'),
+                            ),
+                            const SizedBox(width: 10),
+                            _AiQuickCard(
+                              icon: Iconsax.edit_2,
+                              label: 'Content\nEnhancer',
+                              color: AppColors.warning,
+                              onTap: () => context.push('/ai-content-enhancer'),
+                            ),
+                            const SizedBox(width: 10),
+                            _AiQuickCard(
+                              icon: Iconsax.document_text_1,
+                              label: 'Resume\nGenerator',
+                              color: AppColors.primary,
+                              onTap: () => context.push('/ai-resume-generator'),
+                            ),
+                            const SizedBox(width: 10),
+                            _AiQuickCard(
+                              icon: Iconsax.document_text,
+                              label: 'Cover\nLetter',
+                              color: AppColors.secondary,
+                              onTap: () => context.push('/cover-letter'),
+                            ),
+                            const SizedBox(width: 20),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
+              ),
+
+              // Create Resume Button
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      onPressed: _createNewResume,
+                      icon: const Icon(Iconsax.add),
+                      label: const Text('Create New Resume'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 2,
+                      ),
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2, end: 0),
+              ),
+            ],
+          ),
         ),
       ),
     );

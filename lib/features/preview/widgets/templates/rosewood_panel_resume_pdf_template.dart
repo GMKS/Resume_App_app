@@ -20,9 +20,9 @@ class RosewoodPanelResumePdfTemplate extends PdfTemplate {
   static const PdfColor _avatar =
       PdfColor.fromInt(RosewoodPanelTemplateSupport.avatarHex);
 
-    PdfColor get _sectionRule => _blendPdfWithWhite(_accent, 0.55);
-    PdfColor get _sidebarBorder => _blendPdfWithWhite(_accent, 0.45);
-    PdfColor get _avatarFill => _blendPdfWithWhite(_accent, 0.22);
+  PdfColor get _sectionRule => _blendPdfWithWhite(_accent, 0.55);
+  PdfColor get _sidebarBorder => _blendPdfWithWhite(_accent, 0.45);
+  PdfColor get _avatarFill => _blendPdfWithWhite(_accent, 0.22);
 
   static const double _pageMargin = 28;
   static const double _pageTop = 26;
@@ -167,10 +167,13 @@ class RosewoodPanelResumePdfTemplate extends PdfTemplate {
         continue;
       }
 
+      final title = displayUserCustomSectionTitle(
+        section,
+        fallback: 'SECTION',
+      ).toUpperCase();
+
       sections[section.id] = [
-        _sectionHeader(normalizeUserCustomSectionTitle(section.title).isEmpty
-            ? 'CUSTOM SECTION'
-            : normalizeUserCustomSectionTitle(section.title).toUpperCase()),
+        _sectionHeader(title),
         ...section.items.map(
           (item) {
             final displayItem = buildUserCustomSectionDisplayItem(item);

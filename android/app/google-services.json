@@ -88,11 +88,19 @@
       },
       "oauth_client": [
         {
-          "client_id": "884039901207-c8e041uk1ncvu3o75e15m1nh83a6j557.apps.googleusercontent.com",
+          "client_id": "884039901207-5d5kbbvmufjkmev7lu9hmtdropvbb9vm.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.seenaigmk.resumebuilderai",
-            "certificate_hash": "69af4d27b5fdf632f5b99a28d90723f412fa762f"
+            "certificate_hash": "e6e3e326ad1439c2304e1f7827f294ee5b9ef557"
+          }
+        },
+        {
+          "client_id": "884039901207-j3go8i3ms2uesi43340i8t3n545rl55n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.seenaigmk.resumebuilderai",
+            "certificate_hash": "f69b7b78b2ae1fb9de40db65ea3e71e81d3cfcd1"
           }
         },
         {

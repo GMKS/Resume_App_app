@@ -10,6 +10,10 @@ import '../../../core/services/resume_quality_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/utils/resume_translations.dart';
+import '../../../core/utils/validation_feedback.dart';
+import '../../../shared/widgets/adaptive_tooltip.dart';
+import '../../../shared/widgets/app_empty_state_card.dart';
+import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/editor_intro_card.dart';
@@ -113,9 +117,9 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
     if (resume != null) {
       final updated = resume.experience.where((e) => e.id != id).toList();
       ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
-        resume.copyWith(experience: updated),
-      );
-      
+            resume.copyWith(experience: updated),
+          );
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -128,7 +132,8 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
           ),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -140,7 +145,8 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _ExperienceForm(resumeId: widget.resumeId, existing: existing),
+      builder: (context) =>
+          _ExperienceForm(resumeId: widget.resumeId, existing: existing),
     );
   }
 
@@ -149,62 +155,94 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
 
     if (resume == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: AppLoadingState(
+          title: 'Loading experience',
+          message: 'Preparing your work history editor.',
+        ),
+      );
     }
 
     final qualityReport = ResumeQualityService.analyzeResume(resume);
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Iconsax.arrow_left),
+        leading: AdaptiveTooltip(
+          message: 'Back',
+          button: true,
+          child: IconButton(
+            onPressed: () => context.pop(),
+            icon: const Icon(Iconsax.arrow_left),
+          ),
         ),
         title: const Text('Work Experience'),
       ),
-      body: resume.experience.isEmpty
-          ? ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                _buildScreenHeader(context, resume, qualityReport),
-                const SizedBox(height: 20),
-                _buildEmptyState(),
-              ],
-            )
-          : Column(
-              children: [
-                Padding(
+      body: SafeArea(
+        bottom: false,
+        child: resume.experience.isEmpty
+            ? ListView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: ClampingScrollPhysics(),
+                ),
+                children: [
+                  _buildScreenHeader(context, resume, qualityReport),
+                  const SizedBox(height: 20),
+                  _buildEmptyState(),
+                ],
+              )
+            : ReorderableListView.builder(
+                buildDefaultDragHandles: false,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: ClampingScrollPhysics(),
+                ),
+                header: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                   child: _buildScreenHeader(context, resume, qualityReport),
                 ),
-                Expanded(
-                  child: ReorderableListView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                    itemCount: resume.experience.length,
-                    onReorder: (oldIndex, newIndex) {
-                      if (newIndex > oldIndex) newIndex--;
-                      final items = List<Experience>.from(resume.experience);
-                      final item = items.removeAt(oldIndex);
-                      items.insert(newIndex, item);
-                      ref
-                          .read(currentResumeProvider(widget.resumeId).notifier)
-                          .updateResume(
-                            resume.copyWith(experience: items),
-                          );
-                    },
-                    itemBuilder: (context, index) {
-                      final exp = resume.experience[index];
-                      return _ExperienceCard(
-                        key: ValueKey(exp.id),
-                        experience: exp,
-                        onEdit: () => _editExperience(exp),
-                        onDelete: () => _deleteExperience(exp.id),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+                itemCount: resume.experience.length,
+                onReorder: (oldIndex, newIndex) {
+                  if (newIndex > oldIndex) newIndex--;
+                  final items = List<Experience>.from(resume.experience);
+                  final item = items.removeAt(oldIndex);
+                  items.insert(newIndex, item);
+                  ref
+                      .read(currentResumeProvider(widget.resumeId).notifier)
+                      .updateResume(
+                        resume.copyWith(experience: items),
                       );
-                    },
-                  ),
-                ),
-              ],
-            ),
+                },
+                itemBuilder: (context, index) {
+                  final exp = resume.experience[index];
+                  return _ExperienceCard(
+                    key: ValueKey(exp.id),
+                    experience: exp,
+                    onEdit: () => _editExperience(exp),
+                    onDelete: () => _deleteExperience(exp.id),
+                    dragHandle: ReorderableDragStartListener(
+                      index: index,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.success.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: const Icon(
+                          Iconsax.menu_1,
+                          size: 18,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -222,48 +260,12 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Iconsax.briefcase,
-              size: 60,
-              color: AppColors.success,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No Experience Added',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Add your work history to highlight progression, ownership, and measurable impact.',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return const AppEmptyStateCard(
+      icon: Iconsax.briefcase,
+      accentColor: AppColors.success,
+      title: 'No Experience Added',
+      message:
+          'Add your work history to highlight progression, ownership, and measurable impact.',
     ).animate().fadeIn(duration: 500.ms);
   }
 }
@@ -272,8 +274,14 @@ class _ExperienceCard extends StatelessWidget {
   final Experience experience;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final Widget? dragHandle;
 
-  const _ExperienceCard({super.key, required this.experience, required this.onEdit, required this.onDelete});
+  const _ExperienceCard(
+      {super.key,
+      required this.experience,
+      required this.onEdit,
+      required this.onDelete,
+      this.dragHandle});
 
   @override
   Widget build(BuildContext context) {
@@ -300,48 +308,82 @@ class _ExperienceCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.success.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+              borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16), topRight: Radius.circular(16)),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 48, height: 48,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: AppColors.success.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Iconsax.briefcase, color: AppColors.success),
+                  child:
+                      const Icon(Iconsax.briefcase, color: AppColors.success),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(experience.position, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-                      Text(experience.company, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+                      Text(experience.position,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      Text(experience.company,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
                 if (experience.isCurrentlyWorking)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppColors.success,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('Current', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500)),
+                    child: const Text('Current',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500)),
                   ),
                 PopupMenuButton<String>(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Iconsax.edit, size: 18), SizedBox(width: 8), Text('Edit')])),
-                    const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Iconsax.trash, size: 18, color: AppColors.error), SizedBox(width: 8), Text('Delete', style: TextStyle(color: AppColors.error))])),
+                    const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(children: [
+                          Icon(Iconsax.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit')
+                        ])),
+                    const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(children: [
+                          Icon(Iconsax.trash, size: 18, color: AppColors.error),
+                          SizedBox(width: 8),
+                          Text('Delete',
+                              style: TextStyle(color: AppColors.error))
+                        ])),
                   ],
                   onSelected: (value) {
                     if (value == 'edit') onEdit();
                     if (value == 'delete') onDelete();
                   },
                 ),
+                if (dragHandle != null) ...[
+                  const SizedBox(width: 8),
+                  dragHandle!,
+                ],
               ],
             ),
           ),
@@ -352,11 +394,15 @@ class _ExperienceCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Iconsax.calendar, size: 16, color: AppColors.textTertiary),
+                    const Icon(Iconsax.calendar,
+                        size: 16, color: AppColors.textTertiary),
                     const SizedBox(width: 8),
                     Text(
                       '${DateFormat('MMM yyyy').format(experience.startDate)} - ${experience.isCurrentlyWorking ? 'Present' : experience.endDate != null ? DateFormat('MMM yyyy').format(experience.endDate!) : ''}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -386,28 +432,41 @@ class _ExperienceCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Iconsax.location, size: 16, color: AppColors.textTertiary),
+                      const Icon(Iconsax.location,
+                          size: 16, color: AppColors.textTertiary),
                       const SizedBox(width: 8),
-                      Text(experience.location!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+                      Text(experience.location!,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.textSecondary)),
                     ],
                   ),
                 ],
                 if (experience.description.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Text(experience.description, style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.5)),
+                  Text(experience.description,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(height: 1.5)),
                 ],
                 if (experience.achievements.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   ...experience.achievements.map((a) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('• ', style: TextStyle(color: AppColors.success)),
-                        Expanded(child: Text(a, style: Theme.of(context).textTheme.bodySmall)),
-                      ],
-                    ),
-                  )),
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('• ',
+                                style: TextStyle(color: AppColors.success)),
+                            Expanded(
+                                child: Text(a,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall)),
+                          ],
+                        ),
+                      )),
                 ],
               ],
             ),
@@ -447,14 +506,18 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
   @override
   void initState() {
     super.initState();
-    _companyController = TextEditingController(text: widget.existing?.company ?? '');
-    _positionController = TextEditingController(text: widget.existing?.position ?? '');
-    _locationController = TextEditingController(text: widget.existing?.location ?? '');
-    _descriptionController = TextEditingController(text: widget.existing?.description ?? '');
+    _companyController =
+        TextEditingController(text: widget.existing?.company ?? '');
+    _positionController =
+        TextEditingController(text: widget.existing?.position ?? '');
+    _locationController =
+        TextEditingController(text: widget.existing?.location ?? '');
+    _descriptionController =
+        TextEditingController(text: widget.existing?.description ?? '');
     _startDate = widget.existing?.startDate;
     _endDate = widget.existing?.endDate;
     _isCurrently = widget.existing?.isCurrentlyWorking ?? false;
-    
+
     if (widget.existing?.achievements.isNotEmpty ?? false) {
       for (var a in widget.existing!.achievements) {
         _achievementControllers.add(TextEditingController(text: a));
@@ -490,7 +553,8 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
         _companyController.text.trim().isNotEmpty ||
         _descriptionController.text.trim().isNotEmpty ||
         _locationController.text.trim().isNotEmpty ||
-        _achievementControllers.any((controller) => controller.text.trim().isNotEmpty) ||
+        _achievementControllers
+            .any((controller) => controller.text.trim().isNotEmpty) ||
         _startDate != null ||
         _endDate != null;
 
@@ -515,7 +579,8 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
 
     final updatedExperience = widget.existing != null
         ? resume.experience
-            .map((item) => item.id == draftExperience.id ? draftExperience : item)
+            .map((item) =>
+                item.id == draftExperience.id ? draftExperience : item)
             .toList()
         : [...resume.experience, draftExperience];
 
@@ -548,9 +613,10 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
       context: context,
       initialDate: isStart
           ? (_startDate ?? DateTime.now())
-          : (_endDate ?? (_startDate != null
-              ? DateTime(_startDate!.year, _startDate!.month + 1, 1)
-              : DateTime.now())),
+          : (_endDate ??
+              (_startDate != null
+                  ? DateTime(_startDate!.year, _startDate!.month + 1, 1)
+                  : DateTime.now())),
       firstDate: isStart ? DateTime(1950) : (_startDate ?? DateTime(1950)),
       lastDate: isStart ? (_endDate ?? DateTime.now()) : DateTime.now(),
     );
@@ -570,6 +636,26 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
   }
 
   void _saveExperience() {
+    final missingFields = <String>[];
+    if (_positionController.text.trim().isEmpty) {
+      missingFields.add('Job Title');
+    }
+    if (_companyController.text.trim().isEmpty) {
+      missingFields.add('Company');
+    }
+    if (_startDate == null) {
+      missingFields.add('Start Date');
+    }
+    if (_endDate == null && !_isCurrently) {
+      missingFields.add('End Date or Currently Working');
+    }
+
+    if (missingFields.isNotEmpty) {
+      showMissingFieldsSnackBar(context, missingFields);
+      _formKey.currentState?.validate();
+      return;
+    }
+
     if (_formKey.currentState?.validate() ?? false) {
       if (_startDate == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -583,7 +669,8 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
             ),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -606,7 +693,8 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
             ),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -617,23 +705,27 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
       if (resume == null) return;
 
       // Check for overlapping date ranges (same month/year = overlap)
-      final endForCheck = _isCurrently ? DateTime.now() : (_endDate ?? DateTime.now());
+      final endForCheck =
+          _isCurrently ? DateTime.now() : (_endDate ?? DateTime.now());
       final conflicts = resume.experience
           .where((e) => e.id != (widget.existing?.id ?? ''))
           .where((e) {
-            final eEnd = e.isCurrentlyWorking ? DateTime.now() : (e.endDate ?? DateTime.now());
-            // Overlaps if date ranges share any month (same-month boundary counts as overlap)
-            final newStartBeforeExistingEnd = _startDate!.year < eEnd.year ||
-              (_startDate!.year == eEnd.year && _startDate!.month <= eEnd.month);
-            final newEndAfterExistingStart = endForCheck.year > e.startDate.year ||
-              (endForCheck.year == e.startDate.year && endForCheck.month >= e.startDate.month);
-            return newStartBeforeExistingEnd && newEndAfterExistingStart;
-          })
-          .toList();
+        final eEnd = e.isCurrentlyWorking
+            ? DateTime.now()
+            : (e.endDate ?? DateTime.now());
+        // Overlaps if date ranges share any month (same-month boundary counts as overlap)
+        final newStartBeforeExistingEnd = _startDate!.year < eEnd.year ||
+            (_startDate!.year == eEnd.year && _startDate!.month <= eEnd.month);
+        final newEndAfterExistingStart = endForCheck.year > e.startDate.year ||
+            (endForCheck.year == e.startDate.year &&
+                endForCheck.month >= e.startDate.month);
+        return newStartBeforeExistingEnd && newEndAfterExistingStart;
+      }).toList();
       if (conflicts.isNotEmpty) {
         final c = conflicts.first;
-        final conflictDates = '${DateFormat('MMM yyyy').format(c.startDate)} - ${c.isCurrentlyWorking ? 'Present' : DateFormat('MMM yyyy').format(c.endDate!)}';
-        
+        final conflictDates =
+            '${DateFormat('MMM yyyy').format(c.startDate)} - ${c.isCurrentlyWorking ? 'Present' : DateFormat('MMM yyyy').format(c.endDate!)}';
+
         showDialog<void>(
           context: context,
           builder: (context) => AlertDialog(
@@ -642,7 +734,9 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('This date range conflicts with an existing experience:', style: TextStyle(fontWeight: FontWeight.w500)),
+                const Text(
+                    'This date range conflicts with an existing experience:',
+                    style: TextStyle(fontWeight: FontWeight.w500)),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -654,21 +748,33 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(c.position, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      Text(c.company, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                      Text(c.position,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(c.company,
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade700)),
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today, size: 14, color: Colors.orange),
+                          const Icon(Icons.calendar_today,
+                              size: 14, color: Colors.orange),
                           const SizedBox(width: 6),
-                          Text(conflictDates, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                          Text(conflictDates,
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text('Please adjust the dates to avoid overlap, or mark it as "Currently working here".', style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)),
+                const Text(
+                    'Please adjust the dates to avoid overlap, or mark it as "Currently working here".',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontStyle: FontStyle.italic)),
               ],
             ),
             actions: [
@@ -691,18 +797,25 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
         startDate: _startDate!,
         endDate: _endDate,
         isCurrentlyWorking: _isCurrently,
-        achievements: _achievementControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList(),
+        achievements: _achievementControllers
+            .map((c) => c.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList(),
       );
 
       List<Experience> updated;
       if (widget.existing != null) {
-        updated = resume.experience.map((e) => e.id == experience.id ? experience : e).toList();
+        updated = resume.experience
+            .map((e) => e.id == experience.id ? experience : e)
+            .toList();
       } else {
         updated = [...resume.experience, experience];
       }
 
-      ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(resume.copyWith(experience: updated));
-      
+      ref
+          .read(currentResumeProvider(widget.resumeId).notifier)
+          .updateResume(resume.copyWith(experience: updated));
+
       // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -711,17 +824,20 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 12),
-                Text(widget.existing != null ? 'Experience updated' : 'Experience added'),
+                Text(widget.existing != null
+                    ? 'Experience updated'
+                    : 'Experience added'),
               ],
             ),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
       }
-      
+
       Navigator.pop(context);
     }
   }
@@ -741,20 +857,34 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
       height: MediaQuery.of(context).size.height * 0.9,
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+        borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24), topRight: Radius.circular(24)),
       ),
       child: Column(
         children: [
-          Container(margin: const EdgeInsets.only(top: 12), width: 40, height: 4,
-            decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(2))),
+          Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2))),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(widget.existing != null ? 'Edit Experience' : 'Add Experience',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Iconsax.close_circle)),
+                Text(
+                    widget.existing != null
+                        ? 'Edit Experience'
+                        : 'Add Experience',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Iconsax.close_circle)),
               ],
             ),
           ),
@@ -867,9 +997,22 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
                   ),
                   Row(
                     children: [
-                      Expanded(child: _DateField(label: ResumeTranslations.getFieldLabel(ResumeTranslations.kStartDate, _getLanguage()), date: _startDate, onTap: () => _selectDate(true))),
+                      Expanded(
+                          child: _DateField(
+                              label: ResumeTranslations.getFieldLabel(
+                                  ResumeTranslations.kStartDate,
+                                  _getLanguage()),
+                              date: _startDate,
+                              onTap: () => _selectDate(true))),
                       const SizedBox(width: 16),
-                      if (!_isCurrently) Expanded(child: _DateField(label: ResumeTranslations.getFieldLabel(ResumeTranslations.kEndDate, _getLanguage()), date: _endDate, onTap: () => _selectDate(false))),
+                      if (!_isCurrently)
+                        Expanded(
+                            child: _DateField(
+                                label: ResumeTranslations.getFieldLabel(
+                                    ResumeTranslations.kEndDate,
+                                    _getLanguage()),
+                                date: _endDate,
+                                onTap: () => _selectDate(false))),
                     ],
                   ),
                   CheckboxListTile(
@@ -893,29 +1036,43 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(ResumeTranslations.getFieldLabel(ResumeTranslations.kAchievements, _getLanguage()), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                      TextButton.icon(onPressed: _addAchievement, icon: const Icon(Iconsax.add, size: 16), label: const Text('Add')),
+                      Text(
+                          ResumeTranslations.getFieldLabel(
+                              ResumeTranslations.kAchievements, _getLanguage()),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      TextButton.icon(
+                          onPressed: _addAchievement,
+                          icon: const Icon(Iconsax.add, size: 16),
+                          label: const Text('Add')),
                     ],
                   ),
                   ..._achievementControllers.asMap().entries.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: e.value,
-                            onChanged: (_) => setState(() {}),
-                            decoration: InputDecoration(
-                              hintText: 'Achievement ${e.key + 1}',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: e.value,
+                                onChanged: (_) => setState(() {}),
+                                decoration: InputDecoration(
+                                  hintText: 'Achievement ${e.key + 1}',
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12)),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 12),
+                                ),
+                              ),
                             ),
-                          ),
+                            IconButton(
+                                onPressed: () => _removeAchievement(e.key),
+                                icon: const Icon(Iconsax.trash,
+                                    color: AppColors.error, size: 20)),
+                          ],
                         ),
-                        IconButton(onPressed: () => _removeAchievement(e.key), icon: const Icon(Iconsax.trash, color: AppColors.error, size: 20)),
-                      ],
-                    ),
-                  )),
+                      )),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -923,13 +1080,16 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
           ),
           // Pinned Save Button
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            padding: EdgeInsets.fromLTRB(
+                20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
             child: SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
                 onPressed: _saveExperience,
-                child: Text(widget.existing != null ? 'Update Experience' : 'Save Experience'),
+                child: Text(widget.existing != null
+                    ? 'Update Experience'
+                    : 'Save Experience'),
               ),
             ),
           ),
@@ -951,19 +1111,31 @@ class _DateField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppColors.textSecondary)),
+        Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(color: AppColors.textSecondary)),
         const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+                border: Border.all(color: AppColors.divider),
+                borderRadius: BorderRadius.circular(12)),
             child: Row(
               children: [
-                const Icon(Iconsax.calendar, size: 20, color: AppColors.textTertiary),
+                const Icon(Iconsax.calendar,
+                    size: 20, color: AppColors.textTertiary),
                 const SizedBox(width: 8),
-                Text(date != null ? DateFormat('MMM yyyy').format(date!) : 'Select', style: TextStyle(color: date != null ? null : AppColors.textTertiary)),
+                Text(
+                    date != null
+                        ? DateFormat('MMM yyyy').format(date!)
+                        : 'Select',
+                    style: TextStyle(
+                        color: date != null ? null : AppColors.textTertiary)),
               ],
             ),
           ),

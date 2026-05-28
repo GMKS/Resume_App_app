@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/models/resume_model.dart';
+import '../../../shared/widgets/responsive_content.dart';
 
 class CareerToolsTabScreen extends ConsumerWidget {
   const CareerToolsTabScreen({super.key});
@@ -17,9 +18,10 @@ class CareerToolsTabScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Career Tools'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: ResponsiveContent(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
           _CareerToolCard(
             icon: Iconsax.task_square,
             title: 'Job Tracker',
@@ -94,7 +96,8 @@ class CareerToolsTabScreen extends ConsumerWidget {
             color: const Color(0xFFEF4444),
             onTap: () => _handleResumeToolTap(context, 'roast-resume'),
           ).animate().fadeIn(delay: 900.ms).slideX(begin: -0.1, end: 0),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -125,9 +128,10 @@ class CareerToolsTabScreen extends ConsumerWidget {
       context: context,
       builder: (context) => _ResumePickerDialog(resumes: resumes),
     );
-    if (selected != null) {
-      context.push('/$route?resumeId=${selected.id}');
+    if (!context.mounted || selected == null) {
+      return;
     }
+    context.push('/$route?resumeId=${selected.id}');
   }
 }
 
@@ -201,7 +205,7 @@ class _CareerToolCard extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 28),

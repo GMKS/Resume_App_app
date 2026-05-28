@@ -10,7 +10,10 @@ import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/resume_quality_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
+import '../../../core/utils/validation_feedback.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
+import '../../../shared/widgets/app_empty_state_card.dart';
+import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/custom_text_field.dart';
@@ -57,9 +60,8 @@ class _CertificationsScreenState extends ConsumerState<CertificationsScreen> {
     final withLinks = resume.certifications
         .where((cert) => (cert.credentialUrl ?? '').trim().isNotEmpty)
         .length;
-    final withExpiry = resume.certifications
-        .where((cert) => cert.expiryDate != null)
-        .length;
+    final withExpiry =
+        resume.certifications.where((cert) => cert.expiryDate != null).length;
 
     return Column(
       children: [
@@ -113,7 +115,12 @@ class _CertificationsScreenState extends ConsumerState<CertificationsScreen> {
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
 
     if (resume == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: AppLoadingState(
+          title: 'Loading certifications',
+          message: 'Preparing your credential list.',
+        ),
+      );
     }
     final qualityReport = ResumeQualityService.analyzeResume(resume);
 
@@ -191,40 +198,12 @@ class _CertificationsScreenState extends ConsumerState<CertificationsScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-                color: const Color(0xFF14B8A6).withValues(alpha: 0.1),
-                shape: BoxShape.circle),
-            child: const Icon(Iconsax.medal_star,
-                size: 60, color: Color(0xFF14B8A6)),
-          ),
-          const SizedBox(height: 24),
-          Text('No Certifications Added',
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text('Add certifications with issuer and date details so they survive every template and export path.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColors.textSecondary),
-              textAlign: TextAlign.center),
-        ],
-      ),
+    return const AppEmptyStateCard(
+      icon: Iconsax.medal_star,
+      accentColor: Color(0xFF14B8A6),
+      title: 'No Certifications Added',
+      message:
+          'Add certifications with issuer and date details so they survive every template and export path.',
     ).animate().fadeIn(duration: 500.ms);
   }
 }
@@ -277,9 +256,13 @@ class _CertCard extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     EditorStatPill(
-                      label: cert.issueDate != null ? 'dated credential' : 'date optional',
+                      label: cert.issueDate != null
+                          ? 'dated credential'
+                          : 'date optional',
                       icon: Iconsax.calendar,
-                      color: cert.issueDate != null ? AppColors.success : AppColors.info,
+                      color: cert.issueDate != null
+                          ? AppColors.success
+                          : AppColors.info,
                     ),
                     if (hasId)
                       const EditorStatPill(
@@ -342,8 +325,8 @@ class _CertCard extends StatelessWidget {
             label: 'Certification actions',
             button: true,
             child: PopupMenuButton<String>(
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               itemBuilder: (context) => [
                 const PopupMenuItem(
                     value: 'edit',
@@ -473,7 +456,8 @@ class _CertFormState extends ConsumerState<_CertForm> {
 
     final updatedCertifications = widget.existing != null
         ? resume.certifications
-            .map((item) => item.id == draftCertification.id ? draftCertification : item)
+            .map((item) =>
+                item.id == draftCertification.id ? draftCertification : item)
             .toList()
         : [...resume.certifications, draftCertification];
 
@@ -487,16 +471,33 @@ class _CertFormState extends ConsumerState<_CertForm> {
     if (_issuerController.text.trim().isEmpty) {
       return 'Add the issuing organization to make the credential trustworthy.';
     }
-    if (_issueDate != null && _expiryDate != null && _expiryDate!.isBefore(_issueDate!)) {
+    if (_issueDate != null &&
+        _expiryDate != null &&
+        _expiryDate!.isBefore(_issueDate!)) {
       return 'Expiry date must stay after the issue date so exported certification timelines remain consistent.';
     }
-    if (_urlController.text.trim().isEmpty && _credIdController.text.trim().isEmpty) {
+    if (_urlController.text.trim().isEmpty &&
+        _credIdController.text.trim().isEmpty) {
       return 'Add a credential URL or ID when possible so recruiters can verify this certification quickly.';
     }
     return null;
   }
 
   void _save() {
+    final missingFields = <String>[];
+    if (_nameController.text.trim().isEmpty) {
+      missingFields.add('Certification Name');
+    }
+    if (_issuerController.text.trim().isEmpty) {
+      missingFields.add('Issuing Organization');
+    }
+
+    if (missingFields.isNotEmpty) {
+      showMissingFieldsSnackBar(context, missingFields);
+      _formKey.currentState?.validate();
+      return;
+    }
+
     if (_formKey.currentState?.validate() ?? false) {
       if (_issueDate != null &&
           _expiryDate != null &&
@@ -653,7 +654,10 @@ class _CertFormState extends ConsumerState<_CertForm> {
                           Expanded(
                             child: Text(
                               liveGuidanceMessage,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     color: AppColors.textSecondary,
                                     height: 1.4,
                                   ),

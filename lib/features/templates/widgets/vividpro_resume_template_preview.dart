@@ -58,14 +58,20 @@ class VividProResumeTemplatePreview extends StatelessWidget {
         : 'Results-driven professional with expertise in delivering high-quality solutions.';
   }
 
-  Experience? get _experience =>
-      resume != null && resume!.experience.isNotEmpty ? resume!.experience.first : null;
+  Experience? get _experience => resume != null && resume!.experience.isNotEmpty
+      ? resume!.experience.first
+      : null;
 
-  Education? get _education =>
-      resume != null && resume!.education.isNotEmpty ? resume!.education.first : null;
+  Education? get _education => resume != null && resume!.education.isNotEmpty
+      ? resume!.education.first
+      : null;
 
   List<String> get _skills {
-    final values = resume?.skills.map((skill) => skill.name.trim()).where((skill) => skill.isNotEmpty).toList(growable: false) ?? const <String>[];
+    final values = resume?.skills
+            .map((skill) => skill.name.trim())
+            .where((skill) => skill.isNotEmpty)
+            .toList(growable: false) ??
+        const <String>[];
     return values.isNotEmpty
         ? values
         : const ['Flutter', 'Dart', 'Firebase', 'REST APIs'];
@@ -85,7 +91,8 @@ class VividProResumeTemplatePreview extends StatelessWidget {
 
   List<String> get _languageLines {
     final values = resume?.languages
-            .map((language) => '${language.name} ${language.proficiency}'.trim())
+            .map(
+                (language) => '${language.name} ${language.proficiency}'.trim())
             .where((line) => line.isNotEmpty)
             .take(3)
             .toList(growable: false) ??
@@ -294,7 +301,7 @@ class VividProResumeTemplatePreview extends StatelessWidget {
     }
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map(customSectionItemBlock)
           .whereType<Widget>()
@@ -307,7 +314,7 @@ class VividProResumeTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          sectionHeader(title.isEmpty ? 'Custom Section' : title),
+          sectionHeader(title),
           ...itemBlocks,
         ],
       );
@@ -411,7 +418,8 @@ class VividProResumeTemplatePreview extends StatelessWidget {
                     const SizedBox(height: 3),
                     sectionHeader('SKILLS'),
                     Wrap(
-                      children: _skills.take(4).toList().asMap().entries.map((entry) {
+                      children:
+                          _skills.take(4).toList().asMap().entries.map((entry) {
                         const chipColors = [
                           Color(0xFF7C3AED),
                           Color(0xFFEC4899),

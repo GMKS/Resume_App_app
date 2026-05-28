@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_loading_state.dart';
 import '../models/job_tracker_models.dart';
 import '../services/job_tracker_service.dart';
 
@@ -475,7 +476,10 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
             if (state.isLoading && state.jobs.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 72),
-                child: Center(child: CircularProgressIndicator()),
+                child: AppLoadingState(
+                  title: 'Loading job tracker',
+                  message: 'Pulling your saved applications and analytics.',
+                ),
               )
             else if (state.jobs.isEmpty)
               _EmptyTrackerState(onAddJob: () => _openJobForm())
@@ -503,10 +507,17 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openJobForm(),
-        icon: const Icon(Iconsax.add),
-        label: const Text('Track Job'),
+      floatingActionButton: SafeArea(
+        minimum: EdgeInsets.only(
+          bottom: kBottomNavigationBarHeight +
+              MediaQuery.paddingOf(context).bottom +
+              16,
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => _openJobForm(),
+          icon: const Icon(Iconsax.add),
+          label: const Text('Track Job'),
+        ),
       ),
     );
   }

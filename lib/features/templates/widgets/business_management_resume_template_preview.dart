@@ -585,7 +585,7 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
     );
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map((item) {
             final displayItem = buildUserCustomSectionDisplayItem(item);
@@ -639,7 +639,7 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(title.isEmpty ? 'CUSTOM SECTION' : title.toUpperCase()),
+          _sectionHeader(title.toUpperCase()),
           ...itemBlocks,
         ],
       );

@@ -29,6 +29,17 @@ class SocialAuthService {
       'com.seenaigmk.resumebuilderai.MainActivity';
   static const String _linkedInIssuer = 'https://www.linkedin.com/oauth';
 
+  static Set<String> get _firebaseAndroidCertificateHashes =>
+    _readCertificateSet('FIREBASE_ANDROID_CERTIFICATE_HASHES');
+
+  static Set<String> get _packageSha1Values => _readCertificateSet('PACKAGE_SHA1');
+
+  static Set<String> get _packageSha256Values =>
+    _readCertificateSet('PACKAGE_SHA256');
+
+  static List<String> get _facebookKeyHashes =>
+    _readConfigList('FACEBOOK_KEY_HASH');
+
   static bool get _hasFacebookNativeConfig =>
       AppConfigService.read('FACEBOOK_APP_ID').isNotEmpty &&
       AppConfigService.read('FACEBOOK_CLIENT_TOKEN').isNotEmpty;
@@ -46,8 +57,23 @@ class SocialAuthService {
 
   static bool get canAttemptFacebookSignIn => true;
 
+  static bool get canAttemptGoogleSignIn => true;
+
+  static bool get canAttemptTwitterSignIn => true;
+
+  static bool get canAttemptLinkedInSignIn => true;
+
   static const String facebookDisabledMessage =
       'Facebook sign-in is disabled for this build until the Android Facebook App ID and client token are configured.';
+
+    static String get googleDisabledMessage =>
+      _firebaseFingerprintMismatchMessage('Google');
+
+    static String get twitterDisabledMessage =>
+      _firebaseFingerprintMismatchMessage('Twitter/X');
+
+    static String get linkedInDisabledMessage =>
+      _firebaseFingerprintMismatchMessage('LinkedIn');
 
   // ──────────────────────────────────────────────────────────────────
   // Google Sign-In
@@ -81,6 +107,12 @@ class SocialAuthService {
       await _persistSession(userCredential.user, 'google');
       return SocialAuthResult(success: true, user: userCredential.user);
     } catch (e) {
+      if (_isFirebaseFingerprintError(e.toString())) {
+        return SocialAuthResult(
+          success: false,
+          message: _firebaseFingerprintMismatchMessage('Google'),
+        );
+      }
       return SocialAuthResult(success: false, message: _parseError(e));
     }
   }
@@ -115,6 +147,12 @@ class SocialAuthService {
         if (result.status != LoginStatus.success) {
           // Map known SDK error messages to friendly text.
           final msg = result.message ?? '';
+          if (_isFacebookPackageHashError(msg)) {
+            return SocialAuthResult(
+              success: false,
+              message: _facebookPackageHashMessage(),
+            );
+          }
           if (msg.toLowerCase().contains('invalid app id') ||
               msg.toLowerCase().contains('invalid_app_id')) {
             return const SocialAuthResult(
@@ -152,6 +190,12 @@ class SocialAuthService {
       await _persistSession(userCredential.user, 'facebook');
       return SocialAuthResult(success: true, user: userCredential.user);
     } catch (e) {
+      if (_isFacebookPackageHashError(e.toString())) {
+        return SocialAuthResult(
+          success: false,
+          message: _facebookPackageHashMessage(),
+        );
+      }
       return SocialAuthResult(success: false, message: _parseError(e));
     }
   }
@@ -173,6 +217,12 @@ class SocialAuthService {
       await _persistSession(userCredential.user, 'twitter');
       return SocialAuthResult(success: true, user: userCredential.user);
     } on FirebaseAuthException catch (e) {
+      if (_isFirebaseFingerprintError(e.message ?? '')) {
+        return SocialAuthResult(
+          success: false,
+          message: _firebaseFingerprintMismatchMessage('Twitter/X'),
+        );
+      }
       if (e.code == 'operation-not-allowed') {
         return const SocialAuthResult(
           success: false,
@@ -185,6 +235,12 @@ class SocialAuthService {
       }
       return SocialAuthResult(success: false, message: _parseError(e));
     } catch (e) {
+      if (_isFirebaseFingerprintError(e.toString())) {
+        return SocialAuthResult(
+          success: false,
+          message: _firebaseFingerprintMismatchMessage('Twitter/X'),
+        );
+      }
       return SocialAuthResult(success: false, message: _parseError(e));
     }
   }
@@ -211,6 +267,12 @@ class SocialAuthService {
       await _persistSession(userCredential.user, 'linkedin');
       return SocialAuthResult(success: true, user: userCredential.user);
     } on FirebaseAuthException catch (e) {
+      if (_isFirebaseFingerprintError(e.message ?? '')) {
+        return SocialAuthResult(
+          success: false,
+          message: _firebaseFingerprintMismatchMessage('LinkedIn'),
+        );
+      }
       if (e.code == 'operation-not-allowed') {
         return SocialAuthResult(
           success: false,
@@ -226,6 +288,12 @@ class SocialAuthService {
       }
       return SocialAuthResult(success: false, message: _parseError(e));
     } catch (e) {
+      if (_isFirebaseFingerprintError(e.toString())) {
+        return SocialAuthResult(
+          success: false,
+          message: _firebaseFingerprintMismatchMessage('LinkedIn'),
+        );
+      }
       if (_isLinkedInIssuerError(e.toString())) {
         return SocialAuthResult(
           success: false,
@@ -234,6 +302,83 @@ class SocialAuthService {
       }
       return SocialAuthResult(success: false, message: _parseError(e));
     }
+  }
+
+  static Set<String> _readCertificateSet(String key) {
+    return _readConfigList(key)
+        .map(_normalizeCertificateHash)
+        .where((value) => value.isNotEmpty)
+        .toSet();
+  }
+
+  static List<String> _readConfigList(String key) {
+    return AppConfigService.read(key)
+        .split(',')
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  static String _normalizeCertificateHash(String value) {
+    return value.replaceAll(RegExp(r'[^A-Fa-f0-9]'), '').toLowerCase();
+  }
+
+  static bool _isFirebaseFingerprintError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('package certificate hash') ||
+        normalized.contains('apiexception: 10') ||
+        normalized.contains('developer_error');
+  }
+
+  static bool _isFacebookPackageHashError(String message) {
+    return message.toLowerCase().contains('package certificate hash');
+  }
+
+  static String _firebaseFingerprintMismatchMessage(String providerLabel) {
+    final currentSha1 = _formatCertificateHashes(_packageSha1Values);
+    final currentSha256 = _formatCertificateHashes(_packageSha256Values);
+    final expected = _formatCertificateHashes(_firebaseAndroidCertificateHashes);
+
+    return '$providerLabel sign-in is blocked on this Android install because the app signing fingerprints do not match Firebase for package\n'
+        '$_facebookPackageName.\n\n'
+        'Current install SHA-1: $currentSha1\n'
+        'Current install SHA-256: $currentSha256\n'
+        'Configured in google-services.json: $expected\n\n'
+        'Add the current SHA-1/SHA-256 in Firebase Console -> Project Settings -> Your Android app, then download a fresh android/app/google-services.json and reinstall the app.';
+  }
+
+  static String _facebookPackageHashMessage() {
+    final currentSha1 = _formatCertificateHashes(_packageSha1Values);
+    final keyHashes = _facebookKeyHashes.isEmpty
+        ? 'Unavailable from this install'
+        : _facebookKeyHashes.join(', ');
+
+    return 'Facebook sign-in could not validate this Android app signature.\n\n'
+        'Package: $_facebookPackageName\n'
+        'Activity: $_facebookActivityName\n'
+        'Current SHA-1: $currentSha1\n'
+        'Current Facebook key hash: $keyHashes\n\n'
+        'In Meta Developers, add the Android platform for this package/activity and register the current key hash, then reinstall the app.';
+  }
+
+  static String _formatCertificateHashes(Set<String> values) {
+    if (values.isEmpty) {
+      return 'Unavailable';
+    }
+
+    return values.map(_prettyPrintCertificateHash).join(', ');
+  }
+
+  static String _prettyPrintCertificateHash(String value) {
+    if (value.length.isOdd) {
+      return value.toUpperCase();
+    }
+
+    final parts = <String>[];
+    for (var index = 0; index < value.length; index += 2) {
+      parts.add(value.substring(index, index + 2).toUpperCase());
+    }
+    return parts.join(':');
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -424,6 +569,14 @@ class SocialAuthService {
         'In Meta Developers, switch the app to Live mode or add your Facebook account as a Developer/Tester for this app, then try again.';
       }
 
+      if (_isFacebookPackageHashError(detail)) {
+        return _facebookPackageHashMessage();
+      }
+
+      if (_isFirebaseFingerprintError(detail)) {
+        return _firebaseFingerprintMismatchMessage('Google');
+      }
+
       if (_isFacebookNativePlatformError(detail)) {
         return 'Facebook sign-in is misconfigured in Meta Developers.\n'
             'Add an Android platform for package $_facebookPackageName, set the default activity to $_facebookActivityName, and register the app signing key hashes in the Facebook app settings.';
@@ -434,14 +587,7 @@ class SocialAuthService {
         // The debug/release SHA-1 fingerprint is not registered in Firebase
         // Console or Google Cloud OAuth client.
         if (detail.contains('ApiException: 10') || detail.contains('10:')) {
-          return 'Google Sign-In is not fully configured.\n'
-              'Firebase must contain the correct SHA-1/SHA-256 for package\n'
-              'com.seenaigmk.resumebuilderai.\n\n'
-              'For local debug installs, add:\n'
-              'B1:25:67:8C:A9:3C:37:20:5F:DA:60:58:20:E4:33:C3:98:40:01:57\n\n'
-              'For Play internal testing or production, also add the Play App Signing\n'
-              'SHA-1/SHA-256 in Firebase Console → Project Settings → Your Android app,\n'
-              'then download a fresh android/app/google-services.json.';
+          return _firebaseFingerprintMismatchMessage('Google');
         }
         if (detail.contains('ApiException: 7')) {
           return 'No internet connection. Please try again.';
@@ -464,6 +610,12 @@ class SocialAuthService {
     }
 
     final raw = e.toString();
+    if (_isFacebookPackageHashError(raw)) {
+      return _facebookPackageHashMessage();
+    }
+    if (_isFirebaseFingerprintError(raw)) {
+      return _firebaseFingerprintMismatchMessage('Google');
+    }
     if (_isLinkedInIssuerError(raw)) {
       return _linkedInIssuerMessage(raw);
     }

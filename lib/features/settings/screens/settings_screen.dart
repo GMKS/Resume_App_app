@@ -84,10 +84,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
+      builder: (context) => SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          24,
+          24,
+          24 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,7 +198,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
         content: const Text(
-          'Users can delete their data anytime. Delete your resumes, job tracker entries, saved settings, AI preferences, and any synced cloud backup for this app? You will be signed out on this device.'),
+            'Users can delete their data anytime. Delete your resumes, job tracker entries, saved settings, AI preferences, and any synced cloud backup for this app? You will be signed out on this device.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
@@ -267,10 +274,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Iconsax.shield_tick, 'Privacy', AppInfo.privacyPolicyUrl),
                 const SizedBox(width: 16),
                 _buildSocialButton(
-                    Iconsax.message,
-                    'Support',
-                    'mailto:${AppInfo.supportEmail}',
-                  ),
+                  Iconsax.message,
+                  'Support',
+                  'mailto:${AppInfo.supportEmail}',
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -947,7 +954,8 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                     Text('Backup & Sync',
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18)),
-                    Text('Manual cloud sync for resumes and job tracker across devices',
+                    Text(
+                        'Manual cloud sync for resumes and job tracker across devices',
                         style: TextStyle(
                             color: AppColors.textSecondary, fontSize: 13)),
                   ],
@@ -976,29 +984,49 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                 SizedBox(height: 8),
                 Text(
                   '1. Set the same Sync Code on every device you want to connect.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.5),
                 ),
                 Text(
                   '2. On the device with your latest changes, tap Backup to Cloud.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.5),
                 ),
                 Text(
                   '3. On the other device, tap Restore from Cloud to pull that data down.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.5),
                 ),
                 Text(
                   '4. Repeat Backup whenever you make changes. Restore whenever another device needs the newest copy.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.5),
                 ),
                 SizedBox(height: 6),
                 Text(
                   'Cloud backup and restore are manual. Resume restore is also checked on app launch, but uploads are never pushed automatically in the background.',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.info, height: 1.5),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.info,
+                      height: 1.5),
                 ),
                 SizedBox(height: 6),
                 Text(
                   'Resumes stay on this device unless you tap Backup to Cloud. Restore keeps the most recently updated local or cloud version to avoid overwriting newer edits.',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.info, height: 1.5),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.info,
+                      height: 1.5),
                 ),
               ],
             ),
@@ -1169,7 +1197,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                               _currentCode = code.toLowerCase();
                               _editingCode = false;
                               _statusMessage =
-                                  '✅ Sync code set! Set the same code on your other device, then Backup/Restore.';
+                                  'Sync code set. Set the same code on your other device, then use Backup or Restore.';
                             });
                           }
                         },
@@ -1221,11 +1249,14 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
-                _buildStatusRow('Last synced', _formatSyncTimestamp(_lastSyncedAt)),
+                _buildStatusRow(
+                    'Last synced', _formatSyncTimestamp(_lastSyncedAt)),
                 const SizedBox(height: 8),
-                _buildStatusRow('Last cloud backup', _formatSyncTimestamp(_lastBackupAt)),
+                _buildStatusRow(
+                    'Last cloud backup', _formatSyncTimestamp(_lastBackupAt)),
                 const SizedBox(height: 8),
-                _buildStatusRow('Last restore', _formatSyncTimestamp(_lastRestoreAt)),
+                _buildStatusRow(
+                    'Last restore', _formatSyncTimestamp(_lastRestoreAt)),
                 if (_lastSyncSummary != null) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -1286,7 +1317,8 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Iconsax.cloud_add),
-              label: Text(_inProgress ? 'Processing...' : 'Manual Backup to Cloud'),
+              label: Text(
+                  _inProgress ? 'Processing...' : 'Manual Backup to Cloud'),
             ),
           ),
           const SizedBox(height: 10),
@@ -1358,7 +1390,8 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
     if (!mounted) return;
     final label = _currentCode != null ? 'code "$_currentCode"' : 'this device';
     final backedUp = <String>[
-      if (resumeError == null && resumes.isNotEmpty) '${resumes.length} resume(s)',
+      if (resumeError == null && resumes.isNotEmpty)
+        '${resumes.length} resume(s)',
       if (jobError == null && jobs.isNotEmpty) '${jobs.length} tracked job(s)',
     ];
     final failures = <String>[
@@ -1754,7 +1787,8 @@ class _AiApiKeySheetState extends State<_AiApiKeySheet> {
                 textInputAction: TextInputAction.done,
                 decoration: InputDecoration(
                   labelText: 'Groq API Key',
-                  helperText: 'Paste the Groq key from console.groq.com. It should start with gsk_.',
+                  helperText:
+                      'Paste the Groq key from console.groq.com. It should start with gsk_.',
                   prefixIcon: const Icon(Iconsax.key),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,

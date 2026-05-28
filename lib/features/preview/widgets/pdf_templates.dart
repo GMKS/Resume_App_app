@@ -97,7 +97,7 @@ String _pdfLang = 'English';
 String _h(String text) => ResumeTranslations.translate(text, _pdfLang);
 String _present() => ResumeTranslations.present(_pdfLang);
 String _pdfDate(DateTime date, {String pattern = 'MMM yyyy'}) =>
-  DateFormat(pattern).format(date);
+    DateFormat(pattern).format(date);
 
 // -- Font loading --------------------------------------------------------------
 const _nonLatinLanguages = {
@@ -615,8 +615,10 @@ List<pw.Widget> _buildGenericUserCustomSectionWidgets(
   double bottomSpacing = 8,
   pw.Widget Function(String title)? headerBuilder,
 }) {
-  final normalizedTitle = normalizeUserCustomSectionTitle(section.title);
-  final title = normalizedTitle.isEmpty ? 'CUSTOM SECTION' : normalizedTitle;
+  final title = displayUserCustomSectionTitle(
+    section,
+    fallback: 'SECTION',
+  );
   final itemWidgets = section.items
       .map(
         (item) => _buildGenericUserCustomSectionItem(
@@ -3277,9 +3279,7 @@ class CreativeTemplate extends PdfTemplate {
       );
 
   String _monthRange(DateTime start, DateTime? end, bool isCurrent) {
-    final endText = isCurrent || end == null
-        ? _present()
-        : _pdfDate(end);
+    final endText = isCurrent || end == null ? _present() : _pdfDate(end);
     return '${_pdfDate(start)} - $endText';
   }
 
@@ -6332,7 +6332,10 @@ class ModernAestheticTemplate extends PdfTemplate {
   }
 
   pw.Widget _maCustomSection(CustomSection section, PdfColor accentColor) {
-    final title = normalizeUserCustomSectionTitle(section.title);
+    final title = displayUserCustomSectionTitle(
+      section,
+      fallback: 'SECTION',
+    );
     final itemWidgets = section.items.expand((item) {
       final displayItem = buildUserCustomSectionDisplayItem(item);
       final metaParts = <String>[
@@ -6375,7 +6378,7 @@ class ModernAestheticTemplate extends PdfTemplate {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        _maSection(title.isEmpty ? 'CUSTOM SECTION' : title.toUpperCase(), accentColor),
+        _maSection(title.toUpperCase(), accentColor),
         ...itemWidgets,
       ],
     );
@@ -9419,7 +9422,7 @@ class SlateArcTemplate extends PdfTemplate {
         child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-          pw.Text(_h(title),
+              pw.Text(_h(title),
                   style: pw.TextStyle(
                       fontSize: 10,
                       fontWeight: pw.FontWeight.bold,
@@ -9709,7 +9712,7 @@ class EditorialFrameTemplate extends PdfTemplate {
         child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-          pw.Text(_h(title),
+              pw.Text(_h(title),
                   style: pw.TextStyle(
                       fontSize: 10,
                       fontWeight: pw.FontWeight.bold,
@@ -9890,7 +9893,7 @@ class GraphiteColumnTemplate extends PdfTemplate {
         child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-          pw.Text(_h(title),
+              pw.Text(_h(title),
                   style: pw.TextStyle(
                       fontSize: 9.5,
                       fontWeight: pw.FontWeight.bold,
@@ -10176,7 +10179,7 @@ class RosewoodPanelTemplate extends PdfTemplate {
         child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-          pw.Text(_h(title),
+              pw.Text(_h(title),
                   style: pw.TextStyle(
                       fontSize: 10,
                       fontWeight: pw.FontWeight.bold,

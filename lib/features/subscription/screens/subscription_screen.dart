@@ -49,11 +49,16 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   bool get _canUseGooglePlayTestFallback =>
       PlayBillingService.canUseTestPurchaseFallback;
 
-  bool get _canUseDummyPaymentFallback =>
-      AppConfigService.readBool(
+  bool get _canUseDummyPaymentFallback => AppConfigService.readBool(
         'ENABLE_DUMMY_PAYMENTS',
         defaultValue: !kReleaseMode,
       );
+
+  bool get _canUseGooglePlayDummyFallback =>
+      _usesGooglePlayBilling &&
+      _selectedPlan != null &&
+      !_playProducts.containsKey(_selectedPlan) &&
+      _canUseDummyPaymentFallback;
 
   List<SubscriptionPricingOption> get _visiblePlans {
     return _plans;
@@ -90,7 +95,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         });
       } else {
         setState(() {
-          _storeMessage = 'Payments are not configured for this build yet. Please check Razorpay configuration.';
+          _storeMessage =
+              'Payments are not configured for this build yet. Please check Razorpay configuration.';
         });
       }
     }
@@ -134,7 +140,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   }
 
   Future<void> _resolvePricingRegion() async {
-    final region = await _pricingRegionService.resolveRegion(forceRefresh: true);
+    final region =
+        await _pricingRegionService.resolveRegion(forceRefresh: true);
     if (!mounted) {
       return;
     }
@@ -197,14 +204,15 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                         const SizedBox(height: 8),
                         Text(
                           'Access AI-powered tools, premium templates, and career coaching',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.9),
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                  ),
                           textAlign: TextAlign.center,
                         ),
                       ],
                     ),
-                  ).animate().fadeIn(delay:100.ms).scale(),
+                  ).animate().fadeIn(delay: 100.ms).scale(),
 
                   const SizedBox(height: 24),
 
@@ -216,7 +224,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            const Icon(Iconsax.tick_circle, color: AppColors.success),
+                            const Icon(Iconsax.tick_circle,
+                                color: AppColors.success),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -235,9 +244,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
-                                          ?.copyWith(color: AppColors.textSecondary),
+                                          ?.copyWith(
+                                              color: AppColors.textSecondary),
                                     )
-                                  else if (currentSubscription.expiryDate != null)
+                                  else if (currentSubscription.expiryDate !=
+                                      null)
                                     Text(
                                       currentSubscription.cancelAtPeriodEnd
                                           ? 'Cancels: ${_formatDate(currentSubscription.expiryDate!)}'
@@ -245,7 +256,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
-                                          ?.copyWith(color: AppColors.textSecondary),
+                                          ?.copyWith(
+                                              color: AppColors.textSecondary),
                                     ),
                                   if (currentSubscription.cancelAtPeriodEnd)
                                     Text(
@@ -263,7 +275,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       ),
                     ).animate().fadeIn(delay: 200.ms),
 
-                  if (currentSubscription.isPremium()) const SizedBox(height: 16),
+                  if (currentSubscription.isPremium())
+                    const SizedBox(height: 16),
 
                   if (_usesGooglePlayBilling)
                     Container(
@@ -295,10 +308,10 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                                _isStoreLoading
+                              _isStoreLoading
                                   ? 'Loading Google Play subscriptions...'
                                   : _storeMessage ??
-                                    'Subscriptions on Android are managed securely through Google Play.',
+                                      'Subscriptions on Android are managed securely through Google Play.',
                               style: TextStyle(
                                 fontSize: 12.5,
                                 height: 1.5,
@@ -320,12 +333,14 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                     children: [
                       _buildOfferChip(
                         '🔥 Limited Time Offer',
-                        backgroundColor: AppColors.warning.withValues(alpha: 0.14),
+                        backgroundColor:
+                            AppColors.warning.withValues(alpha: 0.14),
                         foregroundColor: AppColors.warning,
                       ),
                       _buildOfferChip(
                         'Intro Pricing',
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.1),
                         foregroundColor: AppColors.primary,
                       ),
                       _buildOfferChip(
@@ -351,12 +366,16 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                         originalPrice: plan.price.formatOriginal(),
                         isSelected: _selectedPlan == plan.plan,
                         isEnabled: !_usesGooglePlayBilling ||
-                          _playProducts.containsKey(plan.plan) ||
-                          _canUseGooglePlayTestFallback,
+                            _playProducts.containsKey(plan.plan) ||
+                            _canUseGooglePlayTestFallback ||
+                            _canUseDummyPaymentFallback,
                         availabilityLabel: _availabilityLabelForPlan(plan.plan),
                         onTap: () => setState(() => _selectedPlan = plan.plan),
                       ),
-                    ).animate().fadeIn(delay: (300 + index * 100).ms).slideX(begin: -0.1, end: 0);
+                    )
+                        .animate()
+                        .fadeIn(delay: (300 + index * 100).ms)
+                        .slideX(begin: -0.1, end: 0);
                   }),
 
                   const SizedBox(height: 16),
@@ -416,10 +435,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                   ElevatedButton.icon(
                     onPressed: (_selectedPlan == null ||
                             _isProcessingPayment ||
-                          (_usesGooglePlayBilling && _isStoreLoading) ||
+                            (_usesGooglePlayBilling && _isStoreLoading) ||
                             (_usesGooglePlayBilling &&
                                 !_playProducts.containsKey(_selectedPlan) &&
-                                !_canUseGooglePlayTestFallback))
+                                !_canUseGooglePlayTestFallback &&
+                                !_canUseDummyPaymentFallback))
                         ? null
                         : _handleUpgrade,
                     icon: _isProcessingPayment
@@ -432,26 +452,32 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                             ),
                           )
                         : Icon(
-                            _usesGooglePlayBilling
-                                ? Iconsax.shop
-                            : _canUseDummyPaymentFallback &&
-                                !RazorpayService.isConfigured
-                              ? Iconsax.card_tick
-                                : Iconsax.card,
+                            _canUseGooglePlayDummyFallback
+                                ? Iconsax.card_tick
+                                : _usesGooglePlayBilling
+                                    ? Iconsax.shop
+                                    : _canUseDummyPaymentFallback &&
+                                            !RazorpayService.isConfigured
+                                        ? Iconsax.card_tick
+                                        : Iconsax.card,
                           ),
                     label: Text(_isProcessingPayment
                         ? (_usesGooglePlayBilling
-                            ? 'Connecting to Google Play...'
-                          : _canUseDummyPaymentFallback &&
-                              !RazorpayService.isConfigured
-                            ? 'Opening Test Checkout...'
-                            : 'Opening Payment...')
-                        : (_usesGooglePlayBilling
-                            ? 'Subscribe with Google Play'
-                          : _canUseDummyPaymentFallback &&
-                              !RazorpayService.isConfigured
+                            ? (_canUseGooglePlayDummyFallback
+                                ? 'Opening Test Checkout...'
+                                : 'Connecting to Google Play...')
+                            : _canUseDummyPaymentFallback &&
+                                    !RazorpayService.isConfigured
+                                ? 'Opening Test Checkout...'
+                                : 'Opening Payment...')
+                        : (_canUseGooglePlayDummyFallback
                             ? 'Pay with Test Card'
-                            : 'Subscribe Now')),
+                            : _usesGooglePlayBilling
+                                ? 'Subscribe with Google Play'
+                                : _canUseDummyPaymentFallback &&
+                                        !RazorpayService.isConfigured
+                                    ? 'Pay with Test Card'
+                                    : 'Subscribe Now')),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 54),
                     ),
@@ -469,12 +495,14 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        _usesGooglePlayBilling
-                            ? 'Managed securely by Google Play • Cancel anytime'
-                            : _canUseDummyPaymentFallback &&
-                                    !RazorpayService.isConfigured
-                                ? 'Local dummy checkout • No real charge'
-                            : 'Secured by Razorpay • Cancel anytime',
+                        _canUseGooglePlayDummyFallback
+                            ? 'Test card fallback • No real charge'
+                            : _usesGooglePlayBilling
+                                ? 'Managed securely by Google Play • Cancel anytime'
+                                : _canUseDummyPaymentFallback &&
+                                        !RazorpayService.isConfigured
+                                    ? 'Local dummy checkout • No real charge'
+                                    : 'Secured by Razorpay • Cancel anytime',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textTertiary,
                             ),
@@ -484,7 +512,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                   if (_usesGooglePlayBilling) ...[
                     const SizedBox(height: 4),
                     TextButton(
-                      onPressed: _isProcessingPayment ? null : _restoreGooglePlayPurchases,
+                      onPressed: _isProcessingPayment
+                          ? null
+                          : _restoreGooglePlayPurchases,
                       child: const Text('Restore Google Play Purchases'),
                     ),
                   ],
@@ -521,9 +551,10 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                                   ? _keepSubscription
                                   : _confirmCancellation,
                               style: TextButton.styleFrom(
-                                foregroundColor: currentSubscription.cancelAtPeriodEnd
-                                    ? AppColors.primary
-                                    : AppColors.error,
+                                foregroundColor:
+                                    currentSubscription.cancelAtPeriodEnd
+                                        ? AppColors.primary
+                                        : AppColors.error,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
                                   vertical: 2,
@@ -541,9 +572,10 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                                     .bodySmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w600,
-                                      color: currentSubscription.cancelAtPeriodEnd
-                                          ? AppColors.primary
-                                          : AppColors.error,
+                                      color:
+                                          currentSubscription.cancelAtPeriodEnd
+                                              ? AppColors.primary
+                                              : AppColors.error,
                                     ),
                               ),
                             ),
@@ -578,10 +610,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
-                  const Icon(Iconsax.tick_circle, color: AppColors.success, size: 20),
+                  const Icon(Iconsax.tick_circle,
+                      color: AppColors.success, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(feature, style: Theme.of(context).textTheme.bodyMedium),
+                    child: Text(feature,
+                        style: Theme.of(context).textTheme.bodyMedium),
                   ),
                 ],
               ),
@@ -620,6 +654,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     if (_playProducts.containsKey(plan)) {
       return 'Managed by Google Play • Cancel anytime';
     }
+    if (_canUseDummyPaymentFallback) {
+      return 'Test card fallback available for this build';
+    }
     if (_canUseGooglePlayTestFallback) {
       return 'Local test activation available • Use Internal Testing for real billing';
     }
@@ -632,6 +669,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     if (products.isEmpty) {
       if (_canUseGooglePlayTestFallback) {
         return 'Google Play products are unavailable in this local build. Install from Play Internal Testing for real billing, or continue with debug test activation to validate the premium flow.';
+      }
+      if (_canUseDummyPaymentFallback) {
+        return 'Google Play subscriptions are unavailable in this build, but dummy card checkout is enabled so you can still validate premium unlocks.';
       }
       return 'Google Play subscriptions are not available for this build yet. Configure your Play product IDs and Play Console subscriptions to enable purchases.';
     }
@@ -677,6 +717,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         if (_canUseGooglePlayTestFallback) {
           setState(() => _isProcessingPayment = false);
           _showGooglePlayDebugFallback();
+          return;
+        }
+
+        if (_canUseDummyPaymentFallback) {
+          setState(() => _isProcessingPayment = false);
+          _showDummyPaymentSheet();
           return;
         }
 
@@ -759,7 +805,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   }
 
   void _showDummyPaymentSheet() {
-    final cardNumberController = TextEditingController(text: '4111111111111111');
+    final cardNumberController =
+        TextEditingController(text: '4111111111111111');
     final cardholderController = TextEditingController(text: 'Test User');
     final expiryController = TextEditingController(text: '12/30');
     final cvvController = TextEditingController(text: '123');
@@ -874,17 +921,22 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    final cardNumber =
-                        cardNumberController.text.replaceAll(RegExp(r'\s+'), '');
+                    final cardNumber = cardNumberController.text
+                        .replaceAll(RegExp(r'\s+'), '');
                     final cardholder = cardholderController.text.trim();
                     final expiry = expiryController.text.trim();
                     final cvv = cvvController.text.trim();
 
-                    final isCardValid = RegExp(r'^\d{16}$').hasMatch(cardNumber);
-                    final isExpiryValid = RegExp(r'^(0[1-9]|1[0-2])/\d{2}$').hasMatch(expiry);
+                    final isCardValid =
+                        RegExp(r'^\d{16}$').hasMatch(cardNumber);
+                    final isExpiryValid =
+                        RegExp(r'^(0[1-9]|1[0-2])/\d{2}$').hasMatch(expiry);
                     final isCvvValid = RegExp(r'^\d{3,4}$').hasMatch(cvv);
 
-                    if (!isCardValid || cardholder.isEmpty || !isExpiryValid || !isCvvValid) {
+                    if (!isCardValid ||
+                        cardholder.isEmpty ||
+                        !isExpiryValid ||
+                        !isCvvValid) {
                       setModalState(() {
                         errorMessage =
                             'Enter dummy test details in valid card format to continue.';
@@ -1029,12 +1081,19 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       isDismissible: false,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(32),
+      builder: (ctx) => SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          32,
+          32,
+          32,
+          32 + MediaQuery.viewInsetsOf(ctx).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1094,8 +1153,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 ),
                 child: const Text(
                   'Start Using Premium',
-                  style:
-                      TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
             ).animate().fadeIn(delay: 500.ms),
@@ -1108,11 +1167,18 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   void _showWebCheckoutFallback() {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
+      builder: (ctx) => SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          24,
+          24,
+          24 + MediaQuery.viewInsetsOf(ctx).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1287,7 +1353,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Subscription will end at the close of the current billing period.'),
+        content: Text(
+            'Subscription will end at the close of the current billing period.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -1300,7 +1367,8 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Scheduled cancellation removed. Your subscription stays active.'),
+        content: Text(
+            'Scheduled cancellation removed. Your subscription stays active.'),
         behavior: SnackBarBehavior.floating,
       ),
     );

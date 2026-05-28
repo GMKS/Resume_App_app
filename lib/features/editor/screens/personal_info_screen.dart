@@ -13,6 +13,7 @@ import '../../../core/models/resume_model.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/resume_quality_service.dart';
 import '../../../core/utils/resume_translations.dart';
+import '../../../core/utils/validation_feedback.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/custom_text_field.dart';
@@ -266,6 +267,21 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
       const {'developer', 'startup'}.contains(templateId);
 
   void _saveChanges() {
+    final missingFields = <String>[];
+    if (_nameController.text.trim().isEmpty) {
+      missingFields.add('Full Name');
+    }
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !_isValidEmailFormat(email)) {
+      missingFields.add('Email');
+    }
+
+    if (missingFields.isNotEmpty) {
+      showMissingFieldsSnackBar(context, missingFields);
+      _formKey.currentState?.validate();
+      return;
+    }
+
     if (_formKey.currentState?.validate() ?? false) {
       final resume = ref.read(currentResumeProvider(widget.resumeId));
       if (resume != null) {
@@ -338,8 +354,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     if (value.isEmpty || !value.contains('@')) {
       return false;
     }
-    return RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$')
-        .hasMatch(value);
+    return RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$').hasMatch(value);
   }
 
   Widget _buildSectionCard({required Widget child}) {
@@ -436,7 +451,8 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     ].where((value) => (value ?? '').trim().isNotEmpty).length;
     final hasPhoto = draftResume.personalInfo.profileImage?.isNotEmpty == true;
     final emailValid = _isValidEmailFormat(draftResume.personalInfo.email);
-    final hasJobTitle = (draftResume.personalInfo.jobTitle ?? '').trim().isNotEmpty;
+    final hasJobTitle =
+        (draftResume.personalInfo.jobTitle ?? '').trim().isNotEmpty;
     final hasLocation = draftResume.personalInfo.address.trim().isNotEmpty;
 
     return Scaffold(
@@ -513,22 +529,27 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                     runSpacing: 8,
                     children: [
                       EditorStatPill(
-                        label: emailValid ? 'email verified' : 'email needs review',
+                        label: emailValid
+                            ? 'email verified'
+                            : 'email needs review',
                         icon: Iconsax.sms,
                         color:
                             emailValid ? AppColors.success : AppColors.warning,
                       ),
                       EditorStatPill(
-                        label: hasJobTitle ? 'role headline added' : 'role headline missing',
+                        label: hasJobTitle
+                            ? 'role headline added'
+                            : 'role headline missing',
                         icon: Iconsax.briefcase,
                         color:
                             hasJobTitle ? AppColors.success : AppColors.warning,
                       ),
                       EditorStatPill(
-                        label: hasLocation ? 'location included' : 'location optional',
+                        label: hasLocation
+                            ? 'location included'
+                            : 'location optional',
                         icon: Iconsax.location,
-                        color:
-                            hasLocation ? AppColors.success : AppColors.info,
+                        color: hasLocation ? AppColors.success : AppColors.info,
                       ),
                     ],
                   ),
@@ -636,8 +657,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                               color: AppColors.primary.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color:
-                                    AppColors.primary.withValues(alpha: 0.4),
+                                color: AppColors.primary.withValues(alpha: 0.4),
                                 width: 3,
                               ),
                             ),
@@ -807,8 +827,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                                     Icons.arrow_drop_down,
                                     size: 18,
                                   ),
-                                  style:
-                                      Theme.of(context).textTheme.bodyMedium,
+                                  style: Theme.of(context).textTheme.bodyMedium,
                                   items: _countryCodes
                                       .map(
                                         (cc) => DropdownMenuItem(
@@ -889,9 +908,10 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                     children: [
                       Text(
                         'Social Links',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       if (_isDeveloperTemplate(resume.templateId)) ...[
                         const SizedBox(width: 8),
@@ -934,7 +954,10 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                       prefixIcon: Iconsax.code,
                       keyboardType: TextInputType.url,
                       onChanged: (_) => setState(() {}),
-                    ).animate().fadeIn(delay: 440.ms).slideX(begin: 0.1, end: 0),
+                    )
+                        .animate()
+                        .fadeIn(delay: 440.ms)
+                        .slideX(begin: 0.1, end: 0),
                     CustomTextField(
                       controller: _linkedInController,
                       label: 'LinkedIn',
@@ -942,7 +965,10 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                       prefixIcon: Iconsax.link,
                       keyboardType: TextInputType.url,
                       onChanged: (_) => setState(() {}),
-                    ).animate().fadeIn(delay: 470.ms).slideX(begin: 0.1, end: 0),
+                    )
+                        .animate()
+                        .fadeIn(delay: 470.ms)
+                        .slideX(begin: 0.1, end: 0),
                   ] else ...[
                     CustomTextField(
                       controller: _linkedInController,
@@ -951,7 +977,10 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                       prefixIcon: Iconsax.link,
                       keyboardType: TextInputType.url,
                       onChanged: (_) => setState(() {}),
-                    ).animate().fadeIn(delay: 450.ms).slideX(begin: 0.1, end: 0),
+                    )
+                        .animate()
+                        .fadeIn(delay: 450.ms)
+                        .slideX(begin: 0.1, end: 0),
                     CustomTextField(
                       controller: _githubController,
                       label: 'GitHub',
@@ -959,7 +988,10 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                       prefixIcon: Iconsax.code,
                       keyboardType: TextInputType.url,
                       onChanged: (_) => setState(() {}),
-                    ).animate().fadeIn(delay: 500.ms).slideX(begin: 0.1, end: 0),
+                    )
+                        .animate()
+                        .fadeIn(delay: 500.ms)
+                        .slideX(begin: 0.1, end: 0),
                   ],
                   CustomTextField(
                     controller: _websiteController,

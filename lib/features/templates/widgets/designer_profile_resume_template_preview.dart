@@ -191,7 +191,10 @@ class DesignerProfileResumeTemplatePreview extends StatelessWidget {
         : const ['English  |  Native', 'Spanish  |  Professional'];
     final previewCustomSections = orderedUserCustomSectionsFromList(
       previewResume?.customSections ?? const <CustomSection>[],
-    ).where((section) => !isProfessionalRoleOptionalSectionKey('designer_profile', section.id)).toList(growable: false);
+    )
+        .where((section) => !isProfessionalRoleOptionalSectionKey(
+            'designer_profile', section.id))
+        .toList(growable: false);
 
     Text text(
       String value, {
@@ -202,15 +205,13 @@ class DesignerProfileResumeTemplatePreview extends StatelessWidget {
       int? maxLines,
       double height = 1.15,
     }) {
-      final normalizedMaxLines = maxLines != null && maxLines <= 0
-          ? null
-          : maxLines;
+      final normalizedMaxLines =
+          maxLines != null && maxLines <= 0 ? null : maxLines;
       return Text(
         value,
         textAlign: align,
         maxLines: normalizedMaxLines,
-        overflow:
-            normalizedMaxLines != null ? TextOverflow.ellipsis : null,
+        overflow: normalizedMaxLines != null ? TextOverflow.ellipsis : null,
         style: TextStyle(
           fontSize: size,
           color: color ?? _ink,
@@ -470,7 +471,7 @@ class DesignerProfileResumeTemplatePreview extends StatelessWidget {
         );
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map((item) {
             final displayItem = buildUserCustomSectionDisplayItem(item);
@@ -531,7 +532,7 @@ class DesignerProfileResumeTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          mainSection(title.isEmpty ? 'Custom Section' : title),
+          mainSection(title),
           ...itemBlocks,
         ],
       );

@@ -168,8 +168,7 @@ class ForestEdgeClassicResumeTemplatePreview extends StatelessWidget {
         value,
         textAlign: align,
         maxLines: effectiveMaxLines,
-        overflow:
-            effectiveMaxLines != null ? TextOverflow.ellipsis : null,
+        overflow: effectiveMaxLines != null ? TextOverflow.ellipsis : null,
         style: TextStyle(
           fontSize: size,
           color: color ?? _ink,
@@ -245,7 +244,7 @@ class ForestEdgeClassicResumeTemplatePreview extends StatelessWidget {
     }
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map((item) {
             final displayItem = buildUserCustomSectionDisplayItem(item);
@@ -305,7 +304,7 @@ class ForestEdgeClassicResumeTemplatePreview extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             text(
-              title.isEmpty ? 'CUSTOM SECTION' : title.toUpperCase(),
+              title.toUpperCase(),
               size: 1.56,
               color: _ink,
               weight: FontWeight.w700,
@@ -741,7 +740,8 @@ class ForestEdgeClassicResumeTemplatePreview extends StatelessWidget {
                                               maxLines: 1,
                                             ),
                                           ),
-                                          if (previewCertifications.last != entry)
+                                          if (previewCertifications.last !=
+                                              entry)
                                             const SizedBox(height: 1.1),
                                         ],
                                       )

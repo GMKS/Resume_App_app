@@ -9,6 +9,7 @@ import '../../../core/services/free_plan_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
+import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../../../shared/widgets/resume_quality_panel.dart';
 import '../../../core/services/resume_quality_service.dart';
@@ -222,7 +223,14 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
 
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
     
-    if (resume == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (resume == null) {
+      return const Scaffold(
+        body: AppLoadingState(
+          title: 'Loading languages',
+          message: 'Preparing your language proficiency details.',
+        ),
+      );
+    }
     final qualityReport = ResumeQualityService.analyzeResume(resume);
     final fluentOrBetter = resume.languages
       .where((language) =>

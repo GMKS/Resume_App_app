@@ -1399,77 +1399,80 @@ class _TemplateSelectionScreenState
           );
         },
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: widget.isNewResume
-                    ? () => context.go('/editor/${widget.resumeId}')
-                    : () async {
-                        final r = StorageService.getResume(widget.resumeId);
-                        if (r != null && _selectedTemplate != null) {
-                          final updatedResume = r.copyWith(
-                            templateId: _selectedTemplate!,
-                            colorScheme: _usesFixedPalette(_selectedTemplate)
-                                ? 0
-                                : _selectedColor,
-                            updatedAt: DateTime.now(),
-                          );
-                          final normalizedResume =
-                              _selectedTemplate == 'startup'
-                                  ? updatedResume.copyWith(
-                                      customSections:
-                                          ensureStartupProfileSections(
-                                              updatedResume),
-                                    )
-                                  : [
-                                      'executive',
-                                      'designer_profile',
-                                      'professional_tone',
-                                      'elegant_gold_layout',
-                                    ].contains(_selectedTemplate)
-                                      ? updatedResume.copyWith(
-                                          customSections:
-                                              ensureProfessionalRoleSections(
-                                                  updatedResume),
-                                        )
-                                      : updatedResume;
-                          await StorageService.saveResume(normalizedResume);
-                        }
-                        if (mounted) {
-                          context.push('/preview/${widget.resumeId}');
-                        }
-                      },
-                icon: Icon(
-                  widget.isNewResume ? Iconsax.arrow_right : Iconsax.eye,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.isNewResume
+                      ? () => context.go('/editor/${widget.resumeId}')
+                      : () async {
+                          final r = StorageService.getResume(widget.resumeId);
+                          if (r != null && _selectedTemplate != null) {
+                            final updatedResume = r.copyWith(
+                              templateId: _selectedTemplate!,
+                              colorScheme: _usesFixedPalette(_selectedTemplate)
+                                  ? 0
+                                  : _selectedColor,
+                              updatedAt: DateTime.now(),
+                            );
+                            final normalizedResume =
+                                _selectedTemplate == 'startup'
+                                    ? updatedResume.copyWith(
+                                        customSections:
+                                            ensureStartupProfileSections(
+                                                updatedResume),
+                                      )
+                                    : [
+                                        'executive',
+                                        'designer_profile',
+                                        'professional_tone',
+                                        'elegant_gold_layout',
+                                      ].contains(_selectedTemplate)
+                                        ? updatedResume.copyWith(
+                                            customSections:
+                                                ensureProfessionalRoleSections(
+                                                    updatedResume),
+                                          )
+                                        : updatedResume;
+                            await StorageService.saveResume(normalizedResume);
+                          }
+                          if (mounted) {
+                            context.push('/preview/${widget.resumeId}');
+                          }
+                        },
+                  icon: Icon(
+                    widget.isNewResume ? Iconsax.arrow_right : Iconsax.eye,
+                  ),
+                  label: Text(widget.isNewResume ? 'Skip' : 'Preview'),
                 ),
-                label: Text(widget.isNewResume ? 'Skip' : 'Preview'),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: ElevatedButton.icon(
-                onPressed: _saveTemplate,
-                icon: const Icon(Iconsax.tick_circle),
-                label: Text(widget.isNewResume
-                    ? 'Apply & Start Editing'
-                    : 'Apply Template'),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _saveTemplate,
+                  icon: const Icon(Iconsax.tick_circle),
+                  label: Text(widget.isNewResume
+                      ? 'Apply & Start Editing'
+                      : 'Apply Template'),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.3, end: 0),
     );
@@ -3287,8 +3290,7 @@ class _TemplatePreview extends StatelessWidget {
                       ...orderedUserCustomSectionsFromList(
                         resume?.customSections ?? const <CustomSection>[],
                       ).expand((section) {
-                        final title =
-                            normalizeUserCustomSectionTitle(section.title);
+                        final title = displayUserCustomSectionTitle(section);
                         final itemWidgets = section.items.expand((item) {
                           final displayItem =
                               buildUserCustomSectionDisplayItem(item);
@@ -3344,8 +3346,7 @@ class _TemplatePreview extends StatelessWidget {
                         }
 
                         return <Widget>[
-                          _section(title.isEmpty ? 'Custom Section' : title,
-                              accentColor),
+                          _section(title, accentColor),
                           ...itemWidgets,
                         ];
                       }),

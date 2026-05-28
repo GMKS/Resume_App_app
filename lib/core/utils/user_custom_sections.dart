@@ -24,6 +24,19 @@ class UserCustomSectionDisplayItem {
       detailLines.isNotEmpty;
 }
 
+const Set<String> kStandardResumeSectionKeys = <String>{
+  'personal',
+  'summary',
+  'experience',
+  'education',
+  'skills',
+  'projects',
+  'certifications',
+  'languages',
+  'references',
+  'hobbies',
+};
+
 const String kUserCustomSectionIdPrefix = 'user_custom_';
 const String kUserCustomSectionFeatureKey = 'custom_sections';
 
@@ -55,7 +68,15 @@ bool isBuiltInCustomSectionId(String id) {
   return false;
 }
 
+bool isStandardResumeSectionKey(String id) {
+  return kStandardResumeSectionKeys.contains(id);
+}
+
 bool isUserCustomSectionId(String id) {
+  if (isStandardResumeSectionKey(id)) {
+    return false;
+  }
+
   return id.startsWith(kUserCustomSectionIdPrefix) ||
       !isBuiltInCustomSectionId(id);
 }
@@ -66,6 +87,98 @@ bool isUserCustomSection(CustomSection section) {
 
 String normalizeUserCustomSectionTitle(String value) {
   return value.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+String? configuredCustomSectionTitle(
+  String id, {
+  String? templateId,
+}) {
+  final startupTitle = startupSectionConfigById(id)?.title;
+  if ((startupTitle ?? '').trim().isNotEmpty) {
+    return startupTitle!.trim();
+  }
+
+  final scopedRoleTitle =
+      professionalRoleSectionConfigById(templateId ?? '', id)?.title;
+  if ((scopedRoleTitle ?? '').trim().isNotEmpty) {
+    return scopedRoleTitle!.trim();
+  }
+
+  final anyRoleTitle = anyProfessionalRoleSectionConfigById(id)?.title;
+  if ((anyRoleTitle ?? '').trim().isNotEmpty) {
+    return anyRoleTitle!.trim();
+  }
+
+  return null;
+}
+
+String humanizeCustomSectionId(
+  String id, {
+  String fallback = 'Section',
+}) {
+  final raw = id.startsWith(kUserCustomSectionIdPrefix)
+      ? id.substring(kUserCustomSectionIdPrefix.length)
+      : id;
+  final normalized = normalizeUserCustomSectionTitle(
+    raw.replaceAll(RegExp(r'[_-]+'), ' '),
+  );
+  if (normalized.isEmpty) {
+    return fallback;
+  }
+
+  final compact = raw.replaceAll(RegExp(r'[_-]'), '');
+  final looksGenerated = RegExp(
+    r'^[0-9a-f]{32}$|^[0-9a-f]{8}[0-9a-f]{4}[1-5][0-9a-f]{3}[89ab][0-9a-f]{3}[0-9a-f]{12}$',
+    caseSensitive: false,
+  ).hasMatch(compact);
+  if (looksGenerated) {
+    return fallback;
+  }
+
+  return normalized
+      .split(' ')
+      .map(
+        (part) => part.isEmpty
+            ? part
+            : '${part[0].toUpperCase()}${part.substring(1)}',
+      )
+      .join(' ');
+}
+
+String displayUserCustomSectionTitle(
+  CustomSection section, {
+  String fallback = 'Section',
+  String? templateId,
+}) {
+  final explicitTitle = normalizeUserCustomSectionTitle(section.title);
+  if (explicitTitle.isNotEmpty) {
+    return explicitTitle;
+  }
+
+  final configuredTitle = configuredCustomSectionTitle(
+    section.id,
+    templateId: templateId,
+  );
+  if ((configuredTitle ?? '').isNotEmpty) {
+    return configuredTitle!;
+  }
+
+  for (final item in section.items) {
+    final preview = userCustomSectionItemPreview(item).trim();
+    if (preview.isNotEmpty && preview != 'No content yet') {
+      return preview;
+    }
+  }
+
+  final humanizedId = humanizeCustomSectionId(
+    section.id,
+    fallback: fallback,
+  );
+  if (humanizedId.isNotEmpty) {
+    return humanizedId;
+  }
+
+  return fallback;
 }
 
 String buildUserCustomSectionId() {

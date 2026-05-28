@@ -9,6 +9,10 @@ import 'package:intl/intl.dart';
 import '../../../core/services/resume_quality_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
+import '../../../core/utils/validation_feedback.dart';
+import '../../../shared/widgets/adaptive_tooltip.dart';
+import '../../../shared/widgets/app_empty_state_card.dart';
+import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/resume_quality_panel.dart';
 import '../utils/date_range_utils.dart';
 import '../widgets/custom_text_field.dart';
@@ -36,10 +40,13 @@ class _EducationScreenState extends ConsumerState<EducationScreen> {
   void _deleteEducation(String educationId) {
     final resume = ref.read(currentResumeProvider(widget.resumeId));
     if (resume != null) {
-      final updatedEducation = resume.education.where((e) => e.id != educationId).toList();
+      final updatedEducation =
+          resume.education.where((e) => e.id != educationId).toList();
       final updatedResume = resume.copyWith(education: updatedEducation);
-      ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(updatedResume);
-      
+      ref
+          .read(currentResumeProvider(widget.resumeId).notifier)
+          .updateResume(updatedResume);
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -52,7 +59,8 @@ class _EducationScreenState extends ConsumerState<EducationScreen> {
           ),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -125,17 +133,26 @@ class _EducationScreenState extends ConsumerState<EducationScreen> {
   @override
   Widget build(BuildContext context) {
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
-    
+
     if (resume == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: AppLoadingState(
+          title: 'Loading education',
+          message: 'Preparing your education details.',
+        ),
+      );
     }
     final qualityReport = ResumeQualityService.analyzeResume(resume);
-    
+
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Iconsax.arrow_left),
+        leading: AdaptiveTooltip(
+          message: 'Back',
+          button: true,
+          child: IconButton(
+            onPressed: () => context.pop(),
+            icon: const Icon(Iconsax.arrow_left),
+          ),
         ),
         title: const Text('Education'),
       ),
@@ -164,7 +181,10 @@ class _EducationScreenState extends ConsumerState<EducationScreen> {
                   education: education,
                   onEdit: () => _editEducation(education),
                   onDelete: () => _deleteEducation(education.id),
-                ).animate().fadeIn(delay: (100 * index).ms).slideX(begin: 0.1, end: 0);
+                )
+                    .animate()
+                    .fadeIn(delay: (100 * index).ms)
+                    .slideX(begin: 0.1, end: 0);
               },
             ),
       bottomNavigationBar: SafeArea(
@@ -184,44 +204,12 @@ class _EducationScreenState extends ConsumerState<EducationScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0EA5E9).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Iconsax.teacher, size: 60, color: Color(0xFF0EA5E9)),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No Education Added',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Add degrees, institutions, and dates so your preview shows a complete learning timeline.',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return const AppEmptyStateCard(
+      icon: Iconsax.teacher,
+      accentColor: Color(0xFF0EA5E9),
+      title: 'No Education Added',
+      message:
+          'Add degrees, institutions, and dates so your preview shows a complete learning timeline.',
     ).animate().fadeIn(duration: 500.ms);
   }
 }
@@ -284,24 +272,39 @@ class _EducationCard extends StatelessWidget {
                     children: [
                       Text(
                         education.degree,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                       ),
                       Text(
                         education.institution,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                              color: AppColors.textSecondary,
+                            ),
                       ),
                     ],
                   ),
                 ),
                 PopupMenuButton<String>(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Iconsax.edit, size: 18), SizedBox(width: 8), Text('Edit')])),
-                    const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Iconsax.trash, size: 18, color: AppColors.error), SizedBox(width: 8), Text('Delete', style: TextStyle(color: AppColors.error))])),
+                    const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(children: [
+                          Icon(Iconsax.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit')
+                        ])),
+                    const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(children: [
+                          Icon(Iconsax.trash, size: 18, color: AppColors.error),
+                          SizedBox(width: 8),
+                          Text('Delete',
+                              style: TextStyle(color: AppColors.error))
+                        ])),
                   ],
                   onSelected: (value) {
                     if (value == 'edit') onEdit();
@@ -349,20 +352,26 @@ class _EducationCard extends StatelessWidget {
                 if (education.fieldOfStudy.isNotEmpty) ...[
                   Row(
                     children: [
-                      const Icon(Iconsax.book, size: 16, color: AppColors.textTertiary),
+                      const Icon(Iconsax.book,
+                          size: 16, color: AppColors.textTertiary),
                       const SizedBox(width: 8),
-                      Text(education.fieldOfStudy, style: Theme.of(context).textTheme.bodyMedium),
+                      Text(education.fieldOfStudy,
+                          style: Theme.of(context).textTheme.bodyMedium),
                     ],
                   ),
                   const SizedBox(height: 8),
                 ],
                 Row(
                   children: [
-                    const Icon(Iconsax.calendar, size: 16, color: AppColors.textTertiary),
+                    const Icon(Iconsax.calendar,
+                        size: 16, color: AppColors.textTertiary),
                     const SizedBox(width: 8),
                     Text(
                       '${DateFormat('dd MMM yyyy').format(education.startDate)} - ${education.isCurrentlyStudying ? 'Present' : education.endDate != null ? DateFormat('dd MMM yyyy').format(education.endDate!) : ''}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -370,9 +379,11 @@ class _EducationCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Iconsax.medal_star, size: 16, color: AppColors.textTertiary),
+                      const Icon(Iconsax.medal_star,
+                          size: 16, color: AppColors.textTertiary),
                       const SizedBox(width: 8),
-                      Text('Grade: ${education.grade}', style: Theme.of(context).textTheme.bodySmall),
+                      Text('Grade: ${education.grade}',
+                          style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 ],
@@ -409,10 +420,14 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
   @override
   void initState() {
     super.initState();
-    _institutionController = TextEditingController(text: widget.existing?.institution ?? '');
-    _degreeController = TextEditingController(text: widget.existing?.degree ?? '');
-    _fieldController = TextEditingController(text: widget.existing?.fieldOfStudy ?? '');
-    _gradeController = TextEditingController(text: widget.existing?.grade ?? '');
+    _institutionController =
+        TextEditingController(text: widget.existing?.institution ?? '');
+    _degreeController =
+        TextEditingController(text: widget.existing?.degree ?? '');
+    _fieldController =
+        TextEditingController(text: widget.existing?.fieldOfStudy ?? '');
+    _gradeController =
+        TextEditingController(text: widget.existing?.grade ?? '');
     _startDate = widget.existing?.startDate;
     _endDate = widget.existing?.endDate;
     _isCurrently = widget.existing?.isCurrentlyStudying ?? false;
@@ -505,6 +520,23 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
       _validationMessage = null;
     });
 
+    final missingFields = <String>[];
+    if (_institutionController.text.trim().isEmpty) {
+      missingFields.add('Institution');
+    }
+    if (_degreeController.text.trim().isEmpty) {
+      missingFields.add('Degree');
+    }
+    if (_startDate == null) {
+      missingFields.add('Start Date');
+    }
+
+    if (missingFields.isNotEmpty) {
+      showMissingFieldsSnackBar(context, missingFields);
+      _formKey.currentState?.validate();
+      return;
+    }
+
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
@@ -572,14 +604,16 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
 
     List<Education> updatedList;
     if (widget.existing != null) {
-      updatedList = resume.education.map((e) => e.id == education.id ? education : e).toList();
+      updatedList = resume.education
+          .map((e) => e.id == education.id ? education : e)
+          .toList();
     } else {
       updatedList = [...resume.education, education];
     }
 
     ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
-      resume.copyWith(education: updatedList),
-    );
+          resume.copyWith(education: updatedList),
+        );
 
     // Show success message
     if (mounted) {
@@ -589,12 +623,15 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
             children: [
               const Icon(Icons.check_circle, color: Colors.white),
               const SizedBox(width: 12),
-              Text(widget.existing != null ? 'Education updated' : 'Education added'),
+              Text(widget.existing != null
+                  ? 'Education updated'
+                  : 'Education added'),
             ],
           ),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -638,9 +675,14 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
               children: [
                 Text(
                   widget.existing != null ? 'Edit Education' : 'Add Education',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Iconsax.close_circle)),
+                IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Iconsax.close_circle)),
               ],
             ),
           ),
@@ -705,7 +747,10 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
                           Expanded(
                             child: Text(
                               liveGuidanceMessage,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     color: AppColors.textSecondary,
                                     height: 1.4,
                                   ),
@@ -792,7 +837,8 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
                 liveRegion: true,
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     color: AppColors.error,
                     borderRadius: BorderRadius.circular(12),
@@ -809,13 +855,16 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
             ),
           // Pinned Save Button
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            padding: EdgeInsets.fromLTRB(
+                20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
             child: SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
                 onPressed: _saveEducation,
-                child: Text(widget.existing != null ? 'Update Education' : 'Save Education'),
+                child: Text(widget.existing != null
+                    ? 'Update Education'
+                    : 'Save Education'),
               ),
             ),
           ),
@@ -837,7 +886,11 @@ class _DateField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppColors.textSecondary)),
+        Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(color: AppColors.textSecondary)),
         const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
@@ -850,11 +903,15 @@ class _DateField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Iconsax.calendar, size: 20, color: AppColors.textTertiary),
+                const Icon(Iconsax.calendar,
+                    size: 20, color: AppColors.textTertiary),
                 const SizedBox(width: 8),
                 Text(
-                  date != null ? DateFormat('dd MMM yyyy').format(date!) : 'Select',
-                  style: TextStyle(color: date != null ? null : AppColors.textTertiary),
+                  date != null
+                      ? DateFormat('dd MMM yyyy').format(date!)
+                      : 'Select',
+                  style: TextStyle(
+                      color: date != null ? null : AppColors.textTertiary),
                 ),
               ],
             ),

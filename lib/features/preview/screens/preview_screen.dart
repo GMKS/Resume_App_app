@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -20,6 +21,7 @@ import '../../../core/utils/shareable_export_file.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../../../core/utils/browser_pdf_preview.dart';
+import '../services/preview_media_service.dart';
 import '../services/preview_pdf_service.dart';
 
 class PreviewScreen extends ConsumerStatefulWidget {
@@ -33,12 +35,25 @@ class PreviewScreen extends ConsumerStatefulWidget {
 
 class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   static const String _previewRendererVersion =
-  '2026-04-25-spanish-preview-fix-v186';
+      '2026-04-25-spanish-preview-fix-v186';
+  static const double _gifExportDpi = 170;
   ResumeModel? _resume;
   bool _isLoading = false;
+  String? _activeExportLabel;
   bool _isPreviewLoading = false;
   Uint8List? _previewBytes;
   String? _previewSignature;
+
+  void _setExportLoadingState({
+    required bool isLoading,
+    String? exportLabel,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = isLoading;
+      _activeExportLabel = isLoading ? exportLabel : null;
+    });
+  }
 
   @override
   void reassemble() {
@@ -76,28 +91,26 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   }
 
   String _customSectionsPreviewSignature(ResumeModel resume) {
-    return resume.customSections
-        .map((section) {
-          final itemSignature = section.items
-              .map(
-                (item) => [
-                  item.id,
-                  item.title,
-                  item.subtitle ?? '',
-                  item.description ?? '',
-                  item.date?.millisecondsSinceEpoch.toString() ?? '',
-                ].join('~'),
-              )
-              .join('^');
+    return resume.customSections.map((section) {
+      final itemSignature = section.items
+          .map(
+            (item) => [
+              item.id,
+              item.title,
+              item.subtitle ?? '',
+              item.description ?? '',
+              item.date?.millisecondsSinceEpoch.toString() ?? '',
+            ].join('~'),
+          )
+          .join('^');
 
-          return [
-            section.id,
-            section.title,
-            section.order.toString(),
-            itemSignature,
-          ].join('::');
-        })
-        .join('||');
+      return [
+        section.id,
+        section.title,
+        section.order.toString(),
+        itemSignature,
+      ].join('::');
+    }).join('||');
   }
 
   String _resumePreviewSignature(ResumeModel resume) {
@@ -114,7 +127,8 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
 
   void _syncResumeFromStorageIfNeeded(ResumeModel resume) {
     final current = _resume;
-    if (current != null && _resumePreviewSignature(current) == _resumePreviewSignature(resume)) {
+    if (current != null &&
+        _resumePreviewSignature(current) == _resumePreviewSignature(resume)) {
       return;
     }
 
@@ -150,26 +164,70 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
     required String text,
     bool preferPrintingOnWeb = false,
   }) async {
-    if (kIsWeb && preferPrintingOnWeb && mimeType == 'application/pdf') {
-      await Printing.sharePdf(bytes: bytes, filename: fileName);
-      return;
+    Object? lastError;
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (kIsWeb && preferPrintingOnWeb && mimeType == 'application/pdf') {
+          await Printing.sharePdf(bytes: bytes, filename: fileName);
+          return;
+        }
+
+        final file = await buildShareableExportFile(
+          bytes: bytes,
+          fileName: fileName,
+          mimeType: mimeType,
+        );
+
+        await Share.shareXFiles(
+          [file],
+          subject: subject,
+          text: text,
+        );
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt == 1) {
+          rethrow;
+        }
+      }
     }
 
-    final file = await buildShareableExportFile(
-      bytes: bytes,
-      fileName: fileName,
-      mimeType: mimeType,
-    );
+    throw StateError('Unable to prepare the export for sharing: $lastError');
+  }
 
-    await Share.shareXFiles(
-      [file],
-      subject: subject,
-      text: text,
+  void _showExportSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 
+  void _showExportError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+      ),
+    );
+  }
+
+  String _resumeFileStem(ResumeModel resume) {
+    final rawName = resume.personalInfo.fullName.trim();
+    final baseName = rawName.isEmpty ? 'Resume' : rawName;
+    return baseName
+        .replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+  }
+
   String _resumePdfFileName(ResumeModel resume) {
-    return '${resume.personalInfo.fullName.replaceAll(' ', '_')}_Resume.pdf';
+    return '${_resumeFileStem(resume)}_Resume.pdf';
+  }
+
+  String _resumeGifFileName(ResumeModel resume) {
+    return '${_resumeFileStem(resume)}_Resume_Pages.gif';
   }
 
   Future<void> _refreshPreview(ResumeModel resume) async {
@@ -212,7 +270,10 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    _setExportLoadingState(
+      isLoading: true,
+      exportLabel: 'Generating PDF...',
+    );
     try {
       final bytes = await _pdfBytesForResume(resume);
       await _shareBytesFile(
@@ -224,16 +285,11 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         preferPrintingOnWeb: true,
       );
       await FreePlanService.recordPdfExport();
+      _showExportSuccess('PDF export ready to share.');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Error generating PDF: $e'),
-              backgroundColor: AppColors.error),
-        );
-      }
+      _showExportError('Error generating PDF: $e');
     } finally {
-      setState(() => _isLoading = false);
+      _setExportLoadingState(isLoading: false);
     }
   }
 
@@ -249,7 +305,10 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    _setExportLoadingState(
+      isLoading: true,
+      exportLabel: 'Generating TXT...',
+    );
     try {
       final export = ResumeExportService.buildTxtExport(resume);
       await _shareBytesFile(
@@ -259,17 +318,11 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         subject: '${resume.personalInfo.fullName} Resume',
         text: 'TXT resume export from ${AppInfo.appName}',
       );
+      _showExportSuccess('TXT export ready to share.');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting TXT: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      _showExportError('Error exporting TXT: $e');
     } finally {
-      setState(() => _isLoading = false);
+      _setExportLoadingState(isLoading: false);
     }
   }
 
@@ -285,7 +338,10 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    _setExportLoadingState(
+      isLoading: true,
+      exportLabel: 'Generating DOCX...',
+    );
     try {
       final export = ResumeExportService.buildDocxExport(resume);
       await _shareBytesFile(
@@ -295,17 +351,49 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         subject: '${resume.personalInfo.fullName} Resume',
         text: 'DOCX resume export from ${AppInfo.appName}',
       );
+      _showExportSuccess('DOCX export ready to share.');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting DOCX: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      _showExportError('Error exporting DOCX: $e');
     } finally {
-      setState(() => _isLoading = false);
+      _setExportLoadingState(isLoading: false);
+    }
+  }
+
+  Future<void> _exportGif() async {
+    final resume = _currentResume();
+    if (resume == null) return;
+    if (!FreePlanService.canExportResumeTemplate(resume.templateId) ||
+        !FreePlanService.canExportPdf) {
+      showUpgradePromptSheet(
+        context,
+        featureName: 'export_gif',
+        message: FreePlanService.exportMessageForTemplate(resume.templateId),
+      );
+      return;
+    }
+
+    _setExportLoadingState(
+      isLoading: true,
+      exportLabel: 'Generating GIF...',
+    );
+    try {
+      final pdfBytes = await _pdfBytesForResume(resume);
+      final bytes = await PreviewMediaService.generateGifFromPdfBytes(
+        pdfBytes,
+        dpi: _gifExportDpi,
+      );
+      await _shareBytesFile(
+        bytes: bytes,
+        fileName: _resumeGifFileName(resume),
+        mimeType: 'image/gif',
+        subject: '${resume.personalInfo.fullName} Resume Slideshow',
+        text: 'Animated resume page slideshow from ${AppInfo.appName}',
+      );
+      _showExportSuccess('GIF export verified and ready to share.');
+    } catch (e) {
+      _showExportError('Error exporting GIF: $e');
+    } finally {
+      _setExportLoadingState(isLoading: false);
     }
   }
 
@@ -319,7 +407,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -366,6 +454,19 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _exportPdf();
+                },
+              ),
+              _ExportOptionTile(
+                icon: Iconsax.video_play,
+                title: 'GIF',
+                subtitle: 'Animated slideshow of all resume pages',
+                locked: !FreePlanService.canExportResumeTemplate(
+                      resume.templateId,
+                    ) ||
+                    !FreePlanService.canExportPdf,
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportGif();
                 },
               ),
               _ExportOptionTile(
@@ -654,9 +755,10 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
                     const CircularProgressIndicator(color: Colors.white),
                     const SizedBox(height: 16),
                     Text(
-                      resume.writingLanguage != 'English'
-                          ? 'Translating to ${resume.writingLanguage}...'
-                          : 'Generating PDF...',
+                      _activeExportLabel ??
+                          (resume.writingLanguage != 'English'
+                              ? 'Translating to ${resume.writingLanguage}...'
+                              : 'Preparing export...'),
                       style: const TextStyle(color: Colors.white, fontSize: 14),
                     ),
                   ],
@@ -665,70 +767,73 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
             ),
         ],
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -4))
-          ],
-        ),
-        child: Row(
-          children: [
-            AdaptiveTooltip(
-              message: kIsWeb
-                  ? 'Open a print-ready PDF in a new tab'
-                  : 'Print your resume',
-              button: true,
-              child: IconButton(
-                onPressed: _printPdf,
-                icon: const Icon(Iconsax.printer),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -4))
+            ],
+          ),
+          child: Row(
+            children: [
+              AdaptiveTooltip(
+                message: kIsWeb
+                    ? 'Open a print-ready PDF in a new tab'
+                    : 'Print your resume',
+                button: true,
+                child: IconButton(
+                  onPressed: _printPdf,
+                  icon: const Icon(Iconsax.printer),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            AdaptiveTooltip(
-              message: 'Email resume',
-              button: true,
-              child: IconButton(
-                onPressed: _emailPdf,
-                icon: const Icon(Iconsax.sms),
-                style: IconButton.styleFrom(
-                  backgroundColor:
-                      const Color(0xFFEC4899).withValues(alpha: 0.1),
+              const SizedBox(width: 8),
+              AdaptiveTooltip(
+                message: 'Email resume',
+                button: true,
+                child: IconButton(
+                  onPressed: _emailPdf,
+                  icon: const Icon(Iconsax.sms),
+                  style: IconButton.styleFrom(
+                    backgroundColor:
+                        const Color(0xFFEC4899).withValues(alpha: 0.1),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            AdaptiveTooltip(
-              message: 'Share resume',
-              button: true,
-              child: IconButton(
-                onPressed: _sharePdf,
-                icon: const Icon(Iconsax.share),
-                style: IconButton.styleFrom(
-                  backgroundColor:
-                      const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+              const SizedBox(width: 8),
+              AdaptiveTooltip(
+                message: 'Share resume',
+                button: true,
+                child: IconButton(
+                  onPressed: _sharePdf,
+                  icon: const Icon(Iconsax.share),
+                  style: IconButton.styleFrom(
+                    backgroundColor:
+                        const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _showExportSheet,
-                icon: const Icon(Iconsax.document_download),
-                label: const Text('Export Resume'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF14B8A6),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _showExportSheet,
+                  icon: const Icon(Iconsax.document_download),
+                  label: const Text('Export Resume'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF14B8A6),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3, end: 0),
     );

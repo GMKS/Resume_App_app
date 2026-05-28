@@ -685,12 +685,15 @@ class ModernEdgeResumePdfTemplate extends PdfTemplate {
   }
 
   List<pw.Widget> _userCustomSectionWidgets(CustomSection section) {
-    final normalizedTitle = normalizeUserCustomSectionTitle(section.title);
-    final title = normalizedTitle.isEmpty ? 'CUSTOM SECTION' : normalizedTitle;
+    final title = displayUserCustomSectionTitle(
+      section,
+      fallback: 'SECTION',
+    );
     final widgets = <pw.Widget>[];
 
     for (var index = 0; index < section.items.length; index++) {
-      final displayItem = buildUserCustomSectionDisplayItem(section.items[index]);
+      final displayItem =
+          buildUserCustomSectionDisplayItem(section.items[index]);
       if (!displayItem.hasContent) {
         continue;
       }

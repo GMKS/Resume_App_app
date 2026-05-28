@@ -74,4 +74,41 @@ void main() {
     expect(restored.layoutStyle, 'compact');
     expect(restored.writingLanguage, 'Spanish');
   });
+
+  test('resume json round-trip preserves custom section ids and titles', () {
+    final original = _resume(
+      id: 'three',
+      updatedAt: DateTime(2026, 4, 18),
+    ).copyWith(
+      customSections: [
+        CustomSection(
+          id: 'user_custom_awards',
+          title: 'Awards',
+          order: 0,
+          items: [
+            CustomSectionItem(
+              id: 'award-1',
+              title: 'QA Excellence Award',
+            ),
+          ],
+        ),
+        CustomSection(
+          id: 'leadership_experience',
+          title: 'Leadership Experience',
+          order: 1,
+        ),
+      ],
+    );
+
+    final restored = ResumeJson.fromMap(ResumeJson.toMap(original));
+
+    expect(restored.customSections.map((section) => section.id).toList(), [
+      'user_custom_awards',
+      'leadership_experience',
+    ]);
+    expect(restored.customSections.map((section) => section.title).toList(), [
+      'Awards',
+      'Leadership Experience',
+    ]);
+  });
 }

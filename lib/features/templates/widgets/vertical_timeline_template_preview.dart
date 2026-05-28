@@ -44,7 +44,8 @@ class VerticalTimelineTemplatePreview extends StatelessWidget {
       resume?.skills ?? const <Skill>[],
       maxItems: 6,
     );
-    final certificationLines = VerticalTimelineTemplateSupport.certificationLines(
+    final certificationLines =
+        VerticalTimelineTemplateSupport.certificationLines(
       resume?.certifications ?? const <Certification>[],
       maxItems: 2,
     );
@@ -56,8 +57,8 @@ class VerticalTimelineTemplatePreview extends StatelessWidget {
       resume?.personalInfo,
       compactLinks: true,
     );
-    final hasPhoto =
-        resume != null && (resume!.personalInfo.profileImage?.isNotEmpty ?? false);
+    final hasPhoto = resume != null &&
+        (resume!.personalInfo.profileImage?.isNotEmpty ?? false);
 
     final objective = summaryLines.isNotEmpty
         ? summaryLines.join(' ')
@@ -94,12 +95,16 @@ class VerticalTimelineTemplatePreview extends StatelessWidget {
         : const [
             VerticalTimelineProjectEntry(
               title: 'E-Commerce Platform',
-              detailLines: ['Built a scalable storefront and checkout experience.'],
+              detailLines: [
+                'Built a scalable storefront and checkout experience.'
+              ],
               links: ['github.com/johndoe/ecommerce'],
             ),
             VerticalTimelineProjectEntry(
               title: 'Real-time Chat App',
-              detailLines: ['Implemented live messaging with synchronized presence.'],
+              detailLines: [
+                'Implemented live messaging with synchronized presence.'
+              ],
               links: ['github.com/johndoe/chat'],
             ),
           ];
@@ -173,8 +178,7 @@ class VerticalTimelineTemplatePreview extends StatelessWidget {
           fontFamily: 'Helvetica',
         ),
         maxLines: effectiveMaxLines,
-        overflow:
-            effectiveMaxLines != null ? TextOverflow.ellipsis : null,
+        overflow: effectiveMaxLines != null ? TextOverflow.ellipsis : null,
         textAlign: justify ? TextAlign.justify : TextAlign.left,
       );
     }
@@ -343,7 +347,7 @@ class VerticalTimelineTemplatePreview extends StatelessWidget {
     }
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map(customSectionItemBlock)
           .whereType<Widget>()
@@ -356,7 +360,7 @@ class VerticalTimelineTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          vtSectionLabel(title.isEmpty ? 'CUSTOM SECTION' : title.toUpperCase()),
+          vtSectionLabel(title.toUpperCase()),
           ...itemBlocks,
         ],
       );

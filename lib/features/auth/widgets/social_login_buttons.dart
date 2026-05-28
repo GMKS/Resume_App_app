@@ -101,6 +101,8 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
               icon: FontAwesomeIcons.xTwitter,
               color: const Color(0xFF000000),
               label: 'Twitter/X',
+              enabled: SocialAuthService.canAttemptTwitterSignIn,
+              disabledMessage: SocialAuthService.twitterDisabledMessage,
               loading: _activeProvider == 'twitter',
               onTap: () => _handleSocial(
                 'twitter',
@@ -112,6 +114,8 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
               icon: FontAwesomeIcons.linkedinIn,
               color: const Color(0xFF0A66C2),
               label: 'LinkedIn',
+              enabled: SocialAuthService.canAttemptLinkedInSignIn,
+              disabledMessage: SocialAuthService.linkedInDisabledMessage,
               loading: _activeProvider == 'linkedin',
               onTap: () => _handleSocial(
                 'linkedin',
@@ -123,6 +127,8 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
               icon: FontAwesomeIcons.googlePlusG,
               color: const Color(0xFFDD4B39),
               label: 'Google',
+              enabled: SocialAuthService.canAttemptGoogleSignIn,
+              disabledMessage: SocialAuthService.googleDisabledMessage,
               loading: _activeProvider == 'google',
               onTap: () => _handleSocial(
                 'google',

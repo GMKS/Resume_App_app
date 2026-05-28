@@ -19,13 +19,16 @@ const _businessManagementSections = <String, ProfessionalRoleSectionConfig>{
   'business_leadership_achievements': ProfessionalRoleSectionConfig(
     id: 'business_leadership_achievements',
     title: 'Leadership Achievements',
-    description: 'Showcase strategic wins, team growth, and organizational impact.',
-    emptyPrompt: 'Add revenue growth, team scaling, restructures, or strategic initiatives.',
+    description:
+        'Showcase strategic wins, team growth, and organizational impact.',
+    emptyPrompt:
+        'Add revenue growth, team scaling, restructures, or strategic initiatives.',
   ),
   'business_board_memberships': ProfessionalRoleSectionConfig(
     id: 'business_board_memberships',
     title: 'Board Memberships',
-    description: 'Highlight board positions, committee roles, and governance experience.',
+    description:
+        'Highlight board positions, committee roles, and governance experience.',
     emptyPrompt: 'Add board or committee name, role, and tenure.',
   ),
   'business_management_certifications': ProfessionalRoleSectionConfig(
@@ -42,7 +45,8 @@ const _designCreativeSections = <String, ProfessionalRoleSectionConfig>{
     id: 'design_portfolio_highlights',
     title: 'Portfolio Highlights',
     description: 'Showcase your best design projects and creative work.',
-    emptyPrompt: 'Add project title, role, and link to portfolio or case study.',
+    emptyPrompt:
+        'Add project title, role, and link to portfolio or case study.',
   ),
   'design_awards_recognition': ProfessionalRoleSectionConfig(
     id: 'design_awards_recognition',
@@ -60,7 +64,8 @@ const _designCreativeSections = <String, ProfessionalRoleSectionConfig>{
     id: 'design_specializations',
     title: 'Design Specializations',
     description: 'Highlight your design expertise areas.',
-    emptyPrompt: 'Add specialization areas: UX/UI, Branding, Illustration, etc.',
+    emptyPrompt:
+        'Add specialization areas: UX/UI, Branding, Illustration, etc.',
   ),
 };
 
@@ -70,19 +75,23 @@ const _healthcareSections = <String, ProfessionalRoleSectionConfig>{
     id: 'healthcare_licenses_certifications',
     title: 'Medical Licenses & Certifications',
     description: 'Critical healthcare credentials and medical certifications.',
-    emptyPrompt: 'Add license type, issuing authority, license number, and expiry date.',
+    emptyPrompt:
+        'Add license type, issuing authority, license number, and expiry date.',
   ),
   'healthcare_specializations': ProfessionalRoleSectionConfig(
     id: 'healthcare_specializations',
     title: 'Clinical Specializations',
     description: 'Medical specializations and clinical expertise areas.',
-    emptyPrompt: 'Add specialization: Cardiology, Pediatrics, Surgery, Nursing, etc.',
+    emptyPrompt:
+        'Add specialization: Cardiology, Pediatrics, Surgery, Nursing, etc.',
   ),
   'healthcare_clinical_skills': ProfessionalRoleSectionConfig(
     id: 'healthcare_clinical_skills',
     title: 'Clinical Skills',
-    description: 'Specific medical procedures, techniques, or patient care competencies.',
-    emptyPrompt: 'Add clinical skill: Patient assessment, Surgical techniques, etc.',
+    description:
+        'Specific medical procedures, techniques, or patient care competencies.',
+    emptyPrompt:
+        'Add clinical skill: Patient assessment, Surgical techniques, etc.',
   ),
   'healthcare_hospital_affiliations': ProfessionalRoleSectionConfig(
     id: 'healthcare_hospital_affiliations',
@@ -98,48 +107,69 @@ const _hrResumeSection = <String, ProfessionalRoleSectionConfig>{
     id: 'hr_certifications',
     title: 'HR Certifications',
     description: 'Professional HR credentials: SHRM, CIPD, or similar.',
-    emptyPrompt: 'Add certification: PHR, SHRM-CP, CIPD, etc., and year obtained.',
+    emptyPrompt:
+        'Add certification: PHR, SHRM-CP, CIPD, etc., and year obtained.',
   ),
   'hr_talent_management': ProfessionalRoleSectionConfig(
     id: 'hr_talent_management',
     title: 'Talent Management Achievements',
-    description: 'Recruitment, retention, and talent development accomplishments.',
+    description:
+        'Recruitment, retention, and talent development accomplishments.',
     emptyPrompt: 'Add achievement: Hired X employees, Retention rate, etc.',
   ),
   'hr_compliance_programs': ProfessionalRoleSectionConfig(
     id: 'hr_compliance_programs',
     title: 'Compliance & Programs',
-    description: 'HR compliance initiatives, training programs, or policy development.',
-    emptyPrompt: 'Add program name: Benefits administration, Training program, Compliance audit.',
+    description:
+        'HR compliance initiatives, training programs, or policy development.',
+    emptyPrompt:
+        'Add program name: Benefits administration, Training program, Compliance audit.',
   ),
   'hr_employee_relations': ProfessionalRoleSectionConfig(
     id: 'hr_employee_relations',
     title: 'Employee Relations Expertise',
-    description: 'Employee engagement, conflict resolution, or labor relations experience.',
-    emptyPrompt: 'Add expertise: Conflict resolution, Union negotiations, Engagement programs.',
+    description:
+        'Employee engagement, conflict resolution, or labor relations experience.',
+    emptyPrompt:
+        'Add expertise: Conflict resolution, Union negotiations, Engagement programs.',
   ),
 };
 
-Map<String, Map<String, ProfessionalRoleSectionConfig>> _roleSectionCatalogs() => {
-  'executive': _businessManagementSections,
-  'designer_profile': _designCreativeSections,
-  'professional_tone': _healthcareSections,
-  'elegant_gold_layout': _hrResumeSection,
-};
+Map<String, Map<String, ProfessionalRoleSectionConfig>>
+    _roleSectionCatalogs() => {
+          'executive': _businessManagementSections,
+          'designer_profile': _designCreativeSections,
+          'professional_tone': _healthcareSections,
+          'elegant_gold_layout': _hrResumeSection,
+        };
 
-ProfessionalRoleSectionConfig? professionalRoleSectionConfigById(String templateId, String id) {
+ProfessionalRoleSectionConfig? professionalRoleSectionConfigById(
+    String templateId, String id) {
   return _roleSectionCatalogs()[templateId]?[id];
 }
 
-List<ProfessionalRoleSectionConfig> professionalRoleAllOptionalSectionConfigs(String templateId) {
-  return _roleSectionCatalogs()[templateId]?.values.toList(growable: false) ?? [];
+ProfessionalRoleSectionConfig? anyProfessionalRoleSectionConfigById(String id) {
+  for (final catalog in _roleSectionCatalogs().values) {
+    final config = catalog[id];
+    if (config != null) {
+      return config;
+    }
+  }
+  return null;
+}
+
+List<ProfessionalRoleSectionConfig> professionalRoleAllOptionalSectionConfigs(
+    String templateId) {
+  return _roleSectionCatalogs()[templateId]?.values.toList(growable: false) ??
+      [];
 }
 
 bool isProfessionalRoleOptionalSectionKey(String templateId, String key) {
   return _roleSectionCatalogs()[templateId]?.containsKey(key) ?? false;
 }
 
-List<ProfessionalRoleSectionConfig> professionalRoleRecommendedSections(String templateId) {
+List<ProfessionalRoleSectionConfig> professionalRoleRecommendedSections(
+    String templateId) {
   final catalog = _roleSectionCatalogs()[templateId] ?? {};
   return catalog.values.toList(growable: false);
 }
@@ -154,7 +184,8 @@ List<String> professionalRoleOptionalSectionKeys(ResumeModel resume) {
       .toList();
   final existingKnown = resume.customSections
       .map((section) => section.id)
-      .where((id) => isProfessionalRoleOptionalSectionKey(resume.templateId, id))
+      .where(
+          (id) => isProfessionalRoleOptionalSectionKey(resume.templateId, id))
       .where((id) => !recommended.contains(id))
       .toList();
   return [...recommended, ...existingKnown];

@@ -200,7 +200,7 @@ class AtsOptimizedCleanResumeTemplatePreview extends StatelessWidget {
     }
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map(customSectionItemBlock)
           .whereType<Widget>()
@@ -210,7 +210,7 @@ class AtsOptimizedCleanResumeTemplatePreview extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionHeader(title.isEmpty ? 'Custom Section' : title),
+            _sectionHeader(title),
             const SizedBox(height: 1.2),
             _text(
               'No content yet. Add entries to this section to display them here.',
@@ -226,7 +226,7 @@ class AtsOptimizedCleanResumeTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(title.isEmpty ? 'Custom Section' : title),
+          _sectionHeader(title),
           const SizedBox(height: 1.5),
           ...itemBlocks,
         ],

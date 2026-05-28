@@ -25,11 +25,9 @@ class ExecutiveClassicResumeTemplatePreview extends StatelessWidget {
   Color get _pageBg => const Color(ExecutiveClassicTemplateSupport.pageHex);
   Color get _ink => const Color(ExecutiveClassicTemplateSupport.inkHex);
   Color get _muted => const Color(ExecutiveClassicTemplateSupport.mutedHex);
-  Color get _subtle =>
-      const Color(ExecutiveClassicTemplateSupport.subtleHex);
+  Color get _subtle => const Color(ExecutiveClassicTemplateSupport.subtleHex);
   Color get _line => const Color(ExecutiveClassicTemplateSupport.lineHex);
-  Color get _chipBg =>
-      const Color(ExecutiveClassicTemplateSupport.chipBgHex);
+  Color get _chipBg => const Color(ExecutiveClassicTemplateSupport.chipBgHex);
   Color get _chipBorder =>
       const Color(ExecutiveClassicTemplateSupport.chipBorderHex);
   Color get _accentStripe => Color.lerp(_accent, Colors.black, 0.25)!;
@@ -237,7 +235,7 @@ class ExecutiveClassicResumeTemplatePreview extends StatelessWidget {
   }
 
   Widget? _customSectionBlock(CustomSection section) {
-    final title = normalizeUserCustomSectionTitle(section.title);
+    final title = displayUserCustomSectionTitle(section);
     final itemBlocks = section.items
         .map(_customSectionItemBlock)
         .whereType<Widget>()
@@ -247,7 +245,7 @@ class ExecutiveClassicResumeTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(title.isEmpty ? 'Custom Section' : title),
+          _sectionHeader(title),
           const SizedBox(height: 1.5),
           _text(
             'No content yet. Add entries to this section to display them here.',
@@ -263,7 +261,7 @@ class ExecutiveClassicResumeTemplatePreview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(title.isEmpty ? 'Custom Section' : title),
+        _sectionHeader(title),
         const SizedBox(height: 1.5),
         ...itemBlocks,
       ],
@@ -325,7 +323,8 @@ class ExecutiveClassicResumeTemplatePreview extends StatelessWidget {
                       Wrap(
                         spacing: 2,
                         runSpacing: 2,
-                        children: _skills.map(_skillChip).toList(growable: false),
+                        children:
+                            _skills.map(_skillChip).toList(growable: false),
                       ),
                     ],
                     if (_certifications.isNotEmpty) ...[
@@ -694,5 +693,4 @@ class ExecutiveClassicResumeTemplatePreview extends StatelessWidget {
       ),
     );
   }
-
 }

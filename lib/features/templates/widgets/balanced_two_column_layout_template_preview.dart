@@ -340,7 +340,7 @@ class BalancedTwoColumnLayoutTemplatePreview extends StatelessWidget {
   }
 
   Widget? _customSectionBlock(CustomSection section) {
-    final title = normalizeUserCustomSectionTitle(section.title);
+    final title = displayUserCustomSectionTitle(section);
     final itemBlocks = section.items
         .map(_customSectionItemBlock)
         .whereType<Widget>()
@@ -353,7 +353,7 @@ class BalancedTwoColumnLayoutTemplatePreview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle(title.isEmpty ? 'CUSTOM SECTION' : title.toUpperCase()),
+        _sectionTitle(title.toUpperCase()),
         const SizedBox(height: 1.2),
         ...itemBlocks,
       ],
@@ -608,17 +608,18 @@ class BalancedTwoColumnLayoutTemplatePreview extends StatelessWidget {
                           color: _muted,
                           maxLines: 0,
                         )
-                      else ...previewLanguages.map(
-                        (line) => Padding(
-                          padding: const EdgeInsets.only(bottom: 1.2),
-                          child: _text(
-                            line,
-                            size: 1.28,
-                            color: _muted,
-                            maxLines: 0,
+                      else
+                        ...previewLanguages.map(
+                          (line) => Padding(
+                            padding: const EdgeInsets.only(bottom: 1.2),
+                            child: _text(
+                              line,
+                              size: 1.28,
+                              color: _muted,
+                              maxLines: 0,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ],
                 ),

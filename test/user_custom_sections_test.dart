@@ -23,7 +23,10 @@ void main() {
     test('keeps legacy custom sections without the user prefix', () {
       final sections = orderedUserCustomSectionsFromList([
         CustomSection(id: 'startup_tools', title: 'Tools'),
-        CustomSection(id: 'leadership_highlights', title: 'Leadership Highlights', order: 2),
+        CustomSection(
+            id: 'leadership_highlights',
+            title: 'Leadership Highlights',
+            order: 2),
         CustomSection(id: 'awards', title: 'Awards', order: 1),
       ]);
 
@@ -31,6 +34,37 @@ void main() {
         'awards',
         'leadership_highlights',
       ]);
+    });
+
+    test('does not classify standard resume keys as user custom sections', () {
+      expect(isUserCustomSectionId('personal'), isFalse);
+      expect(isUserCustomSectionId('summary'), isFalse);
+      expect(isUserCustomSectionId('experience'), isFalse);
+    });
+  });
+
+  group('displayUserCustomSectionTitle', () {
+    test('prefers configured titles for known optional sections', () {
+      final section = CustomSection(id: 'startup_achievements');
+
+      expect(
+        displayUserCustomSectionTitle(section, templateId: 'startup'),
+        'Achievements',
+      );
+    });
+
+    test('humanizes legacy ids when the stored title is missing', () {
+      final section = CustomSection(id: 'leadership_experience');
+
+      expect(displayUserCustomSectionTitle(section), 'Leadership Experience');
+    });
+
+    test('avoids surfacing generated ids as section titles', () {
+      final section = CustomSection(
+        id: 'user_custom_123e4567-e89b-12d3-a456-426614174000',
+      );
+
+      expect(displayUserCustomSectionTitle(section), 'Section');
     });
   });
 

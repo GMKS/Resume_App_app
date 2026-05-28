@@ -201,20 +201,20 @@ class ResumeCard extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // Stats Row
-                  Row(
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 12,
                     children: [
                       _StatItem(
                         icon: Iconsax.briefcase,
                         count: resume.experience.length,
                         label: 'Experience',
                       ),
-                      const SizedBox(width: 16),
                       _StatItem(
                         icon: Iconsax.teacher,
                         count: resume.education.length,
                         label: 'Education',
                       ),
-                      const SizedBox(width: 16),
                       _StatItem(
                         icon: Iconsax.code,
                         count: resume.skills.length,

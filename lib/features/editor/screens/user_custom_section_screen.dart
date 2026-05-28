@@ -39,18 +39,24 @@ class _UserCustomSectionScreenState
     return null;
   }
 
-  Future<void> _persistSection(ResumeModel resume, CustomSection updated) async {
-    final latestResume = ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
+  Future<void> _persistSection(
+      ResumeModel resume, CustomSection updated) async {
+    final latestResume =
+        ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
     final userSections = orderedUserCustomSections(latestResume);
-    final index = userSections.indexWhere((section) => section.id == updated.id);
+    final index =
+        userSections.indexWhere((section) => section.id == updated.id);
     if (index == -1) {
       return;
     }
 
     final nextUserSections = List<CustomSection>.from(userSections);
-    nextUserSections[index] = updated.copyWith(order: userSections[index].order);
+    nextUserSections[index] =
+        updated.copyWith(order: userSections[index].order);
 
-    await ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
+    await ref
+        .read(currentResumeProvider(widget.resumeId).notifier)
+        .updateResume(
           latestResume.copyWith(
             customSections: mergeUserCustomSections(
               existingSections: latestResume.customSections,
@@ -94,9 +100,10 @@ class _UserCustomSectionScreenState
                     children: [
                       Text(
                         'Edit Section Title',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       const Spacer(),
                       IconButton(
@@ -134,7 +141,8 @@ class _UserCustomSectionScreenState
                         )) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('A custom section with this title already exists'),
+                              content: Text(
+                                  'A custom section with this title already exists'),
                             ),
                           );
                           return;
@@ -202,9 +210,10 @@ class _UserCustomSectionScreenState
                     children: [
                       Text(
                         existing == null ? 'Add Entry' : 'Edit Entry',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       const Spacer(),
                       IconButton(
@@ -240,7 +249,8 @@ class _UserCustomSectionScreenState
                           content: content,
                         );
 
-                        final items = List<CustomSectionItem>.from(section.items);
+                        final items =
+                            List<CustomSectionItem>.from(section.items);
                         final index = items.indexWhere(
                           (entry) => entry.id == item.id,
                         );
@@ -259,7 +269,8 @@ class _UserCustomSectionScreenState
                         }
                         Navigator.pop(sheetContext);
                       },
-                      child: Text(existing == null ? 'Add Entry' : 'Save Entry'),
+                      child:
+                          Text(existing == null ? 'Add Entry' : 'Save Entry'),
                     ),
                   ),
                 ],
@@ -315,12 +326,15 @@ class _UserCustomSectionScreenState
       return;
     }
 
-    final latestResume = ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
+    final latestResume =
+        ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
     final remaining = orderedUserCustomSections(latestResume)
         .where((entry) => entry.id != section.id)
         .toList(growable: false);
 
-    await ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
+    await ref
+        .read(currentResumeProvider(widget.resumeId).notifier)
+        .updateResume(
           latestResume.copyWith(
             customSections: mergeUserCustomSections(
               existingSections: latestResume.customSections,
@@ -372,9 +386,9 @@ class _UserCustomSectionScreenState
     }
 
     final totalLines = section.items
-      .expand(userCustomSectionItemLines)
-      .where((line) => line.trim().isNotEmpty)
-      .length;
+        .expand(userCustomSectionItemLines)
+        .where((line) => line.trim().isNotEmpty)
+        .length;
 
     return Scaffold(
       appBar: AppBar(
@@ -382,7 +396,7 @@ class _UserCustomSectionScreenState
           onPressed: () => context.pop(),
           icon: const Icon(Iconsax.arrow_left),
         ),
-        title: Text(section.title),
+        title: Text(displayUserCustomSectionTitle(section)),
         actions: [
           IconButton(
             tooltip: 'Rename section',
@@ -400,7 +414,7 @@ class _UserCustomSectionScreenState
         padding: const EdgeInsets.all(20),
         children: [
           EditorIntroCard(
-            title: section.title,
+            title: displayUserCustomSectionTitle(section),
             subtitle: section.items.isEmpty
                 ? 'This custom section is saved but still empty. Add entries when you are ready and they will flow into preview, PDF, and exports.'
                 : '${section.items.length} custom entr${section.items.length == 1 ? 'y' : 'ies'} are attached to this resume and will render anywhere the template supports user-defined sections.',
@@ -427,7 +441,8 @@ class _UserCustomSectionScreenState
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -583,7 +598,8 @@ class _UserCustomSectionScreenState
                       ),
                       const SizedBox(height: 10),
                       EditorStatPill(
-                        label: '${userCustomSectionItemLines(item).where((line) => line.trim().isNotEmpty).length} lines',
+                        label:
+                            '${userCustomSectionItemLines(item).where((line) => line.trim().isNotEmpty).length} lines',
                         icon: Iconsax.menu_board,
                         color: AppColors.primary,
                       ),

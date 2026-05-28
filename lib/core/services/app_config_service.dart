@@ -5,6 +5,14 @@ class AppConfigService {
   const AppConfigService._();
 
   static const MethodChannel _channel = MethodChannel('resume_builder/app_config');
+  static const Set<String> _preferRuntimeValues = <String>{
+    'PLAY_WEEKLY_PRODUCT_ID',
+    'PLAY_MONTHLY_PRODUCT_ID',
+    'PLAY_QUARTERLY_PRODUCT_ID',
+    'PLAY_YEARLY_PRODUCT_ID',
+    'ENABLE_DUMMY_PAYMENTS',
+    'DISABLE_GOOGLE_PLAY_BILLING',
+  };
   static final Map<String, String> _runtimeValues = <String, String>{};
   static bool _initialized = false;
 
@@ -75,17 +83,17 @@ class AppConfigService {
       'FACEBOOK_APP_ID' => const String.fromEnvironment('FACEBOOK_APP_ID'),
       'FACEBOOK_CLIENT_TOKEN' =>
           const String.fromEnvironment('FACEBOOK_CLIENT_TOKEN'),
+        'FIREBASE_ANDROID_CERTIFICATE_HASHES' =>
+          const String.fromEnvironment('FIREBASE_ANDROID_CERTIFICATE_HASHES'),
+        'PACKAGE_SHA1' => const String.fromEnvironment('PACKAGE_SHA1'),
+        'PACKAGE_SHA256' => const String.fromEnvironment('PACKAGE_SHA256'),
+        'FACEBOOK_KEY_HASH' => const String.fromEnvironment('FACEBOOK_KEY_HASH'),
       'LINKEDIN_PROVIDER_ID' => const String.fromEnvironment(
           'LINKEDIN_PROVIDER_ID',
           defaultValue: 'oidc.linkedin',
         ),
       _ => '',
     };
-
-    final normalizedCompileTime = _normalizeForKey(key, compileTimeValue);
-    if (normalizedCompileTime.isNotEmpty) {
-      return normalizedCompileTime;
-    }
 
     final runtimeValue = switch (key) {
       'OTP_SEND_URL' => _readOtpUrl(
@@ -101,7 +109,17 @@ class AppConfigService {
       _ => _runtimeValues[key] ?? '',
     };
 
-    return _normalizeForKey(key, runtimeValue);
+    final normalizedRuntime = _normalizeForKey(key, runtimeValue);
+    if (_preferRuntimeValues.contains(key) && normalizedRuntime.isNotEmpty) {
+      return normalizedRuntime;
+    }
+
+    final normalizedCompileTime = _normalizeForKey(key, compileTimeValue);
+    if (normalizedCompileTime.isNotEmpty) {
+      return normalizedCompileTime;
+    }
+
+    return normalizedRuntime;
   }
 
   static String _readOtpUrl({

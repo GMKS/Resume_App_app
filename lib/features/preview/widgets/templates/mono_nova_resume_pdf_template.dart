@@ -27,7 +27,8 @@ class MonoNovaResumePdfTemplate extends PdfTemplate {
       resume.experience,
       maxDetailLines: 6,
     );
-    final educations = MonoNovaTemplateSupport.educationEntries(resume.education);
+    final educations =
+        MonoNovaTemplateSupport.educationEntries(resume.education);
     final skills = MonoNovaTemplateSupport.skillNames(resume.skills);
     final projects = MonoNovaTemplateSupport.projectEntries(
       resume.projects,
@@ -158,7 +159,8 @@ class MonoNovaResumePdfTemplate extends PdfTemplate {
                       _sanitizePdfText(item.label),
                       textAlign: pw.TextAlign.right,
                       style: pw.TextStyle(
-                        fontSize: item.kind.index >= MonoNovaContactKind.linkedin.index
+                        fontSize: item.kind.index >=
+                                MonoNovaContactKind.linkedin.index
                             ? 8.1
                             : 8.6,
                         color: _muted,
@@ -318,8 +320,10 @@ class MonoNovaResumePdfTemplate extends PdfTemplate {
   }
 
   List<pw.Widget> _customSectionWidgets(CustomSection section) {
-    final normalizedTitle = normalizeUserCustomSectionTitle(section.title);
-    final title = normalizedTitle.isEmpty ? 'CUSTOM SECTION' : normalizedTitle;
+    final title = displayUserCustomSectionTitle(
+      section,
+      fallback: 'SECTION',
+    );
     final widgets = <pw.Widget>[
       _sectionHeader(title.toUpperCase()),
       pw.SizedBox(height: 4),

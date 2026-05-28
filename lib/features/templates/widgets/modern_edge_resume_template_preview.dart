@@ -428,7 +428,7 @@ class ModernEdgeResumeTemplatePreview extends StatelessWidget {
     }
 
     Widget? customSectionBlock(CustomSection section) {
-      final titleText = normalizeUserCustomSectionTitle(section.title);
+      final titleText = displayUserCustomSectionTitle(section);
       final itemBlocks = <Widget>[];
 
       for (final item in section.items) {
@@ -445,7 +445,7 @@ class ModernEdgeResumeTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          sectionHeader(titleText.isEmpty ? 'Custom Section' : titleText),
+          sectionHeader(titleText),
           ...itemBlocks,
         ],
       );
@@ -605,7 +605,8 @@ class ModernEdgeResumeTemplatePreview extends StatelessWidget {
                             experienceBlock(entry),
                         ],
                         for (final section in previewCustomSections)
-                          if (customSectionBlock(section) case final block?) block,
+                          if (customSectionBlock(section) case final block?)
+                            block,
                         if (previewProjects.isNotEmpty) ...[
                           sectionHeader('Projects'),
                           for (final entry in previewProjects)

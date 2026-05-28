@@ -152,8 +152,7 @@ class ForestEdgeResumeTemplatePreview extends StatelessWidget {
         value,
         textAlign: align,
         maxLines: effectiveMaxLines,
-        overflow:
-            effectiveMaxLines != null ? TextOverflow.ellipsis : null,
+        overflow: effectiveMaxLines != null ? TextOverflow.ellipsis : null,
         style: TextStyle(
           fontSize: size,
           color: color ?? _ink,
@@ -249,7 +248,7 @@ class ForestEdgeResumeTemplatePreview extends StatelessWidget {
     }
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map((item) {
             final displayItem = buildUserCustomSectionDisplayItem(item);
@@ -306,7 +305,7 @@ class ForestEdgeResumeTemplatePreview extends StatelessWidget {
       }
 
       return card(
-        title: title.isEmpty ? 'CUSTOM SECTION' : title.toUpperCase(),
+        title: title.toUpperCase(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: itemBlocks
@@ -646,19 +645,19 @@ class ForestEdgeResumeTemplatePreview extends StatelessWidget {
                                     maxLines: 1,
                                   ),
                                   ...entry.detailLines.map((line) => bodyText(
-                                            line,
-                                            size: 1.4,
-                                            maxLines: 0,
-                                            color: _muted,
-                                          )),
+                                        line,
+                                        size: 1.4,
+                                        maxLines: 0,
+                                        color: _muted,
+                                      )),
                                   ...entry.links.map(
-                                        (link) => text(
-                                          link,
-                                          size: 1.34,
-                                          color: _ink,
-                                          maxLines: 1,
-                                        ),
-                                      ),
+                                    (link) => text(
+                                      link,
+                                      size: 1.34,
+                                      color: _ink,
+                                      maxLines: 1,
+                                    ),
+                                  ),
                                   if (previewProjects.last != entry)
                                     const SizedBox(height: 1.2),
                                 ],
@@ -687,21 +686,21 @@ class ForestEdgeResumeTemplatePreview extends StatelessWidget {
                                     maxLines: 1,
                                   ),
                                   ...entry.detailLines.map(
-                                        (line) => bodyText(
-                                          line,
-                                          size: 1.36,
-                                          maxLines: 0,
-                                          color: _muted,
-                                        ),
-                                      ),
+                                    (line) => bodyText(
+                                      line,
+                                      size: 1.36,
+                                      maxLines: 0,
+                                      color: _muted,
+                                    ),
+                                  ),
                                   ...entry.links.map(
-                                        (link) => text(
-                                          link,
-                                          size: 1.32,
-                                          color: _ink,
-                                          maxLines: 1,
-                                        ),
-                                      ),
+                                    (link) => text(
+                                      link,
+                                      size: 1.32,
+                                      color: _ink,
+                                      maxLines: 1,
+                                    ),
+                                  ),
                                   if (previewCertifications.last != entry)
                                     const SizedBox(height: 1.1),
                                 ],

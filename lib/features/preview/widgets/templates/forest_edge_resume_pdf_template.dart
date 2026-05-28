@@ -214,12 +214,14 @@ class ForestEdgeResumePdfTemplate extends PdfTemplate {
     }
 
     for (final section in orderedUserCustomSections(resume)) {
+      final title = displayUserCustomSectionTitle(
+        section,
+        fallback: 'SECTION',
+      ).toUpperCase();
       if (section.items.isEmpty) {
         sections[section.id] = [
           _sectionCard(
-            title: normalizeUserCustomSectionTitle(section.title).isEmpty
-                ? 'CUSTOM SECTION'
-                : normalizeUserCustomSectionTitle(section.title).toUpperCase(),
+            title: title,
             child: pw.Text(
               'No content added yet.',
               style: const pw.TextStyle(fontSize: 7, color: _muted),
@@ -231,9 +233,7 @@ class ForestEdgeResumePdfTemplate extends PdfTemplate {
       }
 
       sections[section.id] = _groupedSectionCards(
-        normalizeUserCustomSectionTitle(section.title).isEmpty
-            ? 'CUSTOM SECTION'
-            : normalizeUserCustomSectionTitle(section.title).toUpperCase(),
+        title,
         section.items
             .map(_userCustomSectionBlock)
             .whereType<pw.Widget>()

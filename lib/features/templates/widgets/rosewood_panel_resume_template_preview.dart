@@ -40,7 +40,9 @@ class RosewoodPanelResumeTemplatePreview extends StatelessWidget {
     );
     final previewCustomSections = orderedUserCustomSectionsFromList(
       resume?.customSections ?? const <CustomSection>[],
-    ).where((section) => !awardLikeSectionPattern.hasMatch(section.title)).toList(growable: false);
+    )
+        .where((section) => !awardLikeSectionPattern.hasMatch(section.title))
+        .toList(growable: false);
     final name = RosewoodPanelTemplateSupport.displayName(resume).toUpperCase();
     final title = RosewoodPanelTemplateSupport.displayTitle(resume);
     final contactItems = RosewoodPanelTemplateSupport.contactItems(
@@ -177,9 +179,8 @@ class RosewoodPanelResumeTemplatePreview extends StatelessWidget {
       TextAlign align = TextAlign.left,
       double height = 1.15,
     }) {
-      final normalizedMaxLines = maxLines != null && maxLines <= 0
-          ? null
-          : maxLines;
+      final normalizedMaxLines =
+          maxLines != null && maxLines <= 0 ? null : maxLines;
       return Text(
         value,
         style: TextStyle(
@@ -190,8 +191,7 @@ class RosewoodPanelResumeTemplatePreview extends StatelessWidget {
           height: height,
         ),
         maxLines: normalizedMaxLines,
-        overflow:
-            normalizedMaxLines != null ? TextOverflow.ellipsis : null,
+        overflow: normalizedMaxLines != null ? TextOverflow.ellipsis : null,
         textAlign: align,
       );
     }
@@ -337,7 +337,7 @@ class RosewoodPanelResumeTemplatePreview extends StatelessWidget {
         );
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map((item) {
             final displayItem = buildUserCustomSectionDisplayItem(item);
@@ -394,7 +394,7 @@ class RosewoodPanelResumeTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          mainSection(title.isEmpty ? 'CUSTOM SECTION' : title.toUpperCase()),
+          mainSection(title.toUpperCase()),
           const SizedBox(height: 1.4),
           ...itemBlocks,
         ],

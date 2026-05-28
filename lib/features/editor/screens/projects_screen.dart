@@ -9,6 +9,10 @@ import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/resume_quality_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
+import '../../../core/utils/validation_feedback.dart';
+import '../../../shared/widgets/adaptive_tooltip.dart';
+import '../../../shared/widgets/app_empty_state_card.dart';
+import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/custom_text_field.dart';
@@ -56,7 +60,8 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _ProjectForm(resumeId: widget.resumeId, existing: existing),
+      builder: (context) =>
+          _ProjectForm(resumeId: widget.resumeId, existing: existing),
     );
   }
 
@@ -113,8 +118,10 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     final resume = ref.read(currentResumeProvider(widget.resumeId));
     if (resume != null) {
       final updated = resume.projects.where((p) => p.id != id).toList();
-      ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(resume.copyWith(projects: updated));
-      
+      ref
+          .read(currentResumeProvider(widget.resumeId).notifier)
+          .updateResume(resume.copyWith(projects: updated));
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -127,7 +134,8 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
           ),
           backgroundColor: const Color(0xFFEC4899),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -150,16 +158,25 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
 
     if (resume == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: AppLoadingState(
+          title: 'Loading projects',
+          message: 'Preparing your project showcase.',
+        ),
+      );
     }
 
     final qualityReport = ResumeQualityService.analyzeResume(resume);
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Iconsax.arrow_left),
+        leading: AdaptiveTooltip(
+          message: 'Back',
+          button: true,
+          child: IconButton(
+            onPressed: () => context.pop(),
+            icon: const Icon(Iconsax.arrow_left),
+          ),
         ),
         title: const Text('Projects'),
       ),
@@ -188,7 +205,10 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                   project: project,
                   onEdit: () => _showProjectDialog(project),
                   onDelete: () => _deleteProject(project.id),
-                ).animate().fadeIn(delay: (100 * index).ms).slideX(begin: 0.1, end: 0);
+                )
+                    .animate()
+                    .fadeIn(delay: (100 * index).ms)
+                    .slideX(begin: 0.1, end: 0);
               },
             ),
       bottomNavigationBar: SafeArea(
@@ -200,7 +220,8 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
               onPressed: () => _showProjectDialog(null),
               icon: const Icon(Iconsax.add),
               label: const Text('Add Project'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEC4899)),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEC4899)),
             ),
           ),
         ),
@@ -209,48 +230,12 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEC4899).withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Iconsax.folder_open,
-              size: 60,
-              color: Color(0xFFEC4899),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No Projects Added',
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Showcase your best projects with outcomes, tools, and links that can survive template changes.',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return const AppEmptyStateCard(
+      icon: Iconsax.folder_open,
+      accentColor: Color(0xFFEC4899),
+      title: 'No Projects Added',
+      message:
+          'Showcase your best projects with outcomes, tools, and links that can survive template changes.',
     ).animate().fadeIn(duration: 500.ms);
   }
 }
@@ -260,7 +245,8 @@ class _ProjectCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const _ProjectCard({required this.project, required this.onEdit, required this.onDelete});
+  const _ProjectCard(
+      {required this.project, required this.onEdit, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -287,24 +273,47 @@ class _ProjectCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: const Color(0xFFEC4899).withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+              borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16), topRight: Radius.circular(16)),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 48, height: 48,
-                  decoration: BoxDecoration(color: const Color(0xFFEC4899).withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Iconsax.folder_open, color: Color(0xFFEC4899)),
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFEC4899).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12)),
+                  child:
+                      const Icon(Iconsax.folder_open, color: Color(0xFFEC4899)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(project.title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  child: Text(project.title,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
                 ),
                 PopupMenuButton<String>(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Iconsax.edit, size: 18), SizedBox(width: 8), Text('Edit')])),
-                    const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Iconsax.trash, size: 18, color: AppColors.error), SizedBox(width: 8), Text('Delete', style: TextStyle(color: AppColors.error))])),
+                    const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(children: [
+                          Icon(Iconsax.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit')
+                        ])),
+                    const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(children: [
+                          Icon(Iconsax.trash, size: 18, color: AppColors.error),
+                          SizedBox(width: 8),
+                          Text('Delete',
+                              style: TextStyle(color: AppColors.error))
+                        ])),
                   ],
                   onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
                 ),
@@ -339,28 +348,48 @@ class _ProjectCard extends StatelessWidget {
                 ),
                 if (project.description.isNotEmpty) const SizedBox(height: 12),
                 if (project.description.isNotEmpty)
-                  Text(project.description, style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.5)),
+                  Text(project.description,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(height: 1.5)),
                 if (project.technologies.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Wrap(
-                    spacing: 6, runSpacing: 6,
-                    children: project.technologies.map((t) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEC4899).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(t, style: const TextStyle(fontSize: 12, color: Color(0xFFEC4899), fontWeight: FontWeight.w500)),
-                    )).toList(),
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: project.technologies
+                        .map((t) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEC4899)
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(t,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFFEC4899),
+                                      fontWeight: FontWeight.w500)),
+                            ))
+                        .toList(),
                   ),
                 ],
                 if (project.url?.isNotEmpty ?? false) ...[
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Iconsax.link, size: 16, color: AppColors.primary),
+                      const Icon(Iconsax.link,
+                          size: 16, color: AppColors.primary),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(project.url!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.primary), overflow: TextOverflow.ellipsis)),
+                      Expanded(
+                          child: Text(project.url!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: AppColors.primary),
+                              overflow: TextOverflow.ellipsis)),
                     ],
                   ),
                 ],
@@ -394,8 +423,10 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.existing?.title ?? '');
-    _descriptionController = TextEditingController(text: widget.existing?.description ?? '');
+    _titleController =
+        TextEditingController(text: widget.existing?.title ?? '');
+    _descriptionController =
+        TextEditingController(text: widget.existing?.description ?? '');
     _urlController = TextEditingController(text: widget.existing?.url ?? '');
     _techController = TextEditingController();
     _technologies = List.from(widget.existing?.technologies ?? []);
@@ -467,6 +498,17 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
   }
 
   void _saveProject() {
+    final missingFields = <String>[];
+    if (_titleController.text.trim().isEmpty) {
+      missingFields.add('Project Title');
+    }
+
+    if (missingFields.isNotEmpty) {
+      showMissingFieldsSnackBar(context, missingFields);
+      _formKey.currentState?.validate();
+      return;
+    }
+
     if (_formKey.currentState?.validate() ?? false) {
       final resume = ref.read(currentResumeProvider(widget.resumeId));
       if (resume == null) return;
@@ -481,13 +523,17 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
 
       List<Project> updated;
       if (widget.existing != null) {
-        updated = resume.projects.map((p) => p.id == project.id ? project : p).toList();
+        updated = resume.projects
+            .map((p) => p.id == project.id ? project : p)
+            .toList();
       } else {
         updated = [...resume.projects, project];
       }
 
-      ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(resume.copyWith(projects: updated));
-      
+      ref
+          .read(currentResumeProvider(widget.resumeId).notifier)
+          .updateResume(resume.copyWith(projects: updated));
+
       // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -496,17 +542,20 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 12),
-                Text(widget.existing != null ? 'Project updated' : 'Project added'),
+                Text(widget.existing != null
+                    ? 'Project updated'
+                    : 'Project added'),
               ],
             ),
             backgroundColor: const Color(0xFFEC4899),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
       }
-      
+
       Navigator.pop(context);
     }
   }
@@ -523,18 +572,31 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+        borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24), topRight: Radius.circular(24)),
       ),
       child: Column(
         children: [
-          Container(margin: const EdgeInsets.only(top: 12), width: 40, height: 4, decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(2))),
+          Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2))),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(widget.existing != null ? 'Edit Project' : 'Add Project', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Iconsax.close_circle)),
+                Text(widget.existing != null ? 'Edit Project' : 'Add Project',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Iconsax.close_circle)),
               ],
             ),
           ),
@@ -586,8 +648,8 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
                         color: const Color(0xFFEC4899).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: const Color(0xFFEC4899)
-                              .withValues(alpha: 0.16),
+                          color:
+                              const Color(0xFFEC4899).withValues(alpha: 0.16),
                         ),
                       ),
                       child: Row(
@@ -648,17 +710,27 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
-                      IconButton(onPressed: _addTechnology, icon: const Icon(Iconsax.add_circle, color: AppColors.primary)),
+                      IconButton(
+                          onPressed: _addTechnology,
+                          icon: const Icon(Iconsax.add_circle,
+                              color: AppColors.primary)),
                     ],
                   ),
                   if (_technologies.isNotEmpty)
                     Wrap(
-                      spacing: 8, runSpacing: 8,
-                      children: _technologies.asMap().entries.map((e) => Chip(
-                        label: Text(e.value),
-                        deleteIcon: const Icon(Iconsax.close_circle, size: 18),
-                        onDeleted: () => setState(() => _technologies.removeAt(e.key)),
-                      )).toList(),
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _technologies
+                          .asMap()
+                          .entries
+                          .map((e) => Chip(
+                                label: Text(e.value),
+                                deleteIcon:
+                                    const Icon(Iconsax.close_circle, size: 18),
+                                onDeleted: () => setState(
+                                    () => _technologies.removeAt(e.key)),
+                              ))
+                          .toList(),
                     ),
                   const SizedBox(height: 24),
                 ],
@@ -667,13 +739,16 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
           ),
           // Pinned Save Button
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            padding: EdgeInsets.fromLTRB(
+                20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
             child: SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
                 onPressed: _saveProject,
-                child: Text(widget.existing != null ? 'Update Project' : 'Save Project'),
+                child: Text(widget.existing != null
+                    ? 'Update Project'
+                    : 'Save Project'),
               ),
             ),
           ),

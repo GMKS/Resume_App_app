@@ -10,6 +10,7 @@ import '../../../core/models/resume_model.dart';
 import '../../../core/services/resume_quality_service.dart';
 import '../../../core/services/skill_suggestions_service.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
+import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/editor_intro_card.dart';
 import 'resume_editor_screen.dart';
@@ -271,7 +272,14 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
   Widget build(BuildContext context) {
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
     
-    if (resume == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (resume == null) {
+      return const Scaffold(
+        body: AppLoadingState(
+          title: 'Loading skills',
+          message: 'Preparing your skills inventory.',
+        ),
+      );
+    }
     final qualityReport = ResumeQualityService.analyzeResume(resume);
     final categoriesCovered = resume.skills
       .map((skill) => (skill.category ?? 'Other').trim())

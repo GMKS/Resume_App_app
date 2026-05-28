@@ -67,12 +67,16 @@ class _AIResumeGeneratorScreenState
 
     final objective = _buildObjective(role, expLevel);
     final experiences = _buildExperience(role, expLevel);
-    final skillList = topSkills.asMap().entries.map((e) => Skill(
-          id: const Uuid().v4(),
-          name: e.value,
-          proficiency: 3 + (e.key < 3 ? 1 : 0), // top 3 get proficiency 4
-          category: e.key < 5 ? 'Technical' : 'Soft Skills',
-        )).toList();
+    final skillList = topSkills
+        .asMap()
+        .entries
+        .map((e) => Skill(
+              id: const Uuid().v4(),
+              name: e.value,
+              proficiency: 3 + (e.key < 3 ? 1 : 0), // top 3 get proficiency 4
+              category: e.key < 5 ? 'Technical' : 'Soft Skills',
+            ))
+        .toList();
 
     final resume = ResumeModel(
       id: id,
@@ -123,13 +127,29 @@ class _AIResumeGeneratorScreenState
 
     setState(() => _isGenerating = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
+        margin: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          16 + MediaQuery.paddingOf(context).bottom,
+        ),
+        duration: const Duration(seconds: 3),
         content: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(Iconsax.tick_circle, color: Colors.white),
             SizedBox(width: 12),
-            Text('Resume generated! Review and customize it.'),
+            Expanded(
+              child: Text(
+                'Resume generated! Review and customize it.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         backgroundColor: AppColors.success,
@@ -249,9 +269,17 @@ class _AIResumeGeneratorScreenState
   }
 
   String _degreeForRole(String role) {
-    if (['Software Engineer', 'Frontend Developer', 'Backend Developer',
-        'Mobile Developer', 'Full Stack Developer', 'DevOps Engineer',
-        'Cloud Architect', 'QA Engineer', 'Cybersecurity Analyst'].contains(role)) {
+    if ([
+      'Software Engineer',
+      'Frontend Developer',
+      'Backend Developer',
+      'Mobile Developer',
+      'Full Stack Developer',
+      'DevOps Engineer',
+      'Cloud Architect',
+      'QA Engineer',
+      'Cybersecurity Analyst'
+    ].contains(role)) {
       return "Bachelor's Degree";
     }
     if (['Data Scientist', 'Data Analyst'].contains(role)) {
@@ -261,8 +289,13 @@ class _AIResumeGeneratorScreenState
   }
 
   String _fieldForRole(String role) {
-    if (['Software Engineer', 'Frontend Developer', 'Backend Developer',
-        'Mobile Developer', 'Full Stack Developer'].contains(role)) {
+    if ([
+      'Software Engineer',
+      'Frontend Developer',
+      'Backend Developer',
+      'Mobile Developer',
+      'Full Stack Developer'
+    ].contains(role)) {
       return 'Computer Science / Software Engineering';
     }
     if (['Data Scientist', 'Data Analyst'].contains(role)) {
@@ -289,7 +322,8 @@ class _AIResumeGeneratorScreenState
           controller: _nameController,
           decoration: _inputDecoration('Full Name', Iconsax.user),
           textCapitalization: TextCapitalization.words,
-          validator: (v) => v == null || v.trim().isEmpty ? 'Name required' : null,
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? 'Name required' : null,
         ),
         const SizedBox(height: 14),
         TextFormField(
@@ -311,7 +345,8 @@ class _AIResumeGeneratorScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(Iconsax.briefcase, 'Role & Experience', AppColors.secondary),
+        _sectionHeader(
+            Iconsax.briefcase, 'Role & Experience', AppColors.secondary),
         const SizedBox(height: 20),
         // Role dropdown
         DropdownButtonFormField<String>(
@@ -326,14 +361,15 @@ class _AIResumeGeneratorScreenState
         const SizedBox(height: 14),
         TextFormField(
           controller: _jobTitleController,
-          decoration: _inputDecoration(
-              'Custom Job Title (optional)', Iconsax.edit_2),
+          decoration:
+              _inputDecoration('Custom Job Title (optional)', Iconsax.edit_2),
           textCapitalization: TextCapitalization.words,
         ),
         const SizedBox(height: 14),
         TextFormField(
           controller: _industryController,
-          decoration: _inputDecoration('Industry / Company Type', Iconsax.building_4),
+          decoration:
+              _inputDecoration('Industry / Company Type', Iconsax.building_4),
           textCapitalization: TextCapitalization.words,
         ),
         const SizedBox(height: 14),
@@ -354,7 +390,9 @@ class _AIResumeGeneratorScreenState
                     onSelected: (s) => setState(() => _experience = e),
                     selectedColor: AppColors.secondary,
                     labelStyle: TextStyle(
-                      color: _experience == e ? Colors.white : AppColors.textSecondary,
+                      color: _experience == e
+                          ? Colors.white
+                          : AppColors.textSecondary,
                       fontWeight: FontWeight.w500,
                     ),
                   ))
@@ -366,49 +404,99 @@ class _AIResumeGeneratorScreenState
 
   Widget _step2Preview() {
     final role = _selectedRole;
-    final skills = SkillSuggestionsService.getSkillsForRole(role).take(6).toList();
+    final skills =
+        SkillSuggestionsService.getSkillsForRole(role).take(6).toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const skillAccent = Color(0xFF7C3AED);
+    final skillCardColor = isDark
+        ? skillAccent.withValues(alpha: 0.18)
+        : skillAccent.withValues(alpha: 0.09);
+    final skillBorderColor = isDark
+        ? skillAccent.withValues(alpha: 0.34)
+        : skillAccent.withValues(alpha: 0.18);
+    final skillTextColor = isDark ? Colors.white : const Color(0xFF5B21B6);
+    final skillChipColor =
+        isDark ? const Color(0xFF312E81) : const Color(0xFFEDE9FE);
+    final skillChipTextColor = isDark ? Colors.white : const Color(0xFF4C1D95);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionHeader(Iconsax.eye, 'Preview', const Color(0xFF8B5CF6)),
         const SizedBox(height: 20),
-        _previewRow('Name', _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : '—'),
-        _previewRow('Email', _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : '—'),
+        _previewRow(
+            'Name',
+            _nameController.text.trim().isNotEmpty
+                ? _nameController.text.trim()
+                : '—'),
+        _previewRow(
+            'Email',
+            _emailController.text.trim().isNotEmpty
+                ? _emailController.text.trim()
+                : '—'),
         _previewRow('Role', role),
         _previewRow('Experience', _experience),
-        _previewRow('Industry',
-            _industryController.text.trim().isNotEmpty ? _industryController.text.trim() : 'Technology'),
+        _previewRow(
+            'Industry',
+            _industryController.text.trim().isNotEmpty
+                ? _industryController.text.trim()
+                : 'Technology'),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF8B5CF6).withValues(alpha: 0.07),
+            color: skillCardColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.2)),
+            border: Border.all(color: skillBorderColor),
+            boxShadow: [
+              BoxShadow(
+                color: skillAccent.withValues(alpha: isDark ? 0.12 : 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(Iconsax.lamp_charge, size: 16, color: Color(0xFF8B5CF6)),
+                  Icon(Iconsax.lamp_charge, size: 16, color: skillTextColor),
                   const SizedBox(width: 8),
                   Text('Suggested Skills',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF8B5CF6))),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700, color: skillTextColor)),
                 ],
               ),
               const SizedBox(height: 10),
               Wrap(
-                spacing: 6,
-                runSpacing: 6,
+                spacing: 8,
+                runSpacing: 8,
                 children: skills
                     .map((s) => Chip(
-                          label: Text(s, style: const TextStyle(fontSize: 12)),
-                          backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
-                          side: BorderSide.none,
+                          label: Text(
+                            s,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: skillChipTextColor,
+                            ),
+                          ),
+                          avatar: Icon(
+                            Iconsax.tick_circle,
+                            size: 14,
+                            color: skillChipTextColor,
+                          ),
+                          backgroundColor: skillChipColor,
+                          side: BorderSide(
+                            color: skillBorderColor,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 1.5,
+                          shadowColor: skillAccent.withValues(alpha: 0.12),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                         ))
                     .toList(),
               ),
@@ -430,7 +518,10 @@ class _AIResumeGeneratorScreenState
                 child: Text(
                   'The AI-generated resume will be pre-filled with smart content. '
                   'Review and edit every section in the resume editor before you use it.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.info),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: AppColors.info),
                 ),
               ),
             ],
@@ -548,7 +639,9 @@ class _AIResumeGeneratorScreenState
                     return Expanded(
                       child: Container(
                         height: 2,
-                        color: i ~/ 2 < _currentStep ? AppColors.primary : AppColors.divider,
+                        color: i ~/ 2 < _currentStep
+                            ? AppColors.primary
+                            : AppColors.divider,
                       ),
                     );
                   }
@@ -569,7 +662,9 @@ class _AIResumeGeneratorScreenState
                     ),
                     child: Icon(
                       isDone ? Icons.check : Icons.circle,
-                      color: (isDone || isActive) ? Colors.white : AppColors.border,
+                      color: (isDone || isActive)
+                          ? Colors.white
+                          : AppColors.border,
                       size: isDone ? 18 : 10,
                     ),
                   );

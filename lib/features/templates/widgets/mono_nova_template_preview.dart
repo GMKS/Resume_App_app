@@ -163,8 +163,7 @@ class MonoNovaTemplatePreview extends StatelessWidget {
           height: 1.18,
         ),
         maxLines: effectiveMaxLines,
-        overflow:
-            effectiveMaxLines != null ? TextOverflow.ellipsis : null,
+        overflow: effectiveMaxLines != null ? TextOverflow.ellipsis : null,
         textAlign: align,
       );
     }
@@ -182,7 +181,8 @@ class MonoNovaTemplatePreview extends StatelessWidget {
           ],
         );
 
-    Widget bulletLine(String line, {double size = 3.2, int? maxLines}) => Padding(
+    Widget bulletLine(String line, {double size = 3.2, int? maxLines}) =>
+        Padding(
           padding: const EdgeInsets.only(bottom: 1.1),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,7 +268,7 @@ class MonoNovaTemplatePreview extends StatelessWidget {
     }
 
     Widget? customSectionBlock(CustomSection section) {
-      final title = normalizeUserCustomSectionTitle(section.title);
+      final title = displayUserCustomSectionTitle(section);
       final itemBlocks = section.items
           .map(customSectionItemBlock)
           .whereType<Widget>()
@@ -281,7 +281,7 @@ class MonoNovaTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          sectionHeader(title.isEmpty ? 'Custom Section' : title),
+          sectionHeader(title),
           const SizedBox(height: 2),
           ...itemBlocks,
         ],
@@ -329,7 +329,8 @@ class MonoNovaTemplatePreview extends StatelessWidget {
                         .map(
                           (item) => text(
                             item.label,
-                            size: item.kind.index >= MonoNovaContactKind.linkedin.index
+                            size: item.kind.index >=
+                                    MonoNovaContactKind.linkedin.index
                                 ? 3.0
                                 : 3.25,
                             color: _muted,

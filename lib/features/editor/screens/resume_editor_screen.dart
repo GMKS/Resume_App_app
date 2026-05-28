@@ -352,7 +352,11 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
                   'languages',
                 ]
               : _availableSectionKeys(resume);
-          final normalized = loaded.where(allSectionKeys.contains).toList();
+          final normalized = loaded
+              .map((key) => _resolveStoredSectionOrderKey(resume, key))
+              .whereType<String>()
+              .where(allSectionKeys.contains)
+              .toList();
           final missing =
               allSectionKeys.where((key) => !normalized.contains(key)).toList();
           _customSectionOrder = [...normalized, ...missing];
@@ -369,6 +373,43 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
   Future<void> _saveResumeFormat(String format) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('resume_format_${widget.resumeId}', format);
+  }
+
+  CustomSection? _findCustomSectionForKey(
+    ResumeModel? resume,
+    String key,
+  ) {
+    if (resume == null) {
+      return null;
+    }
+
+    final normalizedKey = normalizeUserCustomSectionTitle(key).toLowerCase();
+    for (final section in resume.customSections) {
+      if (section.id == key) {
+        return section;
+      }
+
+      final normalizedTitle =
+          normalizeUserCustomSectionTitle(section.title).toLowerCase();
+      if (normalizedKey.isNotEmpty && normalizedTitle == normalizedKey) {
+        return section;
+      }
+    }
+
+    return null;
+  }
+
+  String? _resolveStoredSectionOrderKey(ResumeModel? resume, String key) {
+    final matchedSection = _findCustomSectionForKey(resume, key);
+    if (matchedSection != null) {
+      return matchedSection.id;
+    }
+
+    if (!isUserCustomSectionId(key)) {
+      return key;
+    }
+
+    return null;
   }
 
   List<String> _withOrderedUserCustomSectionKeys(
@@ -409,7 +450,9 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
     final ordered = <CustomSection>[];
 
     for (final key in order) {
-      final section = remaining.remove(key);
+      final resolvedKey = _resolveStoredSectionOrderKey(resume, key);
+      final section =
+          resolvedKey == null ? null : remaining.remove(resolvedKey);
       if (section != null) {
         ordered.add(section);
       }
@@ -424,7 +467,8 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
     String title, {
     String? excludingId,
   }) {
-    final normalizedTitle = normalizeUserCustomSectionTitle(title).toLowerCase();
+    final normalizedTitle =
+        normalizeUserCustomSectionTitle(title).toLowerCase();
     if (normalizedTitle.isEmpty) {
       return null;
     }
@@ -541,6 +585,15 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
+            final isDark = Theme.of(sheetContext).brightness == Brightness.dark;
+            final suggestionFill = isDark
+                ? AppColors.primary.withValues(alpha: 0.2)
+                : AppColors.primary.withValues(alpha: 0.08);
+            final suggestionBorder = AppColors.primary.withValues(
+              alpha: isDark ? 0.32 : 0.18,
+            );
+            final suggestionTextColor =
+                isDark ? Colors.white : AppColors.primaryDark;
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -584,7 +637,22 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
                         children: kSuggestedUserCustomSectionTitles
                             .map(
                               (suggestion) => ActionChip(
-                                label: Text(suggestion),
+                                label: Text(
+                                  suggestion,
+                                  style: TextStyle(
+                                    color: suggestionTextColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                backgroundColor: suggestionFill,
+                                side: BorderSide(color: suggestionBorder),
+                                elevation: 1,
+                                shadowColor: AppColors.primary.withValues(
+                                  alpha: 0.1,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 onPressed: isSubmitting
                                     ? null
                                     : () {
@@ -707,7 +775,8 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
       return;
     }
 
-    final latestResume = ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
+    final latestResume =
+        ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
     final normalizedTitle = normalizeUserCustomSectionTitle(draft.title);
     if (normalizedTitle.isEmpty) {
       return;
@@ -1015,7 +1084,7 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
                             color: color, size: 20),
                       ),
                       title: Text(
-                        _sectionLabelForKey(key),
+                        _sectionLabelForKey(key, resume: resume),
                         style: const TextStyle(
                             fontWeight: FontWeight.w500, fontSize: 14),
                       ),
@@ -1189,7 +1258,8 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
                     _AiSheetOption(
                       icon: Iconsax.search_normal_1,
                       title: 'Job-Specific Resume Generator',
-                      subtitle: 'Compare against a job description, review match gaps, and generate AI tailoring',
+                      subtitle:
+                          'Compare against a job description, review match gaps, and generate AI tailoring',
                       color: AppColors.info,
                       isLocked: !FreePlanService.canAccessAiTool('job_tailor'),
                       onTap: () {
@@ -2279,9 +2349,7 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
   List<String> _availableSectionKeys(ResumeModel resume) {
     final baseKeys = [
       ..._getSectionOrder(resume),
-      ...orderedUserCustomSections(resume)
-          .map((section) => section.id)
-          ,
+      ...orderedUserCustomSections(resume).map((section) => section.id),
     ];
     final deduped = <String>[];
     for (final key in baseKeys) {
@@ -2300,27 +2368,26 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
     return [...preserved, ...missing];
   }
 
-  String _sectionLabelForKey(String key) {
-    if (isUserCustomSectionId(key)) {
-      final resume = ref.read(currentResumeProvider(widget.resumeId));
-      if (resume != null) {
-        for (final section in resume.customSections) {
-          if (section.id == key) {
-            final title = normalizeUserCustomSectionTitle(section.title);
-            return title.isEmpty ? 'Custom Section' : title;
-          }
-        }
-      }
-      return 'Custom Section';
+  String _sectionLabelForKey(String key, {ResumeModel? resume}) {
+    final activeResume =
+        resume ?? ref.read(currentResumeProvider(widget.resumeId));
+    final customSection = _findCustomSectionForKey(activeResume, key);
+    if (customSection != null) {
+      return displayUserCustomSectionTitle(
+        customSection,
+        templateId: activeResume?.templateId,
+        fallback: humanizeCustomSectionId(key),
+      );
     }
 
     return _kSectionLabels[key] ??
         startupSectionConfigById(key)?.title ??
         professionalRoleSectionConfigById(
-          ref.read(currentResumeProvider(widget.resumeId))?.templateId ?? '',
+          activeResume?.templateId ?? '',
           key,
         )?.title ??
-        key;
+        anyProfessionalRoleSectionConfigById(key)?.title ??
+        humanizeCustomSectionId(key, fallback: key);
   }
 
   IconData _sectionIconForKey(String key) {
@@ -2690,9 +2757,7 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
           : '$itemCount entr${itemCount == 1 ? 'y' : 'ies'} | ${userCustomSectionItemPreview(section.items.first)}';
 
       tiles[section.id] = () => UserCustomSectionTile(
-            title: normalizeUserCustomSectionTitle(section.title).isEmpty
-                ? 'Custom Section'
-                : normalizeUserCustomSectionTitle(section.title),
+            title: displayUserCustomSectionTitle(section),
             subtitle: subtitle,
             itemCount: itemCount,
             color: color,
