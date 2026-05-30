@@ -44,6 +44,19 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   Uint8List? _previewBytes;
   String? _previewSignature;
 
+  void _logLifecycle(String phase, {ResumeModel? resume, Object? error}) {
+    debugPrint(
+      '[PreviewScreen][$phase] '
+      'resumeId=${widget.resumeId} '
+      'mounted=$mounted '
+      'hasResume=${resume != null} '
+      'previewLoading=$_isPreviewLoading '
+      'hasPreviewBytes=${_previewBytes != null} '
+      'previewSignature=${_previewSignature ?? 'null'} '
+      '${error == null ? '' : 'error=$error'}',
+    );
+  }
+
   void _setExportLoadingState({
     required bool isLoading,
     String? exportLabel,
@@ -58,6 +71,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   @override
   void reassemble() {
     super.reassemble();
+    _logLifecycle('reassemble', resume: _resume);
     final resume = _currentResume();
     if (resume == null) {
       return;
@@ -69,17 +83,28 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   }
 
   ResumeModel? _currentResume() {
-    return StorageService.getResume(widget.resumeId) ?? _resume;
+    return _resume ?? StorageService.getResume(widget.resumeId);
   }
 
   @override
   void initState() {
     super.initState();
+    _logLifecycle('initState:start');
     _loadResume();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _logLifecycle('didChangeDependencies', resume: _resume);
   }
 
   void _loadResume() {
     final resume = StorageService.getResume(widget.resumeId);
+    _logLifecycle('loadResume:start', resume: resume);
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _resume = resume;
       _previewBytes = null;
@@ -123,24 +148,6 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
       resume.updatedAt.millisecondsSinceEpoch.toString(),
       _customSectionsPreviewSignature(resume),
     ].join('|');
-  }
-
-  void _syncResumeFromStorageIfNeeded(ResumeModel resume) {
-    final current = _resume;
-    if (current != null &&
-        _resumePreviewSignature(current) == _resumePreviewSignature(resume)) {
-      return;
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _resume = resume;
-      });
-    });
   }
 
   Future<Uint8List> _buildPdfBytes(ResumeModel resume) async {
@@ -233,9 +240,11 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   Future<void> _refreshPreview(ResumeModel resume) async {
     final signature = _resumePreviewSignature(resume);
     if (_previewSignature == signature && _previewBytes != null) {
+      _logLifecycle('refreshPreview:skip-cached', resume: resume);
       return;
     }
 
+    _logLifecycle('refreshPreview:start', resume: resume);
     setState(() {
       _isPreviewLoading = true;
       _previewSignature = signature;
@@ -247,13 +256,19 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
       if (!mounted || _previewSignature != signature) return;
       setState(() {
         _previewBytes = bytes;
+        _resume = resume;
       });
+      _logLifecycle('refreshPreview:success', resume: resume);
+    } catch (error) {
+      _logLifecycle('refreshPreview:error', resume: resume, error: error);
+      rethrow;
     } finally {
       if (mounted && _previewSignature == signature) {
         setState(() {
           _isPreviewLoading = false;
         });
       }
+      _logLifecycle('refreshPreview:finally', resume: resume);
     }
   }
 
@@ -643,19 +658,10 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   @override
   Widget build(BuildContext context) {
     final resume = _currentResume();
+    _logLifecycle('build', resume: resume);
     if (resume == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    _syncResumeFromStorageIfNeeded(resume);
-    final previewSignature = _resumePreviewSignature(resume);
-    if (_previewSignature != previewSignature && !_isPreviewLoading) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _refreshPreview(resume);
-        }
-      });
-    }
-    final previewKey = ValueKey(previewSignature);
 
     return Scaffold(
       appBar: AppBar(
@@ -724,7 +730,6 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
                   const Center(child: CircularProgressIndicator())
                 else
                   PdfPreview(
-                    key: previewKey,
                     build: (format) async => _previewBytes!,
                     actions: const [],
                     canChangeOrientation: false,
@@ -837,6 +842,20 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         ),
       ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3, end: 0),
     );
+  }
+
+  @override
+  void deactivate() {
+    _logLifecycle('deactivate', resume: _resume);
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _logLifecycle('dispose:start', resume: _resume);
+    _previewBytes = null;
+    _previewSignature = null;
+    super.dispose();
   }
 }
 

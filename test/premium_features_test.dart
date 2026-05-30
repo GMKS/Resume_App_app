@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ import 'package:resume_builder/core/models/resume_model.dart';
 import 'package:resume_builder/core/services/free_plan_service.dart';
 import 'package:resume_builder/core/services/resume_export_service.dart';
 import 'package:resume_builder/core/services/storage_service.dart';
+import 'package:resume_builder/core/utils/export_file_validation.dart';
 import 'package:resume_builder/features/profile/screens/help_support_screen.dart';
 import 'package:resume_builder/features/resume/screens/resumes_tab_screen.dart';
 import 'package:resume_builder/features/settings/screens/settings_screen.dart';
@@ -170,6 +172,107 @@ void main() {
       expect(export.bytes, isNotEmpty);
       expect(export.bytes[0], 0x50);
       expect(export.bytes[1], 0x4B);
+      expect(
+        () => validateExportBytes(
+          bytes: export.bytes,
+          fileName: export.filename,
+          mimeType: export.mimeType,
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('buildDocxExport strips invalid XML characters and escapes symbols',
+        () {
+      final export = ResumeExportService.buildDocxExport(
+        buildResume().copyWith(
+          personalInfo: buildResume().personalInfo.copyWith(
+                fullName: 'Alex Ñ <Morgan> & Co',
+              ),
+          objective: 'Lead special chars \u0001 \u000B & < > " quotes',
+        ),
+      );
+
+      final archive = ZipDecoder().decodeBytes(export.bytes);
+      final documentFile = archive.findFile('word/document.xml');
+      expect(documentFile, isNotNull);
+
+      final content = documentFile!.content;
+      final xmlBytes = content is List<int> ? content : <int>[];
+      final documentXml = utf8.decode(xmlBytes, allowMalformed: false);
+
+      expect(documentXml, contains('Alex Ñ &lt;Morgan&gt; &amp; Co'));
+      expect(documentXml, contains('&quot; quotes'));
+      expect(documentXml.contains('\u0001'), isFalse);
+      expect(documentXml.contains('\u000B'), isFalse);
+    });
+
+    test('buildDocxExport keeps required OOXML parts for empty resume content',
+        () {
+      final export = ResumeExportService.buildDocxExport(
+        ResumeModel(
+          id: 'empty-docx',
+          title: 'Empty Resume',
+          personalInfo: PersonalInfo(),
+          createdAt: DateTime(2026, 3, 17),
+          updatedAt: DateTime(2026, 3, 17),
+        ),
+      );
+
+      expect(
+        () => validateExportBytes(
+          bytes: export.bytes,
+          fileName: export.filename,
+          mimeType: export.mimeType,
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('buildDocxExport handles long text and profile image data', () {
+      final longText =
+          List<String>.filled(120, 'Scaled premium export content.').join(' ');
+      final resume = buildResume().copyWith(
+        objective: longText,
+        personalInfo: buildResume().personalInfo.copyWith(
+              profileImage: base64Encode(List<int>.filled(256, 11)),
+            ),
+      );
+
+      final export = ResumeExportService.buildDocxExport(resume);
+
+      expect(export.bytes.length, greaterThan(1024));
+      expect(
+        () => validateExportBytes(
+          bytes: export.bytes,
+          fileName: export.filename,
+          mimeType: export.mimeType,
+        ),
+        returnsNormally,
+      );
+    });
+  });
+
+  group('Resume completion', () {
+    test('calculateCompletionPercentage rounds expected scenarios', () {
+      expect(calculateCompletionPercentage(0, 8).round(), 0);
+      expect(calculateCompletionPercentage(1, 8).round(), 13);
+      expect(calculateCompletionPercentage(4, 8).round(), 50);
+      expect(calculateCompletionPercentage(5, 8).round(), 63);
+      expect(calculateCompletionPercentage(8, 8).round(), 100);
+    });
+
+    test('completion stats and percentage stay aligned for resume sections',
+        () {
+      final resume = buildResume().copyWith(
+        certifications: const [],
+        languages: const [],
+        projects: const [],
+      );
+
+      expect(resume.completionStats.completedSections, 5);
+      expect(resume.completionStats.totalSections, 8);
+      expect(resume.completionPercentage, 63);
     });
   });
 
@@ -268,11 +371,11 @@ void main() {
       await tester.pumpWidget(wrapWithApp(const ResumesTabScreen()));
       await tester.pumpAndSettle();
 
-      final fab = tester.widget<FloatingActionButton>(
-        find.byType(FloatingActionButton),
+      final createButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Create New Resume'),
       );
 
-      expect(fab.onPressed, isNotNull);
+      expect(createButton.onPressed, isNotNull);
     });
 
     test('free plan keeps premium photo upload locked', () {

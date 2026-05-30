@@ -17,6 +17,7 @@ import '../../../core/utils/user_custom_sections.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/keyboard_safe_bottom_sheet.dart';
 import '../widgets/section_tile.dart';
 import '../widgets/progress_header.dart';
 import '../widgets/resume_customization_sheets.dart';
@@ -594,171 +595,159 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
             );
             final suggestionTextColor =
                 isDark ? Colors.white : AppColors.primaryDark;
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(sheetContext).scaffoldBackgroundColor,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(24),
-                  ),
-                ),
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                child: SafeArea(
-                  top: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            return KeyboardSafeBottomSheet(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Add Custom Section',
-                            style: Theme.of(sheetContext)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            onPressed: isSubmitting
-                                ? null
-                                : () => Navigator.pop(sheetContext),
-                            icon: const Icon(Iconsax.close_circle),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: kSuggestedUserCustomSectionTitles
-                            .map(
-                              (suggestion) => ActionChip(
-                                label: Text(
-                                  suggestion,
-                                  style: TextStyle(
-                                    color: suggestionTextColor,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                backgroundColor: suggestionFill,
-                                side: BorderSide(color: suggestionBorder),
-                                elevation: 1,
-                                shadowColor: AppColors.primary.withValues(
-                                  alpha: 0.1,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                onPressed: isSubmitting
-                                    ? null
-                                    : () {
-                                        titleController.text = suggestion;
-                                      },
-                              ),
-                            )
-                            .toList(growable: false),
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: titleController,
-                        label: 'Section Title',
-                        hint:
-                            'Awards, Leadership Experience, Open Source Contributions...',
-                        prefixIcon: Iconsax.text,
-                        enabled: !isSubmitting,
-                      ),
-                      CustomTextField(
-                        controller: contentController,
-                        label: 'Description / Content',
-                        hint:
-                            'Optional first entry. You can add more entries later.',
-                        prefixIcon: Iconsax.document_text,
-                        maxLines: 5,
-                        enabled: !isSubmitting,
-                      ),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: isSubmitting
-                              ? null
-                              : () async {
-                                  setSheetState(() => isSubmitting = true);
-
-                                  final title = normalizeUserCustomSectionTitle(
-                                    titleController.text,
-                                  );
-                                  if (title.isEmpty) {
-                                    _showSingleSnackBar(
-                                      sheetContext,
-                                      'Section title is required',
-                                    );
-                                    if (sheetContext.mounted) {
-                                      setSheetState(() => isSubmitting = false);
-                                    }
-                                    return;
-                                  }
-                                  if (hasDuplicateUserCustomSectionTitle(
-                                    resume.customSections,
-                                    title,
-                                  )) {
-                                    _showSingleSnackBar(
-                                      sheetContext,
-                                      'A custom section with this title already exists',
-                                    );
-                                    if (sheetContext.mounted) {
-                                      setSheetState(() => isSubmitting = false);
-                                    }
-                                    return;
-                                  }
-
-                                  final initialContent =
-                                      contentController.text.trim();
-                                  if (initialContent.isEmpty) {
-                                    final confirmEmpty =
-                                        await _confirmSaveEmptyUserCustomSection(
-                                      sheetContext,
-                                      title,
-                                    );
-                                    if (!confirmEmpty) {
-                                      if (sheetContext.mounted) {
-                                        setSheetState(
-                                          () => isSubmitting = false,
-                                        );
-                                      }
-                                      return;
-                                    }
-                                  }
-
-                                  if (!sheetContext.mounted) {
-                                    return;
-                                  }
-
-                                  Navigator.pop(
-                                    sheetContext,
-                                    _PendingUserCustomSectionDraft(
-                                      title: title,
-                                      initialContent: initialContent,
-                                    ),
-                                  );
-                                },
-                          child: isSubmitting
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Create Section'),
+                      Expanded(
+                        child: Text(
+                          'Add Custom Section',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        onPressed: isSubmitting
+                            ? null
+                            : () => Navigator.pop(sheetContext),
+                        icon: const Icon(Iconsax.close_circle),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: kSuggestedUserCustomSectionTitles
+                        .map(
+                          (suggestion) => ActionChip(
+                            label: Text(
+                              suggestion,
+                              style: TextStyle(
+                                color: suggestionTextColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            backgroundColor: suggestionFill,
+                            side: BorderSide(color: suggestionBorder),
+                            elevation: 1,
+                            shadowColor: AppColors.primary.withValues(
+                              alpha: 0.1,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            onPressed: isSubmitting
+                                ? null
+                                : () {
+                                    titleController.text = suggestion;
+                                  },
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: titleController,
+                    label: 'Section Title',
+                    hint:
+                        'Awards, Leadership Experience, Open Source Contributions...',
+                    prefixIcon: Iconsax.text,
+                    enabled: !isSubmitting,
+                  ),
+                  CustomTextField(
+                    controller: contentController,
+                    label: 'Description / Content',
+                    hint:
+                        'Optional first entry. You can add more entries later.',
+                    prefixIcon: Iconsax.document_text,
+                    maxLines: 5,
+                    enabled: !isSubmitting,
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              setSheetState(() => isSubmitting = true);
+
+                              final title = normalizeUserCustomSectionTitle(
+                                titleController.text,
+                              );
+                              if (title.isEmpty) {
+                                _showSingleSnackBar(
+                                  sheetContext,
+                                  'Section title is required',
+                                );
+                                if (sheetContext.mounted) {
+                                  setSheetState(() => isSubmitting = false);
+                                }
+                                return;
+                              }
+                              if (hasDuplicateUserCustomSectionTitle(
+                                resume.customSections,
+                                title,
+                              )) {
+                                _showSingleSnackBar(
+                                  sheetContext,
+                                  'A custom section with this title already exists',
+                                );
+                                if (sheetContext.mounted) {
+                                  setSheetState(() => isSubmitting = false);
+                                }
+                                return;
+                              }
+
+                              final initialContent =
+                                  contentController.text.trim();
+                              if (initialContent.isEmpty) {
+                                final confirmEmpty =
+                                    await _confirmSaveEmptyUserCustomSection(
+                                  sheetContext,
+                                  title,
+                                );
+                                if (!confirmEmpty) {
+                                  if (sheetContext.mounted) {
+                                    setSheetState(() => isSubmitting = false);
+                                  }
+                                  return;
+                                }
+                              }
+
+                              if (!sheetContext.mounted) {
+                                return;
+                              }
+
+                              Navigator.pop(
+                                sheetContext,
+                                _PendingUserCustomSectionDraft(
+                                  title: title,
+                                  initialContent: initialContent,
+                                ),
+                              );
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text('Create Section'),
+                    ),
+                  ),
+                ],
               ),
             );
           },
@@ -788,7 +777,7 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
     );
     if (existingSection != null) {
       await WidgetsBinding.instance.endOfFrame;
-      if (!mounted) {
+      if (!context.mounted) {
         return;
       }
       context.push(
@@ -824,7 +813,7 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
     }
 
     await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) {
+    if (!context.mounted) {
       return;
     }
 
@@ -845,102 +834,86 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+        return KeyboardSafeBottomSheet(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Rename Custom Section',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        icon: const Icon(Iconsax.close_circle),
-                      ),
-                    ],
+                  Text(
+                    'Rename Custom Section',
+                    style: Theme.of(sheetContext)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 8),
-                  CustomTextField(
-                    controller: controller,
-                    label: 'Section Title',
-                    hint: 'Enter a unique section title',
-                    prefixIcon: Iconsax.text,
-                  ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final title = normalizeUserCustomSectionTitle(
-                          controller.text,
-                        );
-                        if (title.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Section title is required'),
-                            ),
-                          );
-                          return;
-                        }
-                        if (hasDuplicateUserCustomSectionTitle(
-                          resume.customSections,
-                          title,
-                          excludingId: section.id,
-                        )) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'A custom section with this title already exists',
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-
-                        final sections = _orderedUserCustomSectionsForKeys(
-                          resume,
-                          _normalizedSectionOrderForResume(resume),
-                        );
-                        final index = sections.indexWhere(
-                          (entry) => entry.id == section.id,
-                        );
-                        if (index == -1) {
-                          return;
-                        }
-
-                        sections[index] =
-                            sections[index].copyWith(title: title);
-                        await _saveUserCustomSections(resume, sections);
-                        if (!mounted) {
-                          return;
-                        }
-                        Navigator.pop(sheetContext);
-                      },
-                      child: const Text('Save Title'),
-                    ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Iconsax.close_circle),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+              CustomTextField(
+                controller: controller,
+                label: 'Section Title',
+                hint: 'Enter a unique section title',
+                prefixIcon: Iconsax.text,
+              ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final title = normalizeUserCustomSectionTitle(
+                      controller.text,
+                    );
+                    if (title.isEmpty) {
+                      ScaffoldMessenger.of(sheetContext).showSnackBar(
+                        const SnackBar(
+                          content: Text('Section title is required'),
+                        ),
+                      );
+                      return;
+                    }
+                    if (hasDuplicateUserCustomSectionTitle(
+                      resume.customSections,
+                      title,
+                      excludingId: section.id,
+                    )) {
+                      ScaffoldMessenger.of(sheetContext).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'A custom section with this title already exists',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final sections = _orderedUserCustomSectionsForKeys(
+                      resume,
+                      _normalizedSectionOrderForResume(resume),
+                    );
+                    final index = sections.indexWhere(
+                      (entry) => entry.id == section.id,
+                    );
+                    if (index == -1) {
+                      return;
+                    }
+
+                    sections[index] = sections[index].copyWith(title: title);
+                    await _saveUserCustomSections(resume, sections);
+                    if (!sheetContext.mounted) {
+                      return;
+                    }
+                    Navigator.pop(sheetContext);
+                  },
+                  child: const Text('Save Title'),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -1368,6 +1341,8 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
       );
     }
 
+    final completionStats = resume.completionStats;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -1419,7 +1394,7 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    '${resume.completionPercentage}% Complete',
+                                    '${completionStats.roundedPercentage}% Complete',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
@@ -1543,9 +1518,9 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ProgressHeader(
-                progress: resume.completionPercentage,
-                sectionsCompleted: _getCompletedSections(resume),
-                totalSections: 8,
+                progress: completionStats.roundedPercentage,
+                sectionsCompleted: completionStats.completedSections,
+                totalSections: completionStats.totalSections,
               ),
             ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
 
@@ -1607,19 +1582,6 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
         ),
       ),
     );
-  }
-
-  int _getCompletedSections(ResumeModel resume) {
-    int count = 0;
-    if (resume.personalInfo.fullName.isNotEmpty) count++;
-    if (resume.objective?.isNotEmpty ?? false) count++;
-    if (resume.experience.isNotEmpty) count++;
-    if (resume.education.isNotEmpty) count++;
-    if (resume.skills.isNotEmpty) count++;
-    if (resume.projects.isNotEmpty) count++;
-    if (resume.certifications.isNotEmpty) count++;
-    if (resume.languages.isNotEmpty) count++;
-    return count;
   }
 
   String _templateName(String templateId) {

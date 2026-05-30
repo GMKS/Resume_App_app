@@ -6,7 +6,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/services/free_plan_service.dart';
-import '../../../core/services/resume_quality_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/utils/validation_feedback.dart';
@@ -14,7 +13,6 @@ import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/app_empty_state_card.dart';
 import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/feature_gate.dart';
-import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/editor_intro_card.dart';
 import 'resume_editor_screen.dart';
@@ -29,32 +27,6 @@ class ProjectsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
-  Future<void> _handleQualitySuggestion(
-    ResumeQualitySuggestion suggestion,
-  ) async {
-    String? route;
-    switch (suggestion.sectionKey) {
-      case 'personal':
-        route = '/editor/${widget.resumeId}/personal';
-        break;
-      case 'summary':
-        route = '/editor/${widget.resumeId}/summary';
-        break;
-      case 'experience':
-        route = '/editor/${widget.resumeId}/experience';
-        break;
-      case 'projects':
-        return;
-      case 'skills':
-        route = '/editor/${widget.resumeId}/skills';
-        break;
-      default:
-        return;
-    }
-
-    await context.push(route);
-  }
-
   void _showProjectDialog(Project? existing) {
     showModalBottomSheet(
       context: context,
@@ -65,52 +37,103 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     );
   }
 
-  Widget _buildScreenHeader(
-    BuildContext context,
-    ResumeModel resume,
-    ResumeQualityReport qualityReport,
-  ) {
-    final projectsWithUrls = resume.projects
+  Widget _buildCompactSummary(ResumeModel resume) {
+    final linkedProjects = resume.projects
         .where((project) => (project.url ?? '').trim().isNotEmpty)
         .length;
-    final technologyRichProjects = resume.projects
+    final taggedProjects = resume.projects
         .where((project) => project.technologies.isNotEmpty)
         .length;
 
-    return Column(
-      children: [
-        EditorIntroCard(
-          title: 'Proof Through Projects',
-          subtitle:
-              'Use this section to show applied skills, shipped work, and public links. Clean project data strengthens both the preview and exported resume narrative.',
-          icon: Iconsax.folder_open,
-          accentColor: const Color(0xFFEC4899),
-          stats: [
-            EditorIntroStat(
-              label: '${resume.projects.length} projects',
-              icon: Iconsax.folder_open,
-            ),
-            EditorIntroStat(
-              label: '$projectsWithUrls linked',
-              icon: Iconsax.link,
-            ),
-            EditorIntroStat(
-              label: '$technologyRichProjects tagged',
-              icon: Iconsax.code,
+    Widget statChip({
+      required IconData icon,
+      required String label,
+      required Color color,
+    }) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        ResumeQualityPanel(
-          report: qualityReport,
-          title: 'Project Guidance',
-          subtitle:
-              'Projects work best when they connect outcomes, technologies, and a destination link recruiters can inspect.',
-          accentColor: const Color(0xFFEC4899),
-          maxSuggestions: 2,
-          onSuggestionTap: _handleQualitySuggestion,
-        ),
-      ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Project portfolio',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Keep projects outcome-focused, technology-tagged, and linked when a recruiter can verify the work quickly.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              statChip(
+                icon: Iconsax.folder_open,
+                label: '${resume.projects.length} projects',
+                color: const Color(0xFFEC4899),
+              ),
+              statChip(
+                icon: Iconsax.link,
+                label: '$linkedProjects linked',
+                color: linkedProjects > 0
+                    ? AppColors.info
+                    : AppColors.textTertiary,
+              ),
+              statChip(
+                icon: Iconsax.code,
+                label: '$taggedProjects tagged',
+                color: taggedProjects > 0
+                    ? const Color(0xFFEC4899)
+                    : AppColors.textTertiary,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -166,8 +189,6 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
       );
     }
 
-    final qualityReport = ResumeQualityService.analyzeResume(resume);
-
     return Scaffold(
       appBar: AppBar(
         leading: AdaptiveTooltip(
@@ -184,7 +205,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
           ? ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                _buildScreenHeader(context, resume, qualityReport),
+                _buildCompactSummary(resume),
                 const SizedBox(height: 20),
                 _buildEmptyState(),
               ],
@@ -196,7 +217,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                 if (index == 0) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 20),
-                    child: _buildScreenHeader(context, resume, qualityReport),
+                    child: _buildCompactSummary(resume),
                   );
                 }
 
@@ -235,7 +256,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
       accentColor: Color(0xFFEC4899),
       title: 'No Projects Added',
       message:
-          'Showcase your best projects with outcomes, tools, and links that can survive template changes.',
+          'Add projects that show measurable work, the stack used, and an optional verification link.',
     ).animate().fadeIn(duration: 500.ms);
   }
 }
@@ -450,37 +471,6 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
     }
   }
 
-  ResumeModel _buildDraftResume(ResumeModel resume) {
-    final hasDraftInput = _titleController.text.trim().isNotEmpty ||
-        _descriptionController.text.trim().isNotEmpty ||
-        _urlController.text.trim().isNotEmpty ||
-        _technologies.isNotEmpty ||
-        _techController.text.trim().isNotEmpty;
-
-    if (!hasDraftInput) {
-      return resume;
-    }
-
-    final draftProject = Project(
-      id: widget.existing?.id ?? 'draft-project',
-      title: _titleController.text.trim(),
-      description: _descriptionController.text.trim(),
-      url: _urlController.text.trim(),
-      technologies: [
-        ..._technologies,
-        if (_techController.text.trim().isNotEmpty) _techController.text.trim(),
-      ],
-    );
-
-    final updatedProjects = widget.existing != null
-        ? resume.projects
-            .map((item) => item.id == draftProject.id ? draftProject : item)
-            .toList()
-        : [...resume.projects, draftProject];
-
-    return resume.copyWith(projects: updatedProjects);
-  }
-
   String? _liveValidationMessage() {
     if (_titleController.text.trim().isEmpty) {
       return 'Give the project a clear name so the preview can anchor it quickly.';
@@ -562,18 +552,17 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
 
   @override
   Widget build(BuildContext context) {
-    final resume = ref.watch(currentResumeProvider(widget.resumeId));
-    final qualityReport = resume == null
-        ? null
-        : ResumeQualityService.analyzeResume(_buildDraftResume(resume));
+    ref.watch(currentResumeProvider(widget.resumeId));
     final liveValidationMessage = _liveValidationMessage();
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
       ),
       child: Column(
         children: [
@@ -606,78 +595,25 @@ class _ProjectFormState extends ConsumerState<_ProjectForm> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  EditorIntroCard(
-                    title: widget.existing != null
-                        ? 'Refine project proof'
-                        : 'Add a project that sells your work',
-                    subtitle:
-                        'Pair a concise outcome statement with the stack and link that back it up. This guidance uses your draft values before save.',
-                    icon: Iconsax.folder_open,
-                    accentColor: const Color(0xFFEC4899),
-                    stats: [
-                      EditorIntroStat(
-                        label: _technologies.isNotEmpty
-                            ? '${_technologies.length} saved technologies'
-                            : 'stack not tagged yet',
-                        icon: Iconsax.code,
-                      ),
-                      EditorIntroStat(
-                        label: _urlController.text.trim().isNotEmpty
-                            ? 'link included'
-                            : 'link optional',
-                        icon: Iconsax.link,
-                      ),
-                    ],
-                  ),
-                  if (qualityReport != null) ...[
-                    const SizedBox(height: 16),
-                    ResumeQualityPanel(
-                      report: qualityReport,
-                      title: 'Draft Project Guidance',
-                      subtitle:
-                          'The score below updates from your in-progress title, description, technologies, and link.',
-                      accentColor: const Color(0xFFEC4899),
-                      maxSuggestions: 2,
-                    ),
-                  ],
-                  if (liveValidationMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEC4899).withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color:
-                              const Color(0xFFEC4899).withValues(alpha: 0.16),
+                  Text(
+                    widget.existing != null
+                        ? 'Keep the update concise and evidence-driven.'
+                        : 'Add title, outcome, stack, and optional proof link.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.4,
                         ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Iconsax.info_circle,
-                            color: Color(0xFFEC4899),
-                            size: 18,
+                  ),
+                  if (liveValidationMessage != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      liveValidationMessage,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              liveValidationMessage,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    height: 1.4,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   CustomTextField(
                     controller: _titleController,
                     label: 'Project Title',

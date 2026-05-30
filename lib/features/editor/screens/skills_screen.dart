@@ -7,18 +7,43 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
-import '../../../core/services/resume_quality_service.dart';
 import '../../../core/services/skill_suggestions_service.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/app_loading_state.dart';
-import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/editor_intro_card.dart';
 import 'resume_editor_screen.dart';
 
 const List<String> _skillEmojis = [
-  '💻', '🐍', '⚛️', '🐳', '☁️', '🔧', '🛡️', '📊', '🎨', '📱',
-  '🤖', '🧪', '🔬', '📡', '🌐', '🗃️', '⚙️', '📐', '🎯', '🚀',
-  '🧠', '🤝', '📢', '🎤', '✍️', '📝', '💡', '🏆', '🌍', '🔍',
+  '💻',
+  '🐍',
+  '⚛️',
+  '🐳',
+  '☁️',
+  '🔧',
+  '🛡️',
+  '📊',
+  '🎨',
+  '📱',
+  '🤖',
+  '🧪',
+  '🔬',
+  '📡',
+  '🌐',
+  '🗃️',
+  '⚙️',
+  '📐',
+  '🎯',
+  '🚀',
+  '🧠',
+  '🤝',
+  '📢',
+  '🎤',
+  '✍️',
+  '📝',
+  '💡',
+  '🏆',
+  '🌍',
+  '🔍',
 ];
 
 String _normalizedSkillName(String value) {
@@ -66,7 +91,13 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
   String _searchQuery = '';
   String? _selectedEmoji;
 
-  final List<String> _categories = ['Technical', 'Soft Skills', 'Languages', 'Tools', 'Other'];
+  final List<String> _categories = [
+    'Technical',
+    'Soft Skills',
+    'Languages',
+    'Tools',
+    'Other'
+  ];
   final List<String> _suggestionCategories = ['Role-Specific', 'Soft Skills'];
 
   List<String> get _suggestedSkills {
@@ -122,17 +153,15 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
 
     final skill = Skill(
       id: const Uuid().v4(),
-      name: _selectedEmoji != null
-          ? '$_selectedEmoji $skillName'
-          : skillName,
+      name: _selectedEmoji != null ? '$_selectedEmoji $skillName' : skillName,
       proficiency: _proficiency,
       category: _selectedCategory,
     );
 
     final updated = [...resume.skills, skill];
     ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
-      resume.copyWith(skills: updated),
-    );
+          resume.copyWith(skills: updated),
+        );
 
     // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
@@ -162,7 +191,7 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
     final resume = ref.read(currentResumeProvider(widget.resumeId));
     if (resume == null) return;
     final normalizedSkillName = _normalizedSkillName(skillName).toLowerCase();
-    
+
     // Check if skill already exists
     if (resume.skills.any(
       (s) => _normalizedSkillName(s.name).toLowerCase() == normalizedSkillName,
@@ -182,8 +211,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
 
     final updated = [...resume.skills, skill];
     ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
-      resume.copyWith(skills: updated),
-    );
+          resume.copyWith(skills: updated),
+        );
   }
 
   void _removeSkillIcon(String id) {
@@ -199,8 +228,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
     }).toList();
 
     ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
-      resume.copyWith(skills: updated),
-    );
+          resume.copyWith(skills: updated),
+        );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -226,8 +255,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
     final skillName = resume.skills.firstWhere((s) => s.id == id).name;
     final updated = resume.skills.where((s) => s.id != id).toList();
     ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
-      resume.copyWith(skills: updated),
-    );
+          resume.copyWith(skills: updated),
+        );
 
     // Show success message
     ScaffoldMessenger.of(context).showSnackBar(
@@ -257,8 +286,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
     }).toList();
 
     ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
-      resume.copyWith(skills: updated),
-    );
+          resume.copyWith(skills: updated),
+        );
   }
 
   @override
@@ -271,7 +300,7 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
   @override
   Widget build(BuildContext context) {
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
-    
+
     if (resume == null) {
       return const Scaffold(
         body: AppLoadingState(
@@ -280,22 +309,13 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
         ),
       );
     }
-    final qualityReport = ResumeQualityService.analyzeResume(resume);
-    final categoriesCovered = resume.skills
-      .map((skill) => (skill.category ?? 'Other').trim())
-      .where((category) => category.isNotEmpty)
-      .toSet()
-      .length;
-    final advancedSkills =
-      resume.skills.where((skill) => skill.proficiency >= 4).length;
-    
     // Group skills by category
     final groupedSkills = <String, List<Skill>>{};
     for (var skill in resume.skills) {
       final category = skill.category ?? 'Other';
       groupedSkills.putIfAbsent(category, () => []).add(skill);
     }
-    
+
     return Scaffold(
       appBar: AppBar(
         leading: AdaptiveTooltip(
@@ -311,46 +331,19 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          EditorIntroCard(
-            title: 'Capability Mapping',
-            subtitle:
-                'Skills help ATS matching and make the preview easier to scan. Keep this list balanced, relevant, and evidence-backed by the rest of the resume.',
-            icon: Iconsax.code,
-            accentColor: AppColors.accent,
-            stats: [
-              EditorIntroStat(
-                label: '${resume.skills.length} skills',
-                icon: Iconsax.code,
-              ),
-              EditorIntroStat(
-                label: '$categoriesCovered categories',
-                icon: Iconsax.category,
-              ),
-              EditorIntroStat(
-                label: '$advancedSkills advanced+',
-                icon: Iconsax.flash_1,
-              ),
-            ],
-          ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.06, end: 0),
-          const SizedBox(height: 16),
-          ResumeQualityPanel(
-            report: qualityReport,
-            title: 'Skills Guidance',
-            subtitle:
-                'A strong skill block supports the claims you make in summary, experience, and projects. Changes here save immediately and will reflect in preview output.',
-            accentColor: AppColors.accent,
-            maxSuggestions: 2,
-          ).animate().fadeIn(delay: 60.ms),
-          const SizedBox(height: 20),
           // Add Skill Section
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppColors.accent.withValues(alpha: 0.1), AppColors.accent.withValues(alpha: 0.05)],
+                colors: [
+                  AppColors.accent.withValues(alpha: 0.1),
+                  AppColors.accent.withValues(alpha: 0.05)
+                ],
               ),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+              border:
+                  Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,15 +351,21 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: AppColors.accent.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Iconsax.code, color: AppColors.accent, size: 20),
+                      child: const Icon(Iconsax.code,
+                          color: AppColors.accent, size: 20),
                     ),
                     const SizedBox(width: 12),
-                    Text('Add New Skill', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    Text('Add New Skill',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -374,19 +373,24 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: _categories.map((cat) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(cat),
-                        selected: _selectedCategory == cat,
-                        onSelected: (selected) => setState(() => _selectedCategory = cat),
-                        selectedColor: AppColors.accent,
-                        labelStyle: TextStyle(
-                          color: _selectedCategory == cat ? Colors.white : AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    )).toList(),
+                    children: _categories
+                        .map((cat) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(cat),
+                                selected: _selectedCategory == cat,
+                                onSelected: (selected) =>
+                                    setState(() => _selectedCategory = cat),
+                                selectedColor: AppColors.accent,
+                                labelStyle: TextStyle(
+                                  color: _selectedCategory == cat
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ))
+                        .toList(),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -397,8 +401,10 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                     Row(
                       children: [
                         Text('Skill Icon (optional)',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w500)),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w500)),
                         const SizedBox(width: 6),
                         if (_selectedEmoji != null)
                           TextButton.icon(
@@ -432,8 +438,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                           final emoji = _skillEmojis[i];
                           final selected = _selectedEmoji == emoji;
                           return GestureDetector(
-                            onTap: () => setState(() =>
-                                _selectedEmoji = selected ? null : emoji),
+                            onTap: () => setState(
+                                () => _selectedEmoji = selected ? null : emoji),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 150),
                               margin: const EdgeInsets.only(right: 6),
@@ -472,7 +478,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                           hintText: 'Enter skill name',
                           prefixIcon: _selectedEmoji != null
                               ? Padding(
-                                  padding: const EdgeInsets.only(left: 14, right: 8),
+                                  padding:
+                                      const EdgeInsets.only(left: 14, right: 8),
                                   child: Center(
                                     child: Text(
                                       _selectedEmoji!,
@@ -500,8 +507,11 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                               : null,
                           filled: true,
                           fillColor: Colors.white,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
                         ),
                         onSubmitted: (_) => _addSkill(),
                       ),
@@ -511,7 +521,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                       onPressed: _addSkill,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
                       ),
                       child: const Icon(Iconsax.add),
                     ),
@@ -521,27 +532,38 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                 // Proficiency Slider
                 Row(
                   children: [
-                    Text('Proficiency:', style: Theme.of(context).textTheme.bodySmall),
+                    Text('Proficiency:',
+                        style: Theme.of(context).textTheme.bodySmall),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Row(
-                        children: List.generate(5, (index) => Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _proficiency = index + 1),
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 2),
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: index < _proficiency ? AppColors.accent : AppColors.divider,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ),
-                        )),
+                        children: List.generate(
+                            5,
+                            (index) => Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => setState(
+                                        () => _proficiency = index + 1),
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 2),
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: index < _proficiency
+                                            ? AppColors.accent
+                                            : AppColors.divider,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                  ),
+                                )),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(_getProficiencyLabel(_proficiency), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
+                    Text(_getProficiencyLabel(_proficiency),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(fontWeight: FontWeight.w500)),
                   ],
                 ),
               ],
@@ -554,7 +576,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
           if (resume.skills.length < 15) ...[
             Row(
               children: [
-                const Icon(Iconsax.lamp_charge, size: 18, color: Color(0xFF8B5CF6)),
+                const Icon(Iconsax.lamp_charge,
+                    size: 18, color: Color(0xFF8B5CF6)),
                 const SizedBox(width: 8),
                 Text('Smart Suggestions',
                     style: Theme.of(context)
@@ -572,14 +595,19 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                 prefixIcon: const Icon(Iconsax.briefcase, size: 18),
                 filled: true,
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
               isExpanded: true,
               items: SkillSuggestionsService.allRoles
-                  .map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis)))
+                  .map((r) => DropdownMenuItem(
+                      value: r,
+                      child: Text(r, overflow: TextOverflow.ellipsis)))
                   .toList(),
-              onChanged: (v) => setState(() => _selectedRole = v ?? _selectedRole),
+              onChanged: (v) =>
+                  setState(() => _selectedRole = v ?? _selectedRole),
             ),
             const SizedBox(height: 10),
             // Category tabs
@@ -592,7 +620,8 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                           child: ChoiceChip(
                             label: Text(cat),
                             selected: _suggestionCategory == cat,
-                            onSelected: (_) => setState(() => _suggestionCategory = cat),
+                            onSelected: (_) =>
+                                setState(() => _suggestionCategory = cat),
                             selectedColor: const Color(0xFF8B5CF6),
                             labelStyle: TextStyle(
                               color: _suggestionCategory == cat
@@ -628,8 +657,10 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
                     : null,
                 filled: true,
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
               onChanged: (v) => setState(() => _searchQuery = v),
             ),
@@ -640,12 +671,13 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
               children: _suggestedSkills
                   .where(
                     (s) => !resume.skills.any(
-                      (rs) => _normalizedSkillName(rs.name).toLowerCase() ==
+                      (rs) =>
+                          _normalizedSkillName(rs.name).toLowerCase() ==
                           _normalizedSkillName(s).toLowerCase(),
                     ),
                   )
                   .take(18)
-              .map(_buildSuggestionChip)
+                  .map(_buildSuggestionChip)
                   .toList(),
             ).animate().fadeIn(delay: 200.ms),
             const SizedBox(height: 24),
@@ -653,27 +685,41 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
 
           // Skills List
           if (resume.skills.isNotEmpty) ...[
-            Text('Your Skills (${resume.skills.length})', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            Text('Your Skills (${resume.skills.length})',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             ...groupedSkills.entries.map((entry) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(entry.key, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppColors.textSecondary)),
-                ),
-                ...entry.value.asMap().entries.map((skillEntry) => _SkillCard(
-                  skill: skillEntry.value,
-                  onRemoveIcon: _skillEmojiPrefix(skillEntry.value.name) == null
-                      ? null
-                      : () => _removeSkillIcon(skillEntry.value.id),
-                  onDelete: () => _deleteSkill(skillEntry.value.id),
-                  onUpdateProficiency: (level) => _updateProficiency(skillEntry.value.id, level),
-                ).animate().fadeIn(delay: (300 + skillEntry.key * 50).ms).slideX(begin: 0.1, end: 0)),
-              ],
-            )),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(entry.key,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(color: AppColors.textSecondary)),
+                    ),
+                    ...entry.value.asMap().entries.map((skillEntry) =>
+                        _SkillCard(
+                          skill: skillEntry.value,
+                          onRemoveIcon:
+                              _skillEmojiPrefix(skillEntry.value.name) == null
+                                  ? null
+                                  : () => _removeSkillIcon(skillEntry.value.id),
+                          onDelete: () => _deleteSkill(skillEntry.value.id),
+                          onUpdateProficiency: (level) =>
+                              _updateProficiency(skillEntry.value.id, level),
+                        )
+                            .animate()
+                            .fadeIn(delay: (300 + skillEntry.key * 50).ms)
+                            .slideX(begin: 0.1, end: 0)),
+                  ],
+                )),
           ],
-          
+
           const SizedBox(height: 100),
         ],
       ),
@@ -682,12 +728,18 @@ class _SkillsScreenState extends ConsumerState<SkillsScreen> {
 
   String _getProficiencyLabel(int level) {
     switch (level) {
-      case 1: return 'Beginner';
-      case 2: return 'Basic';
-      case 3: return 'Intermediate';
-      case 4: return 'Advanced';
-      case 5: return 'Expert';
-      default: return '';
+      case 1:
+        return 'Beginner';
+      case 2:
+        return 'Basic';
+      case 3:
+        return 'Intermediate';
+      case 4:
+        return 'Advanced';
+      case 5:
+        return 'Expert';
+      default:
+        return '';
     }
   }
 }
@@ -728,7 +780,11 @@ class _SkillCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(skill.name, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text(skill.name,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -749,17 +805,22 @@ class _SkillCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Row(
-                  children: List.generate(5, (index) => GestureDetector(
-                    onTap: () => onUpdateProficiency(index + 1),
-                    child: Container(
-                      width: 24, height: 6,
-                      margin: const EdgeInsets.only(right: 4),
-                      decoration: BoxDecoration(
-                        color: index < skill.proficiency ? _getColorForProficiency(skill.proficiency) : AppColors.divider,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  )),
+                  children: List.generate(
+                      5,
+                      (index) => GestureDetector(
+                            onTap: () => onUpdateProficiency(index + 1),
+                            child: Container(
+                              width: 24,
+                              height: 6,
+                              margin: const EdgeInsets.only(right: 4),
+                              decoration: BoxDecoration(
+                                color: index < skill.proficiency
+                                    ? _getColorForProficiency(skill.proficiency)
+                                    : AppColors.divider,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                          )),
                 ),
               ],
             ),
@@ -785,7 +846,8 @@ class _SkillCard extends StatelessWidget {
                 button: true,
                 child: IconButton(
                   onPressed: onDelete,
-                  icon: const Icon(Iconsax.trash, size: 20, color: AppColors.error),
+                  icon: const Icon(Iconsax.trash,
+                      size: 20, color: AppColors.error),
                 ),
               ),
             ],

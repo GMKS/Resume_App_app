@@ -32,86 +32,6 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
   void _addExperience() => _showExperienceDialog(null);
   void _editExperience(Experience exp) => _showExperienceDialog(exp);
 
-  Future<void> _handleQualitySuggestion(
-    ResumeQualitySuggestion suggestion,
-  ) async {
-    String? route;
-    switch (suggestion.sectionKey) {
-      case 'personal':
-        route = '/editor/${widget.resumeId}/personal';
-        break;
-      case 'summary':
-        route = '/editor/${widget.resumeId}/summary';
-        break;
-      case 'experience':
-        return;
-      case 'education':
-        route = '/editor/${widget.resumeId}/education';
-        break;
-      case 'skills':
-        route = '/editor/${widget.resumeId}/skills';
-        break;
-      case 'projects':
-        route = '/editor/${widget.resumeId}/projects';
-        break;
-      default:
-        return;
-    }
-
-    await context.push(route);
-  }
-
-  Widget _buildScreenHeader(
-    BuildContext context,
-    ResumeModel resume,
-    ResumeQualityReport qualityReport,
-  ) {
-    final currentRoles =
-        resume.experience.where((exp) => exp.isCurrentlyWorking).length;
-    final impactReadyRoles = resume.experience
-        .where(
-          (exp) =>
-              exp.description.trim().isNotEmpty || exp.achievements.isNotEmpty,
-        )
-        .length;
-
-    return Column(
-      children: [
-        EditorIntroCard(
-          title: 'Timeline & Impact',
-          subtitle:
-              'Arrange roles in the order you want recruiters to scan them. Each change here flows straight into preview and export once it is saved.',
-          icon: Iconsax.briefcase,
-          accentColor: AppColors.success,
-          stats: [
-            EditorIntroStat(
-              label: '${resume.experience.length} roles',
-              icon: Iconsax.briefcase,
-            ),
-            EditorIntroStat(
-              label: '$currentRoles current',
-              icon: Iconsax.clock,
-            ),
-            EditorIntroStat(
-              label: '$impactReadyRoles with impact notes',
-              icon: Iconsax.chart_success,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ResumeQualityPanel(
-          report: qualityReport,
-          title: 'Experience Guidance',
-          subtitle:
-              'Strong date coverage and measurable scope improve both ATS parsing and the confidence of the preview output.',
-          accentColor: AppColors.success,
-          maxSuggestions: 2,
-          onSuggestionTap: _handleQualitySuggestion,
-        ),
-      ],
-    );
-  }
-
   void _deleteExperience(String id) {
     final resume = ref.read(currentResumeProvider(widget.resumeId));
     if (resume != null) {
@@ -162,9 +82,6 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
         ),
       );
     }
-
-    final qualityReport = ResumeQualityService.analyzeResume(resume);
-
     return Scaffold(
       appBar: AppBar(
         leading: AdaptiveTooltip(
@@ -186,8 +103,6 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
                   parent: ClampingScrollPhysics(),
                 ),
                 children: [
-                  _buildScreenHeader(context, resume, qualityReport),
-                  const SizedBox(height: 20),
                   _buildEmptyState(),
                 ],
               )
@@ -195,10 +110,6 @@ class _ExperienceScreenState extends ConsumerState<ExperienceScreen> {
                 buildDefaultDragHandles: false,
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: ClampingScrollPhysics(),
-                ),
-                header: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                  child: _buildScreenHeader(context, resume, qualityReport),
                 ),
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
                 itemCount: resume.experience.length,

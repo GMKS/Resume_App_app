@@ -79,57 +79,6 @@ class _EducationScreenState extends ConsumerState<EducationScreen> {
     );
   }
 
-  Widget _buildScreenHeader(
-    BuildContext context,
-    ResumeModel resume,
-    ResumeQualityReport qualityReport,
-  ) {
-    final currentStudies =
-        resume.education.where((entry) => entry.isCurrentlyStudying).length;
-    final detailedEntries = resume.education
-        .where(
-          (entry) =>
-              entry.fieldOfStudy.trim().isNotEmpty ||
-              (entry.grade ?? '').trim().isNotEmpty,
-        )
-        .length;
-
-    return Column(
-      children: [
-        EditorIntroCard(
-          title: 'Credentials & Foundations',
-          subtitle:
-              'Keep your academic timeline structured and readable. Everything saved here feeds directly into preview, export, and template switching.',
-          icon: Iconsax.teacher,
-          accentColor: const Color(0xFF0EA5E9),
-          stats: [
-            EditorIntroStat(
-              label: '${resume.education.length} entries',
-              icon: Iconsax.teacher,
-            ),
-            EditorIntroStat(
-              label: '$currentStudies current',
-              icon: Iconsax.clock,
-            ),
-            EditorIntroStat(
-              label: '$detailedEntries with detail',
-              icon: Iconsax.book,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ResumeQualityPanel(
-          report: qualityReport,
-          title: 'Education Guidance',
-          subtitle:
-              'Education quality improves when dates are complete and the strongest credentials are easy to scan in preview output.',
-          accentColor: const Color(0xFF0EA5E9),
-          maxSuggestions: 2,
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
@@ -142,8 +91,6 @@ class _EducationScreenState extends ConsumerState<EducationScreen> {
         ),
       );
     }
-    final qualityReport = ResumeQualityService.analyzeResume(resume);
-
     return Scaffold(
       appBar: AppBar(
         leading: AdaptiveTooltip(
@@ -160,23 +107,14 @@ class _EducationScreenState extends ConsumerState<EducationScreen> {
           ? ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                _buildScreenHeader(context, resume, qualityReport),
-                const SizedBox(height: 20),
                 _buildEmptyState(),
               ],
             )
           : ListView.builder(
               padding: const EdgeInsets.all(20),
-              itemCount: resume.education.length + 1,
+              itemCount: resume.education.length,
               itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: _buildScreenHeader(context, resume, qualityReport),
-                  );
-                }
-
-                final education = resume.education[index - 1];
+                final education = resume.education[index];
                 return _EducationCard(
                   education: education,
                   onEdit: () => _editEducation(education),

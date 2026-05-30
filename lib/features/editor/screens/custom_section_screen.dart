@@ -12,6 +12,7 @@ import '../../../core/utils/professional_role_sections.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/editor_intro_card.dart';
+import '../widgets/keyboard_safe_bottom_sheet.dart';
 import 'resume_editor_screen.dart';
 
 class CustomSectionScreen extends ConsumerStatefulWidget {
@@ -25,10 +26,23 @@ class CustomSectionScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<CustomSectionScreen> createState() => _CustomSectionScreenState();
+  ConsumerState<CustomSectionScreen> createState() =>
+      _CustomSectionScreenState();
 }
 
 class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
+  void _showSheetSnackBar(BuildContext sheetContext, String message) {
+    final messenger = ScaffoldMessenger.maybeOf(sheetContext) ??
+        ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      return;
+    }
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   String? _configTitle(Object? config) {
     if (config is StartupOptionalSectionConfig) {
       return config.title;
@@ -60,16 +74,22 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
   }
 
   Future<void> _saveSection(ResumeModel resume, CustomSection section) async {
-    final latestResume = ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
+    final latestResume =
+        ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
     final baseResume = latestResume.templateId == 'startup'
         ? latestResume.copyWith(
             customSections: ensureStartupProfileSections(latestResume),
           )
-        : ['executive', 'designer_profile', 'professional_tone', 'elegant_gold_layout'].contains(latestResume.templateId)
-        ? latestResume.copyWith(
-            customSections: ensureProfessionalRoleSections(latestResume),
-          )
-        : latestResume;
+        : [
+            'executive',
+            'designer_profile',
+            'professional_tone',
+            'elegant_gold_layout'
+          ].contains(latestResume.templateId)
+            ? latestResume.copyWith(
+                customSections: ensureProfessionalRoleSections(latestResume),
+              )
+            : latestResume;
     final sections = List<CustomSection>.from(baseResume.customSections);
     final index = sections.indexWhere((item) => item.id == section.id);
     if (index == -1) {
@@ -80,7 +100,7 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
 
     await ref
         .read(currentResumeProvider(widget.resumeId).notifier)
-      .updateResume(baseResume.copyWith(customSections: sections));
+        .updateResume(baseResume.copyWith(customSections: sections));
   }
 
   Future<void> _showItemEditor(
@@ -90,7 +110,8 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
     CustomSectionItem? existing,
   }) async {
     final titleController = TextEditingController(text: existing?.title ?? '');
-    final subtitleController = TextEditingController(text: existing?.subtitle ?? '');
+    final subtitleController =
+        TextEditingController(text: existing?.subtitle ?? '');
     final descriptionController =
         TextEditingController(text: existing?.description ?? '');
 
@@ -99,104 +120,115 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+        return KeyboardSafeBottomSheet(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        existing == null ? 'Add Item' : 'Edit Item',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        icon: const Icon(Iconsax.close_circle),
-                      ),
-                    ],
+                  Text(
+                    existing == null ? 'Add Item' : 'Edit Item',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 8),
-                  CustomTextField(
-                    controller: titleController,
-                    label: 'Title',
-                    hint: 'Enter the headline for this item',
-                    prefixIcon: Iconsax.document_text,
-                  ),
-                  CustomTextField(
-                    controller: subtitleController,
-                    label: 'Subtitle',
-                    hint: 'Company, institution, credential, or context',
-                    prefixIcon: Iconsax.note,
-                  ),
-                  CustomTextField(
-                    controller: descriptionController,
-                    label: 'Description',
-                    hint: 'Add details, impact, or supporting notes',
-                    maxLines: 4,
-                  ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final title = titleController.text.trim();
-                        if (title.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Title is required')),
-                          );
-                          return;
-                        }
-
-                        final item = CustomSectionItem(
-                          id: existing?.id ?? const Uuid().v4(),
-                          title: title,
-                          subtitle: subtitleController.text.trim().isEmpty
-                              ? null
-                              : subtitleController.text.trim(),
-                          description: descriptionController.text.trim().isEmpty
-                              ? null
-                              : descriptionController.text.trim(),
-                          date: existing?.date,
-                        );
-
-                        final items = List<CustomSectionItem>.from(section.items);
-                        final index = items.indexWhere((entry) => entry.id == item.id);
-                        if (index == -1) {
-                          items.add(item);
-                        } else {
-                          items[index] = item;
-                        }
-
-                        await _saveSection(
-                          resume,
-                          section.copyWith(items: items),
-                        );
-
-                        if (!sheetContext.mounted) {
-                          return;
-                        }
-                        Navigator.pop(sheetContext);
-                      },
-                      child: Text(existing == null ? 'Add Item' : 'Save Changes'),
-                    ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Iconsax.close_circle),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+              CustomTextField(
+                controller: titleController,
+                label: 'Title',
+                hint: 'Enter the headline for this item',
+                prefixIcon: Iconsax.document_text,
+              ),
+              CustomTextField(
+                controller: subtitleController,
+                label: 'Subtitle',
+                hint: 'Company, institution, credential, or context',
+                prefixIcon: Iconsax.note,
+              ),
+              CustomTextField(
+                controller: descriptionController,
+                label: 'Description',
+                hint: 'Add details, impact, or supporting notes',
+                maxLines: 4,
+              ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final title = titleController.text.trim();
+                    if (title.isEmpty) {
+                      _showSheetSnackBar(sheetContext, 'Title is required');
+                      return;
+                    }
+
+                    final item = CustomSectionItem(
+                      id: existing?.id ?? const Uuid().v4(),
+                      title: title,
+                      subtitle: subtitleController.text.trim().isEmpty
+                          ? null
+                          : subtitleController.text.trim(),
+                      description: descriptionController.text.trim().isEmpty
+                          ? null
+                          : descriptionController.text.trim(),
+                      date: existing?.date,
+                    );
+
+                    final items = List<CustomSectionItem>.from(section.items);
+                    final index =
+                        items.indexWhere((entry) => entry.id == item.id);
+                    if (index == -1) {
+                      items.add(item);
+                    } else {
+                      items[index] = item;
+                    }
+
+                    try {
+                      await _saveSection(
+                        resume,
+                        section.copyWith(items: items),
+                      );
+                    } catch (error, stackTrace) {
+                      debugPrint(
+                        'CustomSectionScreen._showItemEditor save failed: $error',
+                      );
+                      FlutterError.reportError(
+                        FlutterErrorDetails(
+                          exception: error,
+                          stack: stackTrace,
+                          library: 'custom_section_screen',
+                          context: ErrorDescription(
+                            'while saving a built-in custom section item',
+                          ),
+                        ),
+                      );
+                      if (!sheetContext.mounted) {
+                        return;
+                      }
+                      _showSheetSnackBar(
+                        sheetContext,
+                        'Unable to save item. Please try again.',
+                      );
+                      return;
+                    }
+
+                    if (!sheetContext.mounted) {
+                      return;
+                    }
+                    Navigator.of(sheetContext).pop();
+                  },
+                  child: Text(existing == null ? 'Add Item' : 'Save Changes'),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -240,17 +272,17 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
       (item) => item.id == widget.sectionId,
       orElse: () => CustomSection(
         id: widget.sectionId,
-      title: _configTitle(config) ?? 'Custom Section',
+        title: _configTitle(config) ?? 'Custom Section',
       ),
     );
 
     final title = section.title.trim().isNotEmpty
         ? section.title
-      : _configTitle(config) ?? 'Custom Section';
+        : _configTitle(config) ?? 'Custom Section';
     final description =
-      _configDescription(config) ?? 'Add structured supporting details.';
+        _configDescription(config) ?? 'Add structured supporting details.';
     final emptyPrompt =
-      _configEmptyPrompt(config) ?? 'Add your first item for this section.';
+        _configEmptyPrompt(config) ?? 'Add your first item for this section.';
     final entriesWithSubtitle = section.items
         .where((item) => (item.subtitle ?? '').trim().isNotEmpty)
         .length;
@@ -303,7 +335,8 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,7 +376,8 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
               ),
               child: Column(
                 children: [
-                  const Icon(Iconsax.document_upload, size: 36, color: AppColors.textTertiary),
+                  const Icon(Iconsax.document_upload,
+                      size: 36, color: AppColors.textTertiary),
                   const SizedBox(height: 12),
                   Text(
                     emptyPrompt,
@@ -426,7 +460,8 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
                             },
                             itemBuilder: (_) => const [
                               PopupMenuItem(value: 'edit', child: Text('Edit')),
-                              PopupMenuItem(value: 'delete', child: Text('Delete')),
+                              PopupMenuItem(
+                                  value: 'delete', child: Text('Delete')),
                             ],
                           ),
                         ],
@@ -436,7 +471,10 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
                           padding: const EdgeInsets.only(top: 10),
                           child: Text(
                             item.description!,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
                                   color: AppColors.textSecondary,
                                   height: 1.35,
                                 ),

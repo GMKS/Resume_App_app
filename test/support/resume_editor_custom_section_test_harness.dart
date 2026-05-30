@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:resume_builder/core/models/resume_model.dart';
 import 'package:resume_builder/core/services/storage_service.dart';
+import 'package:resume_builder/features/editor/screens/custom_section_screen.dart';
 import 'package:resume_builder/features/editor/screens/resume_editor_screen.dart';
 import 'package:resume_builder/features/editor/screens/user_custom_section_screen.dart';
 
@@ -53,9 +54,10 @@ ResumeModel buildResumeEditorCustomSectionResume() {
   );
 }
 
-GoRouter buildResumeEditorCustomSectionRouter() {
+GoRouter buildResumeEditorCustomSectionRouter({String? initialLocation}) {
   return GoRouter(
-    initialLocation: '/editor/$resumeEditorCustomSectionResumeId',
+    initialLocation:
+        initialLocation ?? '/editor/$resumeEditorCustomSectionResumeId',
     routes: [
       GoRoute(
         path: '/home',
@@ -67,6 +69,13 @@ GoRouter buildResumeEditorCustomSectionRouter() {
           resumeId: state.pathParameters['resumeId']!,
         ),
         routes: [
+          GoRoute(
+            path: 'custom/:sectionId',
+            builder: (context, state) => CustomSectionScreen(
+              resumeId: state.pathParameters['resumeId']!,
+              sectionId: state.pathParameters['sectionId']!,
+            ),
+          ),
           GoRoute(
             path: 'user-custom/:sectionId',
             builder: (context, state) => UserCustomSectionScreen(
@@ -80,10 +89,12 @@ GoRouter buildResumeEditorCustomSectionRouter() {
   );
 }
 
-Widget buildResumeEditorCustomSectionTestApp() {
+Widget buildResumeEditorCustomSectionTestApp({String? initialLocation}) {
   return ProviderScope(
     child: MaterialApp.router(
-      routerConfig: buildResumeEditorCustomSectionRouter(),
+      routerConfig: buildResumeEditorCustomSectionRouter(
+        initialLocation: initialLocation,
+      ),
     ),
   );
 }
@@ -141,5 +152,5 @@ Future<void> openAddCustomSectionSheet(WidgetTester tester) async {
 Future<void> disposeTestWidgetTree(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump();
-  await tester.pump(const Duration(seconds: 4));
+  await tester.pump(const Duration(milliseconds: 150));
 }

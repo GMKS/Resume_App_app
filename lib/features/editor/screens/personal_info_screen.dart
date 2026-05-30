@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,13 +11,10 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/services/free_plan_service.dart';
-import '../../../core/services/resume_quality_service.dart';
 import '../../../core/utils/resume_translations.dart';
 import '../../../core/utils/validation_feedback.dart';
 import '../../../shared/widgets/feature_gate.dart';
-import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/custom_text_field.dart';
-import '../widgets/editor_intro_card.dart';
 import 'resume_editor_screen.dart';
 
 class PersonalInfoScreen extends ConsumerStatefulWidget {
@@ -99,6 +96,14 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     super.dispose();
   }
 
+  String _normalizedPhoneDigits(String value) {
+    final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length <= 10) {
+      return digitsOnly;
+    }
+    return digitsOnly.substring(0, 10);
+  }
+
   void _initializeControllers(ResumeModel resume) {
     if (!_isInitialized) {
       _nameController.text = resume.personalInfo.fullName;
@@ -112,13 +117,14 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
       for (final cc in sortedCodes) {
         if (rawPhone.startsWith(cc.$1)) {
           _countryCode = cc.$1;
-          _phoneController.text = rawPhone.substring(cc.$1.length).trimLeft();
+          _phoneController.text =
+              _normalizedPhoneDigits(rawPhone.substring(cc.$1.length));
           codeFound = true;
           break;
         }
       }
       if (!codeFound) {
-        _phoneController.text = rawPhone;
+        _phoneController.text = _normalizedPhoneDigits(rawPhone);
       }
       _addressController.text = resume.personalInfo.address;
       _jobTitleController.text = resume.personalInfo.jobTitle ?? '';
@@ -156,6 +162,9 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
+    if (!mounted) {
+      return;
+    }
     setState(() => _pendingImageBytes = bytes);
   }
 
@@ -238,8 +247,8 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
 
   // ── Template helpers ──────────────────────────────────────────────────────
 
-  /// Templates where a profile photo is rendered in the PDF output
-  bool _isPhotoTemplate(String templateId) => const {
+  /// Templates where a profile photo is rendered in the PDF output.
+  bool _supportsProfilePhoto(String templateId) => const {
         'blue_gray',
         'two_column',
         'emerald_executive',
@@ -285,6 +294,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     if (_formKey.currentState?.validate() ?? false) {
       final resume = ref.read(currentResumeProvider(widget.resumeId));
       if (resume != null) {
+        final normalizedPhone = _normalizedPhoneDigits(_phoneController.text);
         // Encode newly picked photo as base64, or keep existing stored value
         final String? imageBase64 = _pendingImageBytes != null
             ? base64Encode(_pendingImageBytes!)
@@ -295,8 +305,9 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
           personalInfo: PersonalInfo(
             fullName: _nameController.text.trim(),
             email: _emailController.text.trim(),
-            phone:
-                '${_countryCode.trim()} ${_phoneController.text.trim()}'.trim(),
+            phone: normalizedPhone.isEmpty
+                ? ''
+                : '${_countryCode.trim()} $normalizedPhone'.trim(),
             address: _addressController.text.trim(),
             jobTitle: _jobTitleController.text.trim(),
             linkedIn: _linkedInController.text.trim(),
@@ -332,24 +343,6 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     }
   }
 
-  ResumeModel _buildDraftResume(ResumeModel resume) {
-    return resume.copyWith(
-      personalInfo: resume.personalInfo.copyWith(
-        fullName: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: '${_countryCode.trim()} ${_phoneController.text.trim()}'.trim(),
-        address: _addressController.text.trim(),
-        jobTitle: _jobTitleController.text.trim(),
-        linkedIn: _linkedInController.text.trim(),
-        github: _githubController.text.trim(),
-        website: _websiteController.text.trim(),
-        profileImage: _pendingImageBytes != null
-            ? 'draft-profile-image'
-            : resume.personalInfo.profileImage,
-      ),
-    );
-  }
-
   bool _isValidEmailFormat(String value) {
     if (value.isEmpty || !value.contains('@')) {
       return false;
@@ -376,54 +369,6 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     );
   }
 
-  Widget _buildChecklistTile({
-    required bool isReady,
-    required String title,
-    required String subtitle,
-  }) {
-    final color = isReady ? AppColors.success : AppColors.warning;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            isReady ? Iconsax.tick_circle : Iconsax.info_circle,
-            color: color,
-            size: 16,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.4,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
@@ -435,25 +380,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     }
 
     _initializeControllers(resume);
-    final draftResume = _buildDraftResume(resume);
-    final qualityReport = ResumeQualityService.analyzeResume(draftResume);
-    final contactChannels = [
-      draftResume.personalInfo.email,
-      draftResume.personalInfo.phone,
-      draftResume.personalInfo.linkedIn,
-      draftResume.personalInfo.github,
-      draftResume.personalInfo.website,
-    ].where((value) => (value ?? '').trim().isNotEmpty).length;
-    final digitalProfiles = [
-      draftResume.personalInfo.linkedIn,
-      draftResume.personalInfo.github,
-      draftResume.personalInfo.website,
-    ].where((value) => (value ?? '').trim().isNotEmpty).length;
-    final hasPhoto = draftResume.personalInfo.profileImage?.isNotEmpty == true;
-    final emailValid = _isValidEmailFormat(draftResume.personalInfo.email);
-    final hasJobTitle =
-        (draftResume.personalInfo.jobTitle ?? '').trim().isNotEmpty;
-    final hasLocation = draftResume.personalInfo.address.trim().isNotEmpty;
+    final supportsProfilePhoto = _supportsProfilePhoto(resume.templateId);
 
     return Scaffold(
       appBar: AppBar(
@@ -474,132 +401,25 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            EditorIntroCard(
-              title: 'Identity & Reachability',
-              subtitle:
-                  'Shape the personal block that appears across resume templates, exports, and imported edits. The guidance below reflects your in-progress typing before you save.',
-              icon: Iconsax.profile_circle,
-              accentColor: const Color(0xFF0F766E),
-              stats: [
-                EditorIntroStat(
-                  label: '$contactChannels contact channels',
-                  icon: Iconsax.sms,
-                ),
-                EditorIntroStat(
-                  label: '$digitalProfiles live links',
-                  icon: Iconsax.global,
-                ),
-                EditorIntroStat(
-                  label: hasPhoto ? 'photo ready' : 'photo optional',
-                  icon: Iconsax.camera,
-                ),
-              ],
-            ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.06, end: 0),
-            const SizedBox(height: 16),
-            ResumeQualityPanel(
-              report: qualityReport,
-              title: 'Live Resume Guidance',
-              subtitle:
-                  'Your personal details affect resume quality, ATS readiness, and the polish of shared exports. Save when this looks right.',
-              accentColor: const Color(0xFF0F766E),
-              maxSuggestions: 2,
-            ).animate().fadeIn(delay: 60.ms),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F766E).withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color(0xFF0F766E).withValues(alpha: 0.14),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Preview Readiness',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      EditorStatPill(
-                        label: emailValid
-                            ? 'email verified'
-                            : 'email needs review',
-                        icon: Iconsax.sms,
-                        color:
-                            emailValid ? AppColors.success : AppColors.warning,
-                      ),
-                      EditorStatPill(
-                        label: hasJobTitle
-                            ? 'role headline added'
-                            : 'role headline missing',
-                        icon: Iconsax.briefcase,
-                        color:
-                            hasJobTitle ? AppColors.success : AppColors.warning,
-                      ),
-                      EditorStatPill(
-                        label: hasLocation
-                            ? 'location included'
-                            : 'location optional',
-                        icon: Iconsax.location,
-                        color: hasLocation ? AppColors.success : AppColors.info,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  _buildChecklistTile(
-                    isReady: emailValid,
-                    title: 'Professional email',
-                    subtitle:
-                        'A valid email is required in most templates and makes exported resumes look trustworthy.',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildChecklistTile(
-                    isReady: digitalProfiles > 0,
-                    title: 'Digital presence',
-                    subtitle:
-                        'Add LinkedIn, GitHub, or a portfolio so global recruiters can verify your work quickly.',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildChecklistTile(
-                    isReady: !_isPhotoTemplate(resume.templateId) || hasPhoto,
-                    title: _isPhotoTemplate(resume.templateId)
-                        ? 'Photo-enabled template'
-                        : 'Text-first template',
-                    subtitle: _isPhotoTemplate(resume.templateId)
-                        ? 'This selected template can display a profile photo. Add one if you want the preview to feel more complete.'
-                        : 'Your current template relies on text hierarchy, so strong contact details matter more than a portrait.',
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(delay: 100.ms),
-            const SizedBox(height: 20),
-            _buildSectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Profile Photo',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Useful for templates that surface a headshot. The actual save flow is unchanged, so your preview updates after you save.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                          height: 1.4,
-                        ),
-                  ),
-                  if (_isPhotoTemplate(resume.templateId)) ...[
+            if (supportsProfilePhoto) ...[
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Profile Photo',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Optional. Add a clean headshot only if it supports the template and role you are targeting.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                          ),
+                    ),
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -643,92 +463,93 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                         ],
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 20),
-                  Center(
-                    child: Stack(
-                      children: [
-                        GestureDetector(
-                          onTap: _showImageSourceSheet,
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.4),
-                                width: 3,
-                              ),
-                            ),
-                            child: _pendingImageBytes != null
-                                ? ClipOval(
-                                    child: Image.memory(
-                                      _pendingImageBytes!,
-                                      fit: BoxFit.cover,
-                                      width: 120,
-                                      height: 120,
-                                    ),
-                                  )
-                                : Icon(
-                                    Iconsax.user,
-                                    size: 50,
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.5),
-                                  ),
-                          ),
-                        ),
-                        if (!FreePlanService.canUploadPhoto)
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.28),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Center(
-                                  child: PremiumBadge(
-                                    locked: true,
-                                    label: 'PHOTO',
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: GestureDetector(
+                    const SizedBox(height: 20),
+                    Center(
+                      child: Stack(
+                        children: [
+                          GestureDetector(
                             onTap: _showImageSourceSheet,
                             child: Container(
-                              width: 40,
-                              height: 40,
+                              width: 120,
+                              height: 120,
                               decoration: BoxDecoration(
-                                color: AppColors.primary,
+                                color: AppColors.primary.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.white, width: 3),
+                                border: Border.all(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.4),
+                                  width: 3,
+                                ),
                               ),
-                              child: Icon(
-                                FreePlanService.canUploadPhoto
-                                    ? Iconsax.camera
-                                    : Iconsax.lock_1,
-                                color: Colors.white,
-                                size: 18,
+                              child: _pendingImageBytes != null
+                                  ? ClipOval(
+                                      child: Image.memory(
+                                        _pendingImageBytes!,
+                                        fit: BoxFit.cover,
+                                        width: 120,
+                                        height: 120,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Iconsax.user,
+                                      size: 50,
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.5),
+                                    ),
+                            ),
+                          ),
+                          if (!FreePlanService.canUploadPhoto)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.28),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Center(
+                                    child: PremiumBadge(
+                                      locked: true,
+                                      label: 'PHOTO',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              onTap: _showImageSourceSheet,
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                  border:
+                                      Border.all(color: Colors.white, width: 3),
+                                ),
+                                child: Icon(
+                                  FreePlanService.canUploadPhoto
+                                      ? Iconsax.camera
+                                      : Iconsax.lock_1,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(delay: 120.ms).scale(
-                  duration: 320.ms,
-                  curve: Curves.easeOutCubic,
+                  ],
                 ),
-            const SizedBox(height: 20),
+              ).animate().fadeIn(delay: 120.ms).scale(
+                    duration: 320.ms,
+                    curve: Curves.easeOutCubic,
+                  ),
+              const SizedBox(height: 20),
+            ],
             _buildSectionCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -741,7 +562,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                   ).animate().fadeIn(delay: 100.ms),
                   const SizedBox(height: 6),
                   Text(
-                    'Keep this block precise. These fields anchor the header seen in the preview, shared exports, and template switching flow.',
+                    'Enter the details recruiters expect first. Keep labels concise and formatting consistent.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.textSecondary,
                           height: 1.4,
@@ -847,8 +668,23 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                               child: TextFormField(
                                 controller: _phoneController,
                                 keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(10),
+                                ],
                                 onChanged: (_) => setState(() {}),
                                 style: Theme.of(context).textTheme.bodyLarge,
+                                validator: (value) {
+                                  final digits =
+                                      _normalizedPhoneDigits(value ?? '');
+                                  if (digits.isEmpty) {
+                                    return null;
+                                  }
+                                  if (digits.length < 10) {
+                                    return 'Please enter a valid 10-digit phone number';
+                                  }
+                                  return null;
+                                },
                                 decoration: InputDecoration(
                                   hintText: '9916750642',
                                   prefixIcon: const Icon(
@@ -939,7 +775,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                   ).animate().fadeIn(delay: 400.ms),
                   const SizedBox(height: 6),
                   Text(
-                    'Use these links to localize your resume for technical, creative, and international applications without changing the saved data model.',
+                    'Add public links only when they strengthen verification of your work or profile.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.textSecondary,
                           height: 1.4,

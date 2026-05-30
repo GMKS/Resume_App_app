@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:intl/intl.dart';
 
 import '../constants/app_info.dart';
 import '../models/resume_model.dart';
+import '../utils/export_file_validation.dart';
 
 class ResumeExportFile {
   final Uint8List bytes;
@@ -30,53 +32,59 @@ class ResumeExportService {
   }
 
   static ResumeExportFile buildDocxExport(ResumeModel resume) {
-    final archive = Archive()
-      ..addFile(
-        ArchiveFile(
-          '[Content_Types].xml',
-          _contentTypes.length,
-          utf8.encode(_contentTypes),
-        ),
-      )
-      ..addFile(
-        ArchiveFile('_rels/.rels', _rootRels.length, utf8.encode(_rootRels)),
-      )
-      ..addFile(
-        ArchiveFile(
-          'docProps/core.xml',
-          _coreProps(resume).length,
-          utf8.encode(_coreProps(resume)),
-        ),
-      )
-      ..addFile(
-        ArchiveFile(
-          'docProps/app.xml',
-          _appProps.length,
-          utf8.encode(_appProps),
-        ),
-      )
-      ..addFile(
-        ArchiveFile(
-          'word/document.xml',
-          _documentXml(resume).length,
-          utf8.encode(_documentXml(resume)),
-        ),
-      )
-      ..addFile(
-        ArchiveFile(
-          'word/_rels/document.xml.rels',
-          _documentRels.length,
-          utf8.encode(_documentRels),
-        ),
+    debugPrint(
+      '[DOCX] Starting export for resumeId=${resume.id} '
+      'fullName=${resume.personalInfo.fullName}',
+    );
+    if ((resume.personalInfo.profileImage ?? '').trim().isNotEmpty) {
+      debugPrint(
+        '[DOCX] Profile image detected in resume data. '
+        'DOCX export remains text-only and skips image embedding.',
       );
+    }
 
-    final bytes = ZipEncoder().encode(archive) ?? <int>[];
-    return ResumeExportFile(
-      bytes: Uint8List.fromList(bytes),
+    final files = <String, String>{
+      '[Content_Types].xml': _contentTypes,
+      '_rels/.rels': _rootRels,
+      'docProps/core.xml': _coreProps(resume),
+      'docProps/app.xml': _appProps,
+      'word/document.xml': _documentXml(resume),
+      'word/_rels/document.xml.rels': _documentRels,
+    };
+
+    final archive = Archive();
+    for (final entry in files.entries) {
+      debugPrint('[DOCX] Writing package part: ${entry.key}');
+      archive.addFile(_utf8ArchiveFile(entry.key, entry.value));
+    }
+
+    final zipBytes = ZipEncoder().encode(archive);
+    if (zipBytes == null || zipBytes.isEmpty) {
+      throw StateError('DOCX export could not be encoded.');
+    }
+
+    final export = ResumeExportFile(
+      bytes: Uint8List.fromList(zipBytes),
       filename: '${_fileStem(resume)}_Resume.docx',
       mimeType:
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     );
+
+    validateExportBytes(
+      bytes: export.bytes,
+      fileName: export.filename,
+      mimeType: export.mimeType,
+    );
+    debugPrint(
+      '[DOCX] Export completed successfully. '
+      'file=${export.filename} bytes=${export.bytes.length}',
+    );
+    return export;
+  }
+
+  static ArchiveFile _utf8ArchiveFile(String path, String content) {
+    final bytes = utf8.encode(content);
+    return ArchiveFile(path, bytes.length, bytes);
   }
 
   static String _buildPlainText(ResumeModel resume) {
@@ -89,6 +97,9 @@ class ResumeExportService {
           .where((line) => line.isNotEmpty)
           .toList();
       if (filtered.isEmpty) return;
+      debugPrint(
+        '[Export] Adding section "$title" with ${filtered.length} line(s).',
+      );
       if (lines.isNotEmpty) lines.add('');
       lines.add(title.toUpperCase());
       lines.addAll(filtered);
@@ -215,7 +226,8 @@ class ResumeExportService {
           items.add(certification.name.trim());
         }
         final meta = [
-          if (certification.issuer.trim().isNotEmpty) certification.issuer.trim(),
+          if (certification.issuer.trim().isNotEmpty)
+            certification.issuer.trim(),
           _formatOptionalDateRange(
             certification.issueDate,
             certification.expiryDate,
@@ -223,10 +235,12 @@ class ResumeExportService {
         ].where((value) => value.trim().isNotEmpty).join(' | ');
         if (meta.isNotEmpty) items.add(meta);
         if ((certification.credentialId ?? '').trim().isNotEmpty) {
-          items.add('Credential ID: ${(certification.credentialId ?? '').trim()}');
+          items.add(
+              'Credential ID: ${(certification.credentialId ?? '').trim()}');
         }
         if ((certification.credentialUrl ?? '').trim().isNotEmpty) {
-          items.add('Credential URL: ${(certification.credentialUrl ?? '').trim()}');
+          items.add(
+              'Credential URL: ${(certification.credentialUrl ?? '').trim()}');
         }
         items.add('');
         return items;
@@ -236,11 +250,13 @@ class ResumeExportService {
     addSection(
       'Languages',
       resume.languages
-          .map((language) => '• ${language.name.trim()} - ${language.proficiency.trim()}')
+          .map((language) =>
+              '• ${language.name.trim()} - ${language.proficiency.trim()}')
           .toList(),
     );
 
-    addSection('Hobbies', resume.hobbies.map((hobby) => '• ${hobby.trim()}').toList());
+    addSection(
+        'Hobbies', resume.hobbies.map((hobby) => '• ${hobby.trim()}').toList());
 
     addSection(
       'References',
@@ -364,12 +380,16 @@ class ResumeExportService {
     final raw = resume.personalInfo.fullName.trim().isEmpty
         ? resume.title.trim()
         : resume.personalInfo.fullName.trim();
-    return raw.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_').replaceAll(RegExp(r'_+'), '_');
+    return raw
+        .replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_');
   }
 
-  static String _formatDateRange(DateTime start, DateTime? end, {required bool isCurrent}) {
+  static String _formatDateRange(DateTime start, DateTime? end,
+      {required bool isCurrent}) {
     final formatter = DateFormat('MMM yyyy');
-    final endLabel = isCurrent ? 'Present' : (end != null ? formatter.format(end) : '');
+    final endLabel =
+        isCurrent ? 'Present' : (end != null ? formatter.format(end) : '');
     if (endLabel.isEmpty) return formatter.format(start);
     return '${formatter.format(start)} - $endLabel';
   }
@@ -384,12 +404,36 @@ class ResumeExportService {
   }
 
   static String _escapeXml(String value) {
-    return value
+    final sanitized = _sanitizeXmlText(value);
+    if (sanitized != value) {
+      debugPrint('[DOCX] Removed invalid XML characters from export content.');
+    }
+
+    return sanitized
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&apos;');
+  }
+
+  static String _sanitizeXmlText(String value) {
+    final buffer = StringBuffer();
+    for (final rune in value.runes) {
+      if (_isValidXmlRune(rune)) {
+        buffer.writeCharCode(rune);
+      }
+    }
+    return buffer.toString();
+  }
+
+  static bool _isValidXmlRune(int rune) {
+    return rune == 0x9 ||
+        rune == 0xA ||
+        rune == 0xD ||
+        (rune >= 0x20 && rune <= 0xD7FF) ||
+        (rune >= 0xE000 && rune <= 0xFFFD) ||
+        (rune >= 0x10000 && rune <= 0x10FFFF);
   }
 
   static const String _contentTypes =

@@ -282,11 +282,11 @@ class StartupRecoveryScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              SizedBox(
+              const SizedBox(
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: SystemNavigator.pop,
-                  child: const Text('Close App'),
+                  child: Text('Close App'),
                 ),
               ),
               const Spacer(),

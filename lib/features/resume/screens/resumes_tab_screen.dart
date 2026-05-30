@@ -156,67 +156,87 @@ class _ResumesHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        IconButton(
-          onPressed: onBack,
-          icon: const Icon(Iconsax.arrow_left),
-          tooltip: 'Back',
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            'My Resumes',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 380;
+        final headerFontSize = isNarrow ? 16.0 : 17.0;
+        final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: headerFontSize,
+              height: 1,
+            );
+        final buttonTextStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: headerFontSize,
+              height: 1,
+            );
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              onPressed: onBack,
+              icon: const Icon(Iconsax.arrow_left),
+              tooltip: 'Back',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 36,
+                minHeight: 36,
+              ),
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'My Resumes',
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.fade,
+                  style: titleStyle,
                 ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 50, maxWidth: 228),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: isNarrow ? 42 : 44,
+                maxWidth: isNarrow ? 164 : 184,
+              ),
               child: FilledButton.icon(
                 onPressed: onCreate,
-                icon: const Icon(Iconsax.add, size: 18),
-                label: const Text(
-                  'Create New Resume',
+                icon: Icon(Iconsax.add, size: isNarrow ? 15 : 16),
+                label: Text(
+                  'Create New',
                   maxLines: 1,
-                  overflow: TextOverflow.fade,
                   softWrap: false,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0,
-                    height: 1,
-                  ),
-                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.fade,
+                  style: buttonTextStyle,
                 ),
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                  backgroundColor: AppColors.primaryLight,
+                  foregroundColor: AppColors.textOnPrimary,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isNarrow ? 10 : 12,
+                    vertical: isNarrow ? 10 : 11,
                   ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 2,
                   alignment: Alignment.center,
                   visualDensity: const VisualDensity(
-                    horizontal: -1,
-                    vertical: -1,
+                    horizontal: -2,
+                    vertical: -2,
                   ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

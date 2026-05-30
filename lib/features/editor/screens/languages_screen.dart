@@ -11,8 +11,6 @@ import '../../../core/models/resume_model.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/feature_gate.dart';
-import '../../../shared/widgets/resume_quality_panel.dart';
-import '../../../core/services/resume_quality_service.dart';
 import '../widgets/editor_intro_card.dart';
 import 'resume_editor_screen.dart';
 
@@ -32,7 +30,13 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
   String _searchQuery = '';
   String _selectedRegion = 'All';
 
-  final List<String> _proficiencies = ['Native', 'Fluent', 'Professional', 'Intermediate', 'Beginner'];
+  final List<String> _proficiencies = [
+    'Native',
+    'Fluent',
+    'Professional',
+    'Intermediate',
+    'Beginner'
+  ];
 
   // ── 50+ world languages grouped by region ──────────────────────────────────
   static const Map<String, List<Map<String, String>>> _languagesByRegion = {
@@ -111,7 +115,9 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
 
     if (_searchQuery.isEmpty) return allWithRegion;
     final q = _searchQuery.toLowerCase();
-    return allWithRegion.where((l) => l['name']!.toLowerCase().contains(q)).toList();
+    return allWithRegion
+        .where((l) => l['name']!.toLowerCase().contains(q))
+        .toList();
   }
 
   String _normalizeLanguageName(String value) {
@@ -125,7 +131,8 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
     );
   }
 
-  void _showLanguageMessage(String message, {Color backgroundColor = AppColors.warning}) {
+  void _showLanguageMessage(String message,
+      {Color backgroundColor = AppColors.warning}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -156,7 +163,9 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
     );
 
     final updated = [...resume.languages, lang];
-    ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(resume.copyWith(languages: updated));
+    ref
+        .read(currentResumeProvider(widget.resumeId).notifier)
+        .updateResume(resume.copyWith(languages: updated));
     _controller.clear();
   }
 
@@ -181,23 +190,29 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
       ),
     ];
     ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(
-      resume.copyWith(languages: updated),
-    );
+          resume.copyWith(languages: updated),
+        );
   }
 
   void _deleteLanguage(String id) {
     final resume = ref.read(currentResumeProvider(widget.resumeId));
     if (resume != null) {
       final updated = resume.languages.where((l) => l.id != id).toList();
-      ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(resume.copyWith(languages: updated));
+      ref
+          .read(currentResumeProvider(widget.resumeId).notifier)
+          .updateResume(resume.copyWith(languages: updated));
     }
   }
 
   void _updateProficiency(String id, String proficiency) {
     final resume = ref.read(currentResumeProvider(widget.resumeId));
     if (resume != null) {
-      final updated = resume.languages.map((l) => l.id == id ? l.copyWith(proficiency: proficiency) : l).toList();
-      ref.read(currentResumeProvider(widget.resumeId).notifier).updateResume(resume.copyWith(languages: updated));
+      final updated = resume.languages
+          .map((l) => l.id == id ? l.copyWith(proficiency: proficiency) : l)
+          .toList();
+      ref
+          .read(currentResumeProvider(widget.resumeId).notifier)
+          .updateResume(resume.copyWith(languages: updated));
     }
   }
 
@@ -222,7 +237,7 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
     }
 
     final resume = ref.watch(currentResumeProvider(widget.resumeId));
-    
+
     if (resume == null) {
       return const Scaffold(
         body: AppLoadingState(
@@ -231,18 +246,6 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
         ),
       );
     }
-    final qualityReport = ResumeQualityService.analyzeResume(resume);
-    final fluentOrBetter = resume.languages
-      .where((language) =>
-        language.proficiency == 'Native' || language.proficiency == 'Fluent')
-      .length;
-    final professionalOrBetter = resume.languages
-      .where((language) =>
-        language.proficiency == 'Native' ||
-        language.proficiency == 'Fluent' ||
-        language.proficiency == 'Professional')
-      .length;
-    
     return Scaffold(
       appBar: AppBar(
         leading: AdaptiveTooltip(
@@ -258,44 +261,17 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          EditorIntroCard(
-            title: 'Global Readiness',
-            subtitle:
-                'Language coverage helps international applications, client-facing roles, and template completeness. Changes here save immediately and flow into preview output.',
-            icon: Iconsax.translate,
-            accentColor: const Color(0xFF64748B),
-            stats: [
-              EditorIntroStat(
-                label: '${resume.languages.length} languages',
-                icon: Iconsax.translate,
-              ),
-              EditorIntroStat(
-                label: '$fluentOrBetter fluent+',
-                icon: Iconsax.star1,
-              ),
-              EditorIntroStat(
-                label: '$professionalOrBetter professional+',
-                icon: Iconsax.award,
-              ),
-            ],
-          ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.06, end: 0),
-          const SizedBox(height: 16),
-          ResumeQualityPanel(
-            report: qualityReport,
-            title: 'Language Guidance',
-            subtitle:
-                'Language coverage strengthens preview completeness and makes international profiles easier to trust at a glance.',
-            accentColor: const Color(0xFF64748B),
-            maxSuggestions: 2,
-          ).animate().fadeIn(delay: 60.ms),
-          const SizedBox(height: 20),
           // Add Language Section
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [const Color(0xFF64748B).withValues(alpha: 0.1), const Color(0xFF64748B).withValues(alpha: 0.05)]),
+              gradient: LinearGradient(colors: [
+                const Color(0xFF64748B).withValues(alpha: 0.1),
+                const Color(0xFF64748B).withValues(alpha: 0.05)
+              ]),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF64748B).withValues(alpha: 0.2)),
+              border: Border.all(
+                  color: const Color(0xFF64748B).withValues(alpha: 0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,12 +279,20 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(color: const Color(0xFF64748B).withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Iconsax.translate, color: Color(0xFF64748B), size: 20),
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                          color: const Color(0xFF64748B).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Iconsax.translate,
+                          color: Color(0xFF64748B), size: 20),
                     ),
                     const SizedBox(width: 12),
-                    Text('Add Language', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    Text('Add Language',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -321,8 +305,11 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
                           hintText: 'Language name',
                           filled: true,
                           fillColor: Colors.white,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
                         ),
                         onSubmitted: (_) => _addLanguage(),
                       ),
@@ -332,7 +319,8 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
                       onPressed: _addLanguage,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF64748B),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
                       ),
                       child: const Icon(Iconsax.add),
                     ),
@@ -342,20 +330,25 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: _proficiencies.map((p) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(p),
-                        selected: _selectedProficiency == p,
-                        onSelected: (s) => setState(() => _selectedProficiency = p),
-                        selectedColor: const Color(0xFF64748B),
-                        labelStyle: TextStyle(
-                          color: _selectedProficiency == p ? Colors.white : AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 12,
-                        ),
-                      ),
-                    )).toList(),
+                    children: _proficiencies
+                        .map((p) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(p),
+                                selected: _selectedProficiency == p,
+                                onSelected: (s) =>
+                                    setState(() => _selectedProficiency = p),
+                                selectedColor: const Color(0xFF64748B),
+                                labelStyle: TextStyle(
+                                  color: _selectedProficiency == p
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ))
+                        .toList(),
                   ),
                 ),
               ],
@@ -371,7 +364,10 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
                 const Icon(Iconsax.global, size: 18, color: Color(0xFF64748B)),
                 const SizedBox(width: 8),
                 Text('Browse Languages',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 12),
@@ -396,8 +392,10 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
                     : null,
                 filled: true,
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
               onChanged: (v) => setState(() => _searchQuery = v),
             ),
@@ -406,20 +404,25 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: ['All', ..._languagesByRegion.keys].map((region) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(region),
-                    selected: _selectedRegion == region,
-                    onSelected: (_) => setState(() => _selectedRegion = region),
-                    selectedColor: const Color(0xFF64748B),
-                    labelStyle: TextStyle(
-                      color: _selectedRegion == region ? Colors.white : AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
-                    ),
-                  ),
-                )).toList(),
+                children: ['All', ..._languagesByRegion.keys]
+                    .map((region) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(region),
+                            selected: _selectedRegion == region,
+                            onSelected: (_) =>
+                                setState(() => _selectedRegion = region),
+                            selectedColor: const Color(0xFF64748B),
+                            labelStyle: TextStyle(
+                              color: _selectedRegion == region
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ))
+                    .toList(),
               ),
             ),
             const SizedBox(height: 12),
@@ -453,16 +456,23 @@ class _LanguagesScreenState extends ConsumerState<LanguagesScreen> {
 
           // Languages List
           if (resume.languages.isNotEmpty) ...[
-            Text('Your Languages (${resume.languages.length})', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            Text('Your Languages (${resume.languages.length})',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             ...resume.languages.asMap().entries.map((e) => _LanguageCard(
-              language: e.value,
-              onDelete: () => _deleteLanguage(e.value.id),
-              onUpdateProficiency: (p) => _updateProficiency(e.value.id, p),
-              proficiencies: _proficiencies,
-            ).animate().fadeIn(delay: (300 + e.key * 100).ms).slideX(begin: 0.1, end: 0)),
+                  language: e.value,
+                  onDelete: () => _deleteLanguage(e.value.id),
+                  onUpdateProficiency: (p) => _updateProficiency(e.value.id, p),
+                  proficiencies: _proficiencies,
+                )
+                    .animate()
+                    .fadeIn(delay: (300 + e.key * 100).ms)
+                    .slideX(begin: 0.1, end: 0)),
           ],
-          
+
           const SizedBox(height: 100),
         ],
       ),
@@ -503,15 +513,21 @@ class _LanguageCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: _getColorForProficiency(language.proficiency).withValues(alpha: 0.1),
+              color: _getColorForProficiency(language.proficiency)
+                  .withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
               child: Text(
-                language.name.substring(0, min(2, language.name.length)).toUpperCase(),
-                style: TextStyle(fontWeight: FontWeight.bold, color: _getColorForProficiency(language.proficiency)),
+                language.name
+                    .substring(0, min(2, language.name.length))
+                    .toUpperCase(),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: _getColorForProficiency(language.proficiency)),
               ),
             ),
           ),
@@ -520,7 +536,11 @@ class _LanguageCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(language.name, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text(language.name,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 EditorStatPill(
                   label: language.proficiency,
@@ -531,17 +551,27 @@ class _LanguageCard extends StatelessWidget {
                 GestureDetector(
                   onTap: () => _showProficiencyPicker(context),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getColorForProficiency(language.proficiency).withValues(alpha: 0.1),
+                      color: _getColorForProficiency(language.proficiency)
+                          .withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(language.proficiency, style: TextStyle(fontSize: 12, color: _getColorForProficiency(language.proficiency), fontWeight: FontWeight.w500)),
+                        Text(language.proficiency,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: _getColorForProficiency(
+                                    language.proficiency),
+                                fontWeight: FontWeight.w500)),
                         const SizedBox(width: 4),
-                        Icon(Iconsax.arrow_down_1, size: 12, color: _getColorForProficiency(language.proficiency)),
+                        Icon(Iconsax.arrow_down_1,
+                            size: 12,
+                            color:
+                                _getColorForProficiency(language.proficiency)),
                       ],
                     ),
                   ),
@@ -565,28 +595,41 @@ class _LanguageCard extends StatelessWidget {
   void _showProficiencyPicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Select Proficiency', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text('Select Proficiency',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ...proficiencies.map((p) => ListTile(
-              leading: Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: _getColorForProficiency(p).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                child: Icon(_getIconForProficiency(p), color: _getColorForProficiency(p), size: 20),
-              ),
-              title: Text(p),
-              trailing: language.proficiency == p ? const Icon(Iconsax.tick_circle, color: AppColors.success) : null,
-              onTap: () {
-                onUpdateProficiency(p);
-                Navigator.pop(context);
-              },
-            )),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                        color:
+                            _getColorForProficiency(p).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Icon(_getIconForProficiency(p),
+                        color: _getColorForProficiency(p), size: 20),
+                  ),
+                  title: Text(p),
+                  trailing: language.proficiency == p
+                      ? const Icon(Iconsax.tick_circle,
+                          color: AppColors.success)
+                      : null,
+                  onTap: () {
+                    onUpdateProficiency(p);
+                    Navigator.pop(context);
+                  },
+                )),
             const SizedBox(height: 16),
           ],
         ),
@@ -596,23 +639,35 @@ class _LanguageCard extends StatelessWidget {
 
   Color _getColorForProficiency(String p) {
     switch (p) {
-      case 'Native': return const Color(0xFF22C55E);
-      case 'Fluent': return const Color(0xFF3B82F6);
-      case 'Professional': return const Color(0xFF8B5CF6);
-      case 'Intermediate': return const Color(0xFFF59E0B);
-      case 'Beginner': return const Color(0xFF64748B);
-      default: return AppColors.primary;
+      case 'Native':
+        return const Color(0xFF22C55E);
+      case 'Fluent':
+        return const Color(0xFF3B82F6);
+      case 'Professional':
+        return const Color(0xFF8B5CF6);
+      case 'Intermediate':
+        return const Color(0xFFF59E0B);
+      case 'Beginner':
+        return const Color(0xFF64748B);
+      default:
+        return AppColors.primary;
     }
   }
 
   IconData _getIconForProficiency(String p) {
     switch (p) {
-      case 'Native': return Iconsax.star1;
-      case 'Fluent': return Iconsax.medal_star;
-      case 'Professional': return Iconsax.award;
-      case 'Intermediate': return Iconsax.chart;
-      case 'Beginner': return Iconsax.book;
-      default: return Iconsax.translate;
+      case 'Native':
+        return Iconsax.star1;
+      case 'Fluent':
+        return Iconsax.medal_star;
+      case 'Professional':
+        return Iconsax.award;
+      case 'Intermediate':
+        return Iconsax.chart;
+      case 'Beginner':
+        return Iconsax.book;
+      default:
+        return Iconsax.translate;
     }
   }
 

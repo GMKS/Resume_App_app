@@ -84,10 +84,17 @@ class SectionTile extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            title,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
                           ),
                           if (badge != null) ...[  
@@ -130,6 +137,7 @@ class SectionTile extends StatelessWidget {
                 
                 // Status and Arrow
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     if (!isLocked && isCompleted)
                       Container(

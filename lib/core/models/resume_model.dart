@@ -1,57 +1,87 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:hive/hive.dart';
 
 part 'resume_model.g.dart';
+
+double calculateCompletionPercentage(int completedSections, int totalSections) {
+  final percentage =
+      totalSections <= 0 ? 0.0 : (completedSections / totalSections) * 100;
+
+  assert(() {
+    debugPrint('Completed Sections: $completedSections');
+    debugPrint('Total Sections: $totalSections');
+    debugPrint('Completion Percentage: $percentage');
+    return true;
+  }());
+
+  return percentage;
+}
+
+class ResumeCompletionStats {
+  final int completedSections;
+  final int totalSections;
+
+  const ResumeCompletionStats({
+    required this.completedSections,
+    required this.totalSections,
+  });
+
+  double get percentage =>
+      calculateCompletionPercentage(completedSections, totalSections);
+
+  int get roundedPercentage => percentage.round();
+}
 
 @HiveType(typeId: 0)
 class ResumeModel extends HiveObject {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String title;
-  
+
   @HiveField(2)
   PersonalInfo personalInfo;
-  
+
   @HiveField(3)
   String? objective;
-  
+
   @HiveField(4)
   List<Education> education;
-  
+
   @HiveField(5)
   List<Experience> experience;
-  
+
   @HiveField(6)
   List<Skill> skills;
-  
+
   @HiveField(7)
   List<Project> projects;
-  
+
   @HiveField(8)
   List<Certification> certifications;
-  
+
   @HiveField(9)
   List<Language> languages;
-  
+
   @HiveField(10)
   List<String> hobbies;
-  
+
   @HiveField(11)
   List<Reference> references;
-  
+
   @HiveField(12)
   String templateId;
-  
+
   @HiveField(13)
   DateTime createdAt;
-  
+
   @HiveField(14)
   DateTime updatedAt;
-  
+
   @HiveField(15)
   int colorScheme;
-  
+
   @HiveField(16)
   List<CustomSection> customSections;
 
@@ -133,38 +163,26 @@ class ResumeModel extends HiveObject {
     );
   }
 
-  // Calculate completion percentage
+  ResumeCompletionStats get completionStats {
+    var completedSections = 0;
+
+    if (personalInfo.fullName.trim().isNotEmpty) completedSections++;
+    if ((objective ?? '').trim().isNotEmpty) completedSections++;
+    if (experience.isNotEmpty) completedSections++;
+    if (education.isNotEmpty) completedSections++;
+    if (skills.isNotEmpty) completedSections++;
+    if (projects.isNotEmpty) completedSections++;
+    if (certifications.isNotEmpty) completedSections++;
+    if (languages.isNotEmpty) completedSections++;
+
+    return ResumeCompletionStats(
+      completedSections: completedSections,
+      totalSections: 8,
+    );
+  }
+
   int get completionPercentage {
-    int total = 0;
-    int filled = 0;
-    
-    // Personal info
-    total += 7;
-    if (personalInfo.fullName.isNotEmpty) filled++;
-    if (personalInfo.email.isNotEmpty) filled++;
-    if (personalInfo.phone.isNotEmpty) filled++;
-    if (personalInfo.address.isNotEmpty) filled++;
-    if (personalInfo.linkedIn != null && personalInfo.linkedIn!.isNotEmpty) filled++;
-    if (personalInfo.website != null && personalInfo.website!.isNotEmpty) filled++;
-    if (personalInfo.profileImage != null) filled++;
-    
-    // Objective
-    total += 1;
-    if (objective != null && objective!.isNotEmpty) filled++;
-    
-    // Education
-    total += 1;
-    if (education.isNotEmpty) filled++;
-    
-    // Experience
-    total += 1;
-    if (experience.isNotEmpty) filled++;
-    
-    // Skills
-    total += 1;
-    if (skills.isNotEmpty) filled++;
-    
-    return ((filled / total) * 100).round();
+    return completionStats.roundedPercentage;
   }
 }
 
@@ -172,31 +190,31 @@ class ResumeModel extends HiveObject {
 class PersonalInfo {
   @HiveField(0)
   String fullName;
-  
+
   @HiveField(1)
   String email;
-  
+
   @HiveField(2)
   String phone;
-  
+
   @HiveField(3)
   String address;
-  
+
   @HiveField(4)
   String? linkedIn;
-  
+
   @HiveField(5)
   String? github;
-  
+
   @HiveField(6)
   String? website;
-  
+
   @HiveField(7)
   String? profileImage;
-  
+
   @HiveField(8)
   String? jobTitle;
-  
+
   @HiveField(9)
   DateTime? dateOfBirth;
 
@@ -244,31 +262,31 @@ class PersonalInfo {
 class Education {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String institution;
-  
+
   @HiveField(2)
   String degree;
-  
+
   @HiveField(3)
   String fieldOfStudy;
-  
+
   @HiveField(4)
   DateTime startDate;
-  
+
   @HiveField(5)
   DateTime? endDate;
-  
+
   @HiveField(6)
   bool isCurrentlyStudying;
-  
+
   @HiveField(7)
   String? grade;
-  
+
   @HiveField(8)
   String? description;
-  
+
   @HiveField(9)
   String? location;
 
@@ -316,28 +334,28 @@ class Education {
 class Experience {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String company;
-  
+
   @HiveField(2)
   String position;
-  
+
   @HiveField(3)
   String? location;
-  
+
   @HiveField(4)
   DateTime startDate;
-  
+
   @HiveField(5)
   DateTime? endDate;
-  
+
   @HiveField(6)
   bool isCurrentlyWorking;
-  
+
   @HiveField(7)
   String description;
-  
+
   @HiveField(8)
   List<String> achievements;
 
@@ -382,13 +400,13 @@ class Experience {
 class Skill {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String name;
-  
+
   @HiveField(2)
   int proficiency; // 1-5
-  
+
   @HiveField(3)
   String? category;
 
@@ -418,22 +436,22 @@ class Skill {
 class Project {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String title;
-  
+
   @HiveField(2)
   String description;
-  
+
   @HiveField(3)
   String? url;
-  
+
   @HiveField(4)
   List<String> technologies;
-  
+
   @HiveField(5)
   DateTime? startDate;
-  
+
   @HiveField(6)
   DateTime? endDate;
 
@@ -472,22 +490,22 @@ class Project {
 class Certification {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String name;
-  
+
   @HiveField(2)
   String issuer;
-  
+
   @HiveField(3)
   DateTime? issueDate;
-  
+
   @HiveField(4)
   DateTime? expiryDate;
-  
+
   @HiveField(5)
   String? credentialId;
-  
+
   @HiveField(6)
   String? credentialUrl;
 
@@ -526,10 +544,10 @@ class Certification {
 class Language {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String name;
-  
+
   @HiveField(2)
   String proficiency; // Native, Fluent, Professional, Beginner
 
@@ -556,22 +574,22 @@ class Language {
 class Reference {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String name;
-  
+
   @HiveField(2)
   String position;
-  
+
   @HiveField(3)
   String company;
-  
+
   @HiveField(4)
   String email;
-  
+
   @HiveField(5)
   String phone;
-  
+
   @HiveField(6)
   String? relationship;
 
@@ -610,10 +628,10 @@ class Reference {
 class CustomSection {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String title;
-  
+
   @HiveField(2)
   List<CustomSectionItem> items;
 
@@ -646,16 +664,16 @@ class CustomSection {
 class CustomSectionItem {
   @HiveField(0)
   String id;
-  
+
   @HiveField(1)
   String title;
-  
+
   @HiveField(2)
   String? subtitle;
-  
+
   @HiveField(3)
   String? description;
-  
+
   @HiveField(4)
   DateTime? date;
 

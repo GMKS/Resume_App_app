@@ -52,53 +52,6 @@ class _CertificationsScreenState extends ConsumerState<CertificationsScreen> {
     }
   }
 
-  Widget _buildScreenHeader(
-    BuildContext context,
-    ResumeModel resume,
-    ResumeQualityReport qualityReport,
-  ) {
-    final withLinks = resume.certifications
-        .where((cert) => (cert.credentialUrl ?? '').trim().isNotEmpty)
-        .length;
-    final withExpiry =
-        resume.certifications.where((cert) => cert.expiryDate != null).length;
-
-    return Column(
-      children: [
-        EditorIntroCard(
-          title: 'Verification & Trust Signals',
-          subtitle:
-              'Certifications add proof points that sit alongside your skills and experience. Keep issuer, dates, and links clean so exported resumes stay credible.',
-          icon: Iconsax.medal_star,
-          accentColor: const Color(0xFF14B8A6),
-          stats: [
-            EditorIntroStat(
-              label: '${resume.certifications.length} certs',
-              icon: Iconsax.medal_star,
-            ),
-            EditorIntroStat(
-              label: '$withLinks linked',
-              icon: Iconsax.link,
-            ),
-            EditorIntroStat(
-              label: '$withExpiry with expiry',
-              icon: Iconsax.calendar,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ResumeQualityPanel(
-          report: qualityReport,
-          title: 'Certification Guidance',
-          subtitle:
-              'This section strengthens preview output when the credentials are named clearly and supported with date or verification metadata.',
-          accentColor: const Color(0xFF14B8A6),
-          maxSuggestions: 2,
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!FreePlanService.canEditSection('certifications')) {
@@ -122,8 +75,6 @@ class _CertificationsScreenState extends ConsumerState<CertificationsScreen> {
         ),
       );
     }
-    final qualityReport = ResumeQualityService.analyzeResume(resume);
-
     return Scaffold(
       appBar: AppBar(
         leading: AdaptiveTooltip(
@@ -140,23 +91,14 @@ class _CertificationsScreenState extends ConsumerState<CertificationsScreen> {
           ? ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                _buildScreenHeader(context, resume, qualityReport),
-                const SizedBox(height: 20),
                 _buildEmptyState(),
               ],
             )
           : ListView.builder(
               padding: const EdgeInsets.all(20),
-              itemCount: resume.certifications.length + 1,
+              itemCount: resume.certifications.length,
               itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: _buildScreenHeader(context, resume, qualityReport),
-                  );
-                }
-
-                final cert = resume.certifications[index - 1];
+                final cert = resume.certifications[index];
                 return _CertCard(
                   cert: cert,
                   onEdit: () => _showCertDialog(cert),

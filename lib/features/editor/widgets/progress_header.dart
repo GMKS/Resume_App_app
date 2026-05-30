@@ -16,6 +16,8 @@ class ProgressHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final progressValue = progress.clamp(0, 100).toDouble() / 100;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -46,7 +48,7 @@ class ProgressHeader extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 CircularProgressIndicator(
-                  value: progress / 100,
+                  value: progressValue,
                   strokeWidth: 8,
                   backgroundColor: Colors.white.withValues(alpha: 0.3),
                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
@@ -64,9 +66,9 @@ class ProgressHeader extends StatelessWidget {
               ],
             ),
           ),
-          
+
           const SizedBox(width: 20),
-          
+
           // Info
           Expanded(
             child: Column(
@@ -93,9 +95,10 @@ class ProgressHeader extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: sectionsCompleted / totalSections,
+                    value: progressValue,
                     backgroundColor: Colors.white.withValues(alpha: 0.3),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
                     minHeight: 6,
                   ),
                 ),
