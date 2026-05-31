@@ -737,6 +737,7 @@ class _TemplateSelectionScreenState
   }
 
   bool _usesFixedPalette(String? templateId) => const {
+        'executive',
         'elegant_pink',
         'classic_ats',
         'mono_nova',
@@ -1435,13 +1436,15 @@ class _TemplateSelectionScreenState
                         onPressed: widget.isNewResume
                             ? () => context.go('/editor/${widget.resumeId}')
                             : () async {
-                                final r = StorageService.getResume(widget.resumeId);
+                                final r =
+                                    StorageService.getResume(widget.resumeId);
                                 if (r != null && _selectedTemplate != null) {
                                   final updatedResume = r.copyWith(
                                     templateId: _selectedTemplate!,
-                                    colorScheme: _usesFixedPalette(_selectedTemplate)
-                                        ? 0
-                                        : _selectedColor,
+                                    colorScheme:
+                                        _usesFixedPalette(_selectedTemplate)
+                                            ? 0
+                                            : _selectedColor,
                                     updatedAt: DateTime.now(),
                                   );
                                   final normalizedResume =
@@ -1463,7 +1466,8 @@ class _TemplateSelectionScreenState
                                                           updatedResume),
                                                 )
                                               : updatedResume;
-                                  await StorageService.saveResume(normalizedResume);
+                                  await StorageService.saveResume(
+                                      normalizedResume);
                                 }
                                 if (!context.mounted) return;
                                 context.push('/preview/${widget.resumeId}');
@@ -1476,7 +1480,9 @@ class _TemplateSelectionScreenState
                           alignment: Alignment.center,
                         ),
                         icon: Icon(
-                          widget.isNewResume ? Iconsax.arrow_right : Iconsax.eye,
+                          widget.isNewResume
+                              ? Iconsax.arrow_right
+                              : Iconsax.eye,
                           size: 18,
                         ),
                         label: Text(

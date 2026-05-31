@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +22,7 @@ import '../../../core/utils/shareable_export_file.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../../../core/utils/browser_pdf_preview.dart';
+import '../services/preview_image_service.dart';
 import '../services/preview_media_service.dart';
 import '../services/preview_pdf_service.dart';
 
@@ -35,14 +37,22 @@ class PreviewScreen extends ConsumerStatefulWidget {
 
 class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   static const String _previewRendererVersion =
-      '2026-04-25-spanish-preview-fix-v186';
+      '2026-05-31-business-management-curved-header-v196';
   static const double _gifExportDpi = 170;
   ResumeModel? _resume;
   bool _isLoading = false;
   String? _activeExportLabel;
   bool _isPreviewLoading = false;
   Uint8List? _previewBytes;
+  List<Uint8List> _previewPageImages = const [];
   String? _previewSignature;
+
+  bool get _usesRasterizedPreview =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  bool get _hasResolvedPreview =>
+      _previewBytes != null &&
+      (!_usesRasterizedPreview || _previewPageImages.isNotEmpty);
 
   void _logLifecycle(String phase, {ResumeModel? resume, Object? error}) {
     debugPrint(
@@ -52,6 +62,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
       'hasResume=${resume != null} '
       'previewLoading=$_isPreviewLoading '
       'hasPreviewBytes=${_previewBytes != null} '
+      'previewPages=${_previewPageImages.length} '
       'previewSignature=${_previewSignature ?? 'null'} '
       '${error == null ? '' : 'error=$error'}',
     );
@@ -78,6 +89,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
     }
 
     _previewBytes = null;
+    _previewPageImages = const [];
     _previewSignature = null;
     _refreshPreview(resume);
   }
@@ -108,6 +120,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
     setState(() {
       _resume = resume;
       _previewBytes = null;
+      _previewPageImages = const [];
       _previewSignature = null;
     });
     if (resume != null) {
@@ -151,16 +164,11 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   }
 
   Future<Uint8List> _buildPdfBytes(ResumeModel resume) async {
-    return PreviewPdfService.generateBytes(resume);
+    return PreviewPdfService.generatePreviewBytes(resume);
   }
 
   Future<Uint8List> _pdfBytesForResume(ResumeModel resume) async {
-    final signature = _resumePreviewSignature(resume);
-    if (_previewSignature == signature && _previewBytes != null) {
-      return _previewBytes!;
-    }
-
-    return _buildPdfBytes(resume);
+    return PreviewPdfService.generateBytes(resume);
   }
 
   Future<void> _shareBytesFile({
@@ -239,7 +247,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
 
   Future<void> _refreshPreview(ResumeModel resume) async {
     final signature = _resumePreviewSignature(resume);
-    if (_previewSignature == signature && _previewBytes != null) {
+    if (_previewSignature == signature && _hasResolvedPreview) {
       _logLifecycle('refreshPreview:skip-cached', resume: resume);
       return;
     }
@@ -249,13 +257,22 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
       _isPreviewLoading = true;
       _previewSignature = signature;
       _previewBytes = null;
+      _previewPageImages = const [];
     });
 
     try {
       final bytes = await _buildPdfBytes(resume);
       if (!mounted || _previewSignature != signature) return;
+
+      var pageImages = const <Uint8List>[];
+      if (_usesRasterizedPreview) {
+        pageImages = await PreviewImageService.generatePagesFromPdfBytes(bytes);
+        if (!mounted || _previewSignature != signature) return;
+      }
+
       setState(() {
         _previewBytes = bytes;
+        _previewPageImages = pageImages;
         _resume = resume;
       });
       _logLifecycle('refreshPreview:success', resume: resume);
@@ -618,6 +635,51 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
     }
   }
 
+  Widget _buildRasterPreview() {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      itemCount: _previewPageImages.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 18),
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+              ),
+            ],
+          ),
+          child: Image.memory(
+            _previewPageImages[index],
+            fit: BoxFit.fitWidth,
+            gaplessPlayback: true,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPreviewWatermarkOverlay() {
+    return IgnorePointer(
+      child: Center(
+        child: Transform.rotate(
+          angle: -0.5,
+          child: Text(
+            'Generated with ${AppInfo.appName}\nUpgrade to remove watermark',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.withValues(alpha: 0.18),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _sharePdf() async {
     final resume = _currentResume();
     if (resume == null) return;
@@ -728,24 +790,38 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
               children: [
                 if (_previewBytes == null)
                   const Center(child: CircularProgressIndicator())
+                else if (_usesRasterizedPreview)
+                  Stack(
+                    children: [
+                      _buildRasterPreview(),
+                      if (FreePlanService.shouldShowWatermark)
+                        _buildPreviewWatermarkOverlay(),
+                    ],
+                  )
                 else
-                  PdfPreview(
-                    build: (format) async => _previewBytes!,
-                    actions: const [],
-                    canChangeOrientation: false,
-                    canChangePageFormat: false,
-                    canDebug: false,
-                    allowPrinting: false,
-                    allowSharing: false,
-                    pdfPreviewPageDecoration: BoxDecoration(
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 10,
+                  Stack(
+                    children: [
+                      PdfPreview(
+                        build: (format) async => _previewBytes!,
+                        actions: const [],
+                        canChangeOrientation: false,
+                        canChangePageFormat: false,
+                        canDebug: false,
+                        allowPrinting: false,
+                        allowSharing: false,
+                        pdfPreviewPageDecoration: BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 10,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      if (FreePlanService.shouldShowWatermark)
+                        _buildPreviewWatermarkOverlay(),
+                    ],
                   ),
               ],
             ),
@@ -854,6 +930,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   void dispose() {
     _logLifecycle('dispose:start', resume: _resume);
     _previewBytes = null;
+    _previewPageImages = const [];
     _previewSignature = null;
     super.dispose();
   }

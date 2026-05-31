@@ -937,6 +937,22 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
           // ── Header ────────────────────────────────────────────────────────
           Row(
             children: [
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(
+                  Iconsax.arrow_left,
+                  color: AppColors.textPrimary,
+                  size: 22,
+                ),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
+                tooltip: 'Back',
+              ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(

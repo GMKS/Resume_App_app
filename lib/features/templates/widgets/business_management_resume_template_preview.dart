@@ -17,12 +17,17 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
   final Color? templateColor;
   final ResumeModel? resume;
 
-  Color get _accent => templateColor ?? accentColor;
+  Color get _accent => templateColor ?? const Color(0xFF1E293B);
   Color get _ink => const Color(0xFF111827);
   Color get _muted => const Color(0xFF6B7280);
-  Color get _headerBg => const Color(0xFFF2ECE5);
-  Color get _divider => const Color(0xFFD1D5DB);
-  Color get _headerTitle => const Color(0xFF4B5563);
+  Color get _headerBg => Color.lerp(_accent, const Color(0xFF0F172A), 0.78)!;
+  Color get _divider => const Color(0xFFD7DEE8);
+  Color get _headerTitle => const Color(0xFFE5E7EB);
+  Color get _panelBg => const Color(0xFFF8FAFC);
+  Color get _railBg => const Color(0xFFF5F1EA);
+  Color get _accentWash => Color.lerp(_accent, Colors.white, 0.82)!;
+  Color get _strongAccent =>
+      Color.lerp(_accent, const Color(0xFF0F172A), 0.22)!;
 
   String get _name {
     final value = resume?.personalInfo.fullName.trim() ?? '';
@@ -249,6 +254,43 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
         .toList(growable: false);
   }
 
+  List<String> get _executiveHighlights {
+    final values = <String>[];
+
+    void add(String value) {
+      final trimmed = value.trim();
+      if (trimmed.isNotEmpty && !values.contains(trimmed)) {
+        values.add(trimmed);
+      }
+    }
+
+    for (final experience in _experiences) {
+      for (final line in experience.highlights) {
+        add(line);
+        if (values.length == 3) {
+          return values;
+        }
+      }
+    }
+
+    for (final line in _summaryLines) {
+      add(line);
+      if (values.length == 3) {
+        return values;
+      }
+    }
+
+    if (values.isEmpty) {
+      values.addAll(const [
+        'Directed cross-functional execution with clear stakeholder alignment and measurable delivery outcomes.',
+        'Built structured operating rhythms that improved decision quality, velocity, and team coordination.',
+        'Translated strategy into scalable execution plans across business, product, and delivery functions.',
+      ]);
+    }
+
+    return values.take(3).toList(growable: false);
+  }
+
   String _monthYear(DateTime? date) {
     if (date == null) {
       return 'Present';
@@ -305,6 +347,7 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
     FontWeight weight = FontWeight.normal,
     TextAlign align = TextAlign.left,
     int maxLines = 1,
+    double letterSpacing = 0,
   }) {
     return Text(
       text,
@@ -316,76 +359,116 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
         color: color ?? _muted,
         fontWeight: weight,
         height: 1.18,
+        letterSpacing: letterSpacing,
       ),
     );
   }
 
-  Widget _sectionHeader(String title) {
+  String _contactCaption(_BusinessManagementPreviewContactItem item) {
+    switch (item.icon.codePoint) {
+      case 0xe158:
+        return 'EMAIL';
+      case 0xe0b0:
+        return 'PHONE';
+      case 0xe55f:
+        return 'LOCATION';
+      case 0xe157:
+        return 'PROFILE';
+      case 0xe86f:
+        return 'GITHUB';
+      case 0xe894:
+        return 'WEB';
+      default:
+        return 'DETAIL';
+    }
+  }
+
+  Widget _sectionHeader(String title, {String? eyebrow}) {
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      padding: const EdgeInsets.only(top: 4.5, bottom: 2.6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _text(
-            title,
-            size: 4.35,
-            color: _ink,
-            weight: FontWeight.w700,
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: SizedBox(
-              height: 10,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Container(height: 0.75, color: _divider),
-                  ),
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Container(width: 1.5, color: _accent),
-                  ),
-                ],
+          if ((eyebrow ?? '').isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 1.2),
+              child: _text(
+                eyebrow!,
+                size: 2.15,
+                color: _strongAccent,
+                weight: FontWeight.w700,
+                letterSpacing: 0.7,
               ),
             ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 9,
+                height: 1.5,
+                decoration: BoxDecoration(
+                  color: _accent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(width: 3),
+              Expanded(
+                child: _text(
+                  title,
+                  size: 4.2,
+                  color: _ink,
+                  weight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(width: 4),
+          const SizedBox(height: 2.4),
+          Container(height: 0.85, color: _divider),
         ],
       ),
     );
   }
 
+  Widget _heroShell({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
+      decoration: BoxDecoration(
+        color: _headerBg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: child,
+    );
+  }
+
   Widget _headerContactItem(_BusinessManagementPreviewContactItem item) {
-    return SizedBox(
-      height: 10,
-      child: Row(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4.2, vertical: 3.2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+          width: 0.8,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 7.8,
-            height: 7.8,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: _accent, width: 0.9),
-            ),
-            child: Icon(item.icon, size: 4.1, color: _accent),
+          _text(
+            _contactCaption(item),
+            size: 1.95,
+            color: _accentWash,
+            weight: FontWeight.w700,
+            letterSpacing: 0.65,
           ),
-          const SizedBox(width: 2.6),
-          Expanded(
-            child: Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 2.55,
-                color: _muted,
-                height: 1.05,
-              ),
-            ),
+          const SizedBox(height: 0.9),
+          _text(
+            item.label,
+            size: 2.55,
+            color: Colors.white,
+            maxLines: 2,
           ),
         ],
       ),
@@ -398,9 +481,9 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
     }
 
     final rows = <List<_BusinessManagementPreviewContactItem>>[];
-    for (var index = 0; index < _contactItems.length; index += 3) {
+    for (var index = 0; index < _contactItems.length; index += 2) {
       final end =
-          index + 3 < _contactItems.length ? index + 3 : _contactItems.length;
+          index + 2 < _contactItems.length ? index + 2 : _contactItems.length;
       rows.add(_contactItems.sublist(index, end));
     }
     return rows;
@@ -414,14 +497,14 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
           .entries
           .map(
             (entry) => Padding(
-              padding: EdgeInsets.only(top: entry.key == 0 ? 0 : 2.4),
+              padding: EdgeInsets.only(top: entry.key == 0 ? 0 : 2.6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (var index = 0; index < entry.value.length; index++) ...[
                     Expanded(child: _headerContactItem(entry.value[index])),
                     if (index != entry.value.length - 1)
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 4),
                   ],
                 ],
               ),
@@ -436,6 +519,7 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
     required double size,
     required Color color,
     int maxLines = 0,
+    Color? markerColor,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,11 +533,11 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 1.0),
                     child: Container(
-                      width: 3.1,
-                      height: 3.1,
+                      width: 4.2,
+                      height: 1.05,
                       decoration: BoxDecoration(
-                        color: _accent,
-                        shape: BoxShape.circle,
+                        color: markerColor ?? _accent,
+                        borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                   ),
@@ -475,99 +559,291 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
     );
   }
 
-  Widget _experienceBlock(_BusinessManagementPreviewExperience experience) {
-    final highlights = experience.highlights.take(1).toList(growable: false);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 3.6),
-      child: Column(
+  Widget _heroSummaryPanel() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(7, 6.5, 7, 6.5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _text(
-                  experience.title,
-                  size: 4.2,
+          Expanded(
+            flex: 8,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _text(
+                  'Leadership Profile',
+                  size: 2.15,
+                  color: _accentWash,
+                  weight: FontWeight.w700,
+                  letterSpacing: 0.7,
+                ),
+                const SizedBox(height: 2.2),
+                ..._summaryLines.take(3).map(
+                      (line) => Padding(
+                        padding: const EdgeInsets.only(bottom: 1.4),
+                        child: _text(
+                          line,
+                          size: 2.9,
+                          color: Colors.white,
+                          maxLines: 3,
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _text(
+                  'Leadership Focus',
+                  size: 2.15,
+                  color: _accentWash,
+                  weight: FontWeight.w700,
+                  letterSpacing: 0.7,
+                ),
+                const SizedBox(height: 2.4),
+                ..._skills.take(4).map(
+                      (skill) => Padding(
+                        padding: const EdgeInsets.only(bottom: 1.8),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4.2,
+                            vertical: 2.4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.96),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: _text(
+                            skill,
+                            size: 2.45,
+                            color: _strongAccent,
+                            weight: FontWeight.w700,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _executiveHighlightTile(int index, String text) {
+    final label = index < 9 ? '0${index + 1}' : '${index + 1}';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2.8),
+      padding: const EdgeInsets.fromLTRB(5.5, 4.4, 5.5, 4.4),
+      decoration: BoxDecoration(
+        color: _panelBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _divider, width: 0.75),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 13,
+            height: 13,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _accentWash,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: _text(
+              label,
+              size: 2.45,
+              color: _strongAccent,
+              weight: FontWeight.w800,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(width: 4.5),
+          Expanded(
+            child: _text(
+              text,
+              size: 2.9,
+              color: _ink,
+              maxLines: 3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _experienceBlock(_BusinessManagementPreviewExperience experience) {
+    final highlights = experience.highlights.take(2).toList(growable: false);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 3.8),
+      padding: const EdgeInsets.only(bottom: 3.8),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: _divider, width: 0.75)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            padding: const EdgeInsets.fromLTRB(4.2, 3.2, 4.2, 3.2),
+            decoration: BoxDecoration(
+              color: _panelBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _text(
+                  'TENURE',
+                  size: 1.95,
+                  color: _strongAccent,
+                  weight: FontWeight.w700,
+                  letterSpacing: 0.65,
+                ),
+                const SizedBox(height: 1.4),
+                _text(
+                  experience.dateRange,
+                  size: 2.6,
                   color: _ink,
                   weight: FontWeight.w700,
-                  maxLines: 2,
+                  maxLines: 3,
                 ),
-              ),
-              const SizedBox(width: 4),
-              SizedBox(
-                width: 46,
-                child: _text(
-                  experience.dateRange,
-                  size: 2.85,
-                  color: _muted,
-                  align: TextAlign.right,
-                  maxLines: 2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 1.1),
-          _text(
-            experience.companyLine,
-            size: 3.05,
-            color: _muted,
-            maxLines: 2,
-          ),
-          if (highlights.isNotEmpty) ...[
-            const SizedBox(height: 1.1),
-            _bulletLines(
-              highlights,
-              size: 2.95,
-              color: _muted,
-              maxLines: 2,
+              ],
             ),
-          ],
+          ),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _text(
+                  experience.title,
+                  size: 4.1,
+                  color: _ink,
+                  weight: FontWeight.w800,
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 1.1),
+                _text(
+                  experience.companyLine,
+                  size: 2.95,
+                  color: _strongAccent,
+                  weight: FontWeight.w600,
+                  maxLines: 2,
+                ),
+                if (highlights.isNotEmpty) ...[
+                  const SizedBox(height: 2.1),
+                  _bulletLines(
+                    highlights,
+                    size: 2.9,
+                    color: _muted,
+                    maxLines: 3,
+                    markerColor: _strongAccent,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _railSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 1.6, bottom: 2.2),
+      child: _text(
+        title,
+        size: 2.15,
+        color: _strongAccent,
+        weight: FontWeight.w800,
+        letterSpacing: 0.7,
       ),
     );
   }
 
   Widget _skillChip(String label) {
     return Container(
-      margin: const EdgeInsets.only(right: 3, bottom: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 4.2, vertical: 2.1),
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 4.2, vertical: 3.2),
       decoration: BoxDecoration(
-        color: _accent.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _accent.withValues(alpha: 0.22), width: 0.45),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: _accentWash, width: 0.85),
       ),
-      child: _text(
-        label,
-        size: 3.0,
-        color: _accent,
-        weight: FontWeight.w600,
-        maxLines: 1,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: _accent,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(width: 3.4),
+          Expanded(
+            child: _text(
+              label,
+              size: 2.75,
+              color: _ink,
+              weight: FontWeight.w600,
+              maxLines: 2,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _projectBlock(_BusinessManagementPreviewProject project) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2.6),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2.8),
+      padding: const EdgeInsets.fromLTRB(5.5, 4.5, 5.5, 4.5),
+      decoration: BoxDecoration(
+        color: _panelBg,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _text(
             project.title,
-            size: 3.65,
+            size: 3.55,
             color: _ink,
-            weight: FontWeight.w700,
+            weight: FontWeight.w800,
             maxLines: 2,
           ),
-          if (project.description.trim().isNotEmpty)
+          if (project.description.trim().isNotEmpty) ...[
+            const SizedBox(height: 1.3),
             _text(
               project.description.trim(),
-              size: 2.95,
+              size: 2.85,
               color: _muted,
               align: TextAlign.justify,
-              maxLines: 2,
+              maxLines: 3,
             ),
+          ],
         ],
       ),
     );
@@ -639,7 +915,7 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(title.toUpperCase()),
+          _sectionHeader(title),
           ...itemBlocks,
         ],
       );
@@ -650,54 +926,36 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
-              decoration: BoxDecoration(
-                color: _headerBg,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 7),
+            child: Column(
+              children: [
+                _heroShell(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _text(
-                          _name,
-                          size: 7.4,
-                          color: _ink,
-                          weight: FontWeight.w800,
-                          maxLines: 1,
-                        ),
+                      _text(
+                        _name,
+                        size: 7.7,
+                        color: Colors.white,
+                        weight: FontWeight.w800,
+                        maxLines: 1,
                       ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 48,
-                        child: _text(
-                          _title,
-                          size: 2.85,
-                          color: _headerTitle,
-                          align: TextAlign.right,
-                          weight: FontWeight.w600,
-                          maxLines: 2,
-                        ),
+                      const SizedBox(height: 1.8),
+                      _text(
+                        _title,
+                        size: 3.35,
+                        color: _headerTitle,
+                        weight: FontWeight.w600,
+                        maxLines: 2,
                       ),
+                      const SizedBox(height: 5.6),
+                      _buildHeaderContactGrid(),
+                      const SizedBox(height: 6.2),
+                      _heroSummaryPanel(),
                     ],
                   ),
-                  const SizedBox(height: 5),
-                  _buildHeaderContactGrid(),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 6),
-            child: Container(
-              height: 0.9,
-              color: _divider.withValues(alpha: 0.9),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -705,97 +963,121 @@ class BusinessManagementResumeTemplatePreview extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
               child: SingleChildScrollView(
                 physics: const NeverScrollableScrollPhysics(),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_summaryLines.isNotEmpty) ...[
-                      _sectionHeader('OBJECTIVE'),
-                      _bulletLines(
-                        _summaryLines,
-                        size: 3.05,
-                        color: _muted,
-                      ),
-                    ],
-                    _sectionHeader('PROFESSIONAL EXPERIENCE'),
-                    ..._experiences.map(_experienceBlock),
-                    _sectionHeader('EDUCATION'),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _text(
-                                _education.degree,
-                                size: 4.0,
-                                color: _ink,
-                                weight: FontWeight.w700,
-                                maxLines: 2,
+                    Expanded(
+                      flex: 12,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 7),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_executiveHighlights.isNotEmpty) ...[
+                              _sectionHeader(
+                                'Key Executive Wins',
+                                eyebrow: 'BOARD BRIEF',
                               ),
-                              const SizedBox(height: 1.0),
-                              _text(
-                                _education.institution,
-                                size: 3.0,
-                                color: _muted,
-                                maxLines: 2,
+                              ..._executiveHighlights.asMap().entries.map(
+                                    (entry) => _executiveHighlightTile(
+                                      entry.key,
+                                      entry.value,
+                                    ),
+                                  ),
+                            ],
+                            _sectionHeader(
+                              'Executive Experience',
+                              eyebrow: 'CAREER TRACK',
+                            ),
+                            ..._experiences.map(_experienceBlock),
+                            if (_projects.isNotEmpty) ...[
+                              _sectionHeader(
+                                'Selected Initiatives',
+                                eyebrow: 'STRATEGIC DELIVERY',
+                              ),
+                              ..._projects.map(_projectBlock),
+                            ],
+                            for (final section in previewCustomSections)
+                              if (customSectionBlock(section)
+                                  case final block?) ...[
+                                block,
+                              ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 7,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(6.5, 6.5, 6.5, 6.5),
+                        decoration: BoxDecoration(
+                          color: _railBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _accentWash, width: 0.85),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _railSectionTitle('STRATEGIC COMPETENCIES'),
+                            ..._skills.map(_skillChip),
+                            const SizedBox(height: 1.2),
+                            _railSectionTitle('EDUCATION'),
+                            _text(
+                              _education.degree,
+                              size: 3.05,
+                              color: _ink,
+                              weight: FontWeight.w700,
+                              maxLines: 3,
+                            ),
+                            const SizedBox(height: 1),
+                            _text(
+                              _education.institution,
+                              size: 2.7,
+                              color: _muted,
+                              maxLines: 3,
+                            ),
+                            const SizedBox(height: 0.9),
+                            _text(
+                              _education.dateRange,
+                              size: 2.45,
+                              color: _strongAccent,
+                              weight: FontWeight.w600,
+                              maxLines: 2,
+                            ),
+                            if (_certifications.isNotEmpty) ...[
+                              const SizedBox(height: 3.2),
+                              _railSectionTitle('CERTIFICATIONS'),
+                              ..._certifications.map(
+                                (certification) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 1.6),
+                                  child: _text(
+                                    certification,
+                                    size: 2.65,
+                                    color: _muted,
+                                    maxLines: 3,
+                                  ),
+                                ),
                               ),
                             ],
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        SizedBox(
-                          width: 35,
-                          child: _text(
-                            _education.dateRange,
-                            size: 2.8,
-                            color: _muted,
-                            align: TextAlign.right,
-                            maxLines: 2,
-                          ),
-                        ),
-                      ],
-                    ),
-                    _sectionHeader('SKILLS'),
-                    Wrap(
-                      children: _skills.map(_skillChip).toList(growable: false),
-                    ),
-                    if (_projects.isNotEmpty) ...[
-                      _sectionHeader('PROJECTS'),
-                      ..._projects.map(_projectBlock),
-                    ],
-                    if (_certifications.isNotEmpty) ...[
-                      _sectionHeader('CERTIFICATIONS'),
-                      ..._certifications.map(
-                        (certification) => Padding(
-                          padding: const EdgeInsets.only(bottom: 1.2),
-                          child: _text(
-                            certification,
-                            size: 2.95,
-                            color: _muted,
-                            maxLines: 2,
-                          ),
+                            if (_languages.isNotEmpty) ...[
+                              const SizedBox(height: 2.4),
+                              _railSectionTitle('LANGUAGES'),
+                              ..._languages.map(
+                                (language) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 1.4),
+                                  child: _text(
+                                    language,
+                                    size: 2.65,
+                                    color: _muted,
+                                    maxLines: 2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                    ],
-                    if (_languages.isNotEmpty) ...[
-                      _sectionHeader('LANGUAGES'),
-                      ..._languages.map(
-                        (language) => Padding(
-                          padding: const EdgeInsets.only(bottom: 1.2),
-                          child: _text(
-                            language,
-                            size: 2.95,
-                            color: _muted,
-                            maxLines: 1,
-                          ),
-                        ),
-                      ),
-                    ],
-                    for (final section in previewCustomSections)
-                      if (customSectionBlock(section) case final block?) ...[
-                        block,
-                      ],
+                    ),
                   ],
                 ),
               ),

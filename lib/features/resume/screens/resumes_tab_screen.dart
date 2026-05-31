@@ -165,11 +165,12 @@ class _ResumesHeader extends StatelessWidget {
               fontSize: headerFontSize,
               height: 1,
             );
-        final buttonTextStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: headerFontSize,
-              height: 1,
-            );
+        final buttonTextStyle =
+            Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: headerFontSize,
+                  height: 1,
+                );
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.center,

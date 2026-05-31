@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:resume_builder/core/models/resume_model.dart';
 import 'package:resume_builder/core/services/storage_service.dart';
+import 'package:resume_builder/features/preview/services/preview_pdf_service.dart';
 import 'package:resume_builder/features/preview/widgets/pdf_templates.dart';
 import 'package:resume_builder/features/templates/widgets/business_management_resume_template_preview.dart';
 
@@ -164,7 +165,7 @@ void main() {
       ),
     );
 
-    expect(find.text('SPEAKING ENGAGEMENTS'), findsOneWidget);
+    expect(find.text('Speaking Engagements'), findsOneWidget);
     expect(find.text('QA Leadership Summit'), findsOneWidget);
     expect(
       find.text(
@@ -184,5 +185,15 @@ void main() {
     final pdf = await template.generate(resume, PdfColor.fromHex('#5A607D'));
     final bytes = await pdf.save();
     expect(bytes, isNotEmpty);
+  });
+
+  test('executive preview pdf service generates business management bytes',
+      () async {
+    final resume = buildResume('executive');
+
+    final bytes = await PreviewPdfService.generateBytes(resume);
+
+    expect(bytes, isNotEmpty);
+    expect(bytes.take(4).toList(), equals(const [37, 80, 68, 70]));
   });
 }

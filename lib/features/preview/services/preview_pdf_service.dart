@@ -40,9 +40,13 @@ class PreviewPdfService {
     }
   }
 
-  static Future<Uint8List> generateBytes(ResumeModel resume) async {
+  static Future<Uint8List> generatePreviewBytes(ResumeModel resume) async {
     final pdf = await generateDocument(resume);
-    final bytes = await pdf.save();
+    return pdf.save();
+  }
+
+  static Future<Uint8List> generateBytes(ResumeModel resume) async {
+    final bytes = await generatePreviewBytes(resume);
     if (!FreePlanService.shouldShowWatermark) {
       return bytes;
     }
