@@ -44,12 +44,13 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isCompactHeight = MediaQuery.sizeOf(context).height < 760;
 
     return Column(
       children: [
         // ── "Or continue with" divider ─────────────────────────────
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: EdgeInsets.symmetric(vertical: isCompactHeight ? 4 : 16),
           child: Row(
             children: [
               Expanded(
@@ -64,8 +65,7 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
                   'Or continue with',
                   style: TextStyle(
                     fontSize: 13,
-                    color:
-                        isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -96,7 +96,7 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
                 _service.signInWithFacebook,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isCompactHeight ? 12 : 16),
             _SocialCircleButton(
               icon: FontAwesomeIcons.xTwitter,
               color: const Color(0xFF000000),
@@ -109,7 +109,7 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
                 _service.signInWithTwitter,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isCompactHeight ? 12 : 16),
             _SocialCircleButton(
               icon: FontAwesomeIcons.linkedinIn,
               color: const Color(0xFF0A66C2),
@@ -122,7 +122,7 @@ class _SocialLoginButtonsState extends State<SocialLoginButtons> {
                 _service.signInWithLinkedIn,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isCompactHeight ? 12 : 16),
             _SocialCircleButton(
               icon: FontAwesomeIcons.googlePlusG,
               color: const Color(0xFFDD4B39),

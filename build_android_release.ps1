@@ -1,197 +1,144 @@
 param(
-    [ValidateSet('appbundle', 'apk')]
-    [string]$Artifact = 'appbundle',
     [switch]$AnalyzeSize,
-    [switch]$Arm64Only,
-    [string]$SplitDebugInfoDir = 'build/symbols'
+    [switch]$Arm64Only
 )
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
-$pubspecPath = Join-Path $PSScriptRoot 'pubspec.yaml'
-$buildNumberStatePath = Join-Path $PSScriptRoot '.last_android_build_number'
-$androidLocalPropertiesPath = Join-Path $PSScriptRoot 'android\local.properties'
-$dotEnvPath = Join-Path $PSScriptRoot '.env'
+$preferredJavaHome = $null
+$gradlePropertiesPath = Join-Path $PSScriptRoot 'android\gradle.properties'
 
-function Get-LocalPropertyMap {
-    param(
-        [string]$Path
-    )
-
-    $properties = @{}
-
-    if (-not (Test-Path $Path)) {
-        return $properties
-    }
-
-    foreach ($line in Get-Content $Path) {
-        if ([string]::IsNullOrWhiteSpace($line)) {
-            continue
-        }
-
-        $trimmed = $line.Trim()
-        if ($trimmed.StartsWith('#')) {
-            continue
-        }
-
-        $separatorIndex = $trimmed.IndexOf('=')
-        if ($separatorIndex -lt 1) {
-            continue
-        }
-
-        $key = $trimmed.Substring(0, $separatorIndex).Trim()
-        $value = $trimmed.Substring($separatorIndex + 1).Trim()
-        if (-not [string]::IsNullOrWhiteSpace($key)) {
-            $properties[$key] = $value
+if (Test-Path $gradlePropertiesPath) {
+    $gradleJavaHomeMatch = Select-String -Path $gradlePropertiesPath -Pattern '^org\.gradle\.java\.home=(.+)$'
+    if ($gradleJavaHomeMatch) {
+        $candidate = $gradleJavaHomeMatch.Matches[0].Groups[1].Value.Trim()
+        if ($candidate -and (Test-Path $candidate)) {
+            $preferredJavaHome = $candidate
         }
     }
-
-    return $properties
 }
 
-function Get-ConfigValue {
+if (-not $preferredJavaHome -and $env:LOCALAPPDATA) {
+    $candidate = Join-Path $env:LOCALAPPDATA 'Programs\Microsoft\jdk-17'
+    if (Test-Path $candidate) {
+        $preferredJavaHome = $candidate
+    }
+}
+
+if (-not $preferredJavaHome) {
+    $candidate = 'C:\Program Files\Microsoft\jdk-17'
+    if (Test-Path $candidate) {
+        $preferredJavaHome = $candidate
+    }
+}
+
+if ($preferredJavaHome) {
+    $env:JAVA_HOME = $preferredJavaHome
+    $env:Path = (Join-Path $preferredJavaHome 'bin') + ';' + $env:Path
+    Write-Host "Using JAVA_HOME=$preferredJavaHome"
+}
+
+$pubspecVersionMatch = Select-String -Path 'pubspec.yaml' -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)\s*$'
+if (-not $pubspecVersionMatch) {
+    throw 'Unable to determine Flutter version from pubspec.yaml.'
+}
+
+$pubspecBuildNumber = [int64]$pubspecVersionMatch.Matches[0].Groups[2].Value
+$pubspecVersionName = $pubspecVersionMatch.Matches[0].Groups[1].Value
+$lastBuildNumberPath = Join-Path $PSScriptRoot '.last_android_build_number'
+$lastRecordedBuildNumber = 0
+
+if (Test-Path $lastBuildNumberPath) {
+    $lastRecordedValue = (Get-Content $lastBuildNumberPath | Select-Object -First 1).Trim()
+    if ($lastRecordedValue) {
+        $lastRecordedBuildNumber = [int64]$lastRecordedValue
+    }
+}
+
+$nextBuildNumber = [Math]::Max(
+    [DateTimeOffset]::UtcNow.ToUnixTimeSeconds(),
+    [Math]::Max($pubspecBuildNumber + 1, $lastRecordedBuildNumber + 1)
+)
+
+# Keep Android versionCode in a safe range (Play's max is 2,100,000,000).
+if ($nextBuildNumber -gt 2100000000) {
+    throw "Computed build number $nextBuildNumber exceeds Android/Play maximum (2,100,000,000)."
+}
+
+function Update-PubspecBuildNumber {
     param(
-        [string]$Key,
-        [hashtable]$LocalProperties,
-        [hashtable]$DotEnvProperties
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][int64]$BuildNumber
     )
 
-    $environmentValue = [Environment]::GetEnvironmentVariable($Key)
-    if (-not [string]::IsNullOrWhiteSpace($environmentValue)) {
-        return $environmentValue
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $encoding = $null
+    $bomLength = 0
+
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        $encoding = New-Object System.Text.UTF8Encoding($true)
+        $bomLength = 3
+    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+        $encoding = [System.Text.Encoding]::Unicode
+        $bomLength = 2
+    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+        $encoding = [System.Text.Encoding]::BigEndianUnicode
+        $bomLength = 2
+    } else {
+        $encoding = New-Object System.Text.UTF8Encoding($false)
+        $bomLength = 0
     }
 
-    if ($LocalProperties.ContainsKey($Key)) {
-        return $LocalProperties[$Key]
-    }
+    $text = $encoding.GetString($bytes, $bomLength, $bytes.Length - $bomLength)
 
-    if ($DotEnvProperties.ContainsKey($Key)) {
-        return $DotEnvProperties[$Key]
-    }
-
-    return $null
-}
-
-$localProperties = Get-LocalPropertyMap -Path $androidLocalPropertiesPath
-$dotEnvProperties = Get-LocalPropertyMap -Path $dotEnvPath
-
-function Get-PubspecBuildNumber {
-    param(
-        [string]$Path
+    $updated = [System.Text.RegularExpressions.Regex]::Replace(
+        $text,
+        '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)\s*$',
+        { param($m) "version: $($m.Groups[1].Value)+$BuildNumber" }
     )
 
-    if (-not (Test-Path $Path)) {
-        return 0L
-    }
-
-    $versionLine = Select-String -Path $Path -Pattern '^version:\s*.+\+(\d+)\s*$' | Select-Object -First 1
-    if ($null -eq $versionLine) {
-        return 0L
-    }
-
-    return [int64]$versionLine.Matches[0].Groups[1].Value
-}
-
-function Get-LastBuildNumber {
-    param(
-        [string]$Path
-    )
-
-    if (-not (Test-Path $Path)) {
-        return 0L
-    }
-
-    $rawValue = (Get-Content $Path -TotalCount 1).Trim()
-    if ([string]::IsNullOrWhiteSpace($rawValue)) {
-        return 0L
-    }
-
-    try {
-        return [int64]$rawValue
-    }
-    catch {
-        return 0L
+    if ($updated -ne $text) {
+        $outBytes = $encoding.GetBytes($updated)
+        if ($bomLength -gt 0) {
+            $bom = $bytes[0..($bomLength - 1)]
+            $outBytes = $bom + $outBytes
+        }
+        [System.IO.File]::WriteAllBytes($Path, $outBytes)
+        Write-Host "Synced pubspec.yaml build number -> $BuildNumber"
     }
 }
 
-$currentEpochSeconds = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$pubspecBuildNumber = Get-PubspecBuildNumber -Path $pubspecPath
-$lastBuildNumber = Get-LastBuildNumber -Path $buildNumberStatePath
-$buildNumber = [Math]::Max($currentEpochSeconds, [Math]::Max($pubspecBuildNumber + 1, $lastBuildNumber + 1))
+Write-Host "Using Android versionCode=$nextBuildNumber"
 
-Set-Content -Path $buildNumberStatePath -Value $buildNumber
-Write-Host "Using Android version code: $buildNumber"
-
-$isApkBuild = $Artifact -eq 'apk'
-
-if ($AnalyzeSize -and $isApkBuild) {
-    throw 'AnalyzeSize is only supported for appbundle builds.'
-}
-
-$targetPlatform = if ($Arm64Only -or $isApkBuild) {
+$targetPlatform = if ($Arm64Only) {
     'android-arm64'
 } else {
     'android-arm,android-arm64'
 }
 
-if ($isApkBuild -and -not $Arm64Only) {
-    Write-Host 'APK builds default to arm64-only to avoid JVM out-of-memory crashes on low-memory Windows machines.'
-}
-
 $buildArgs = @(
     'build',
-    $Artifact,
+    'appbundle',
     '--release',
-    '--build-number', $buildNumber,
+    '--build-number', $nextBuildNumber,
     '--target-platform', $targetPlatform,
-    '--tree-shake-icons'
+    '--tree-shake-icons',
+    '--obfuscate',
+    '--split-debug-info=build/symbols'
 )
 
 if ($AnalyzeSize) {
     $buildArgs += '--analyze-size'
-} else {
-    $buildArgs += @(
-        '--obfuscate',
-        "--split-debug-info=$SplitDebugInfoDir"
-    )
 }
 
-$razorpayKeyId = Get-ConfigValue -Key 'RAZORPAY_KEY_ID' -LocalProperties $localProperties -DotEnvProperties $dotEnvProperties
-if (-not [string]::IsNullOrWhiteSpace($razorpayKeyId)) {
-    $buildArgs += "--dart-define=RAZORPAY_KEY_ID=$($razorpayKeyId.Trim())"
-}
-
-$playProductEnvKeys = @(
-    'PLAY_WEEKLY_PRODUCT_ID',
-    'PLAY_MONTHLY_PRODUCT_ID',
-    'PLAY_QUARTERLY_PRODUCT_ID',
-    'PLAY_YEARLY_PRODUCT_ID',
-    'ENABLE_DUMMY_PAYMENTS',
-    'DISABLE_GOOGLE_PLAY_BILLING',
-    'ENABLE_FACEBOOK_AUTH',
-    'FACEBOOK_APP_ID',
-    'FACEBOOK_CLIENT_TOKEN',
-    'LINKEDIN_PROVIDER_ID',
-    'OTP_BASE_URL',
-    'OTP_SEND_URL',
-    'OTP_VERIFY_URL'
-)
-
-$otpBaseUrl = Get-ConfigValue -Key 'OTP_BASE_URL' -LocalProperties $localProperties -DotEnvProperties $dotEnvProperties
-$otpSendUrl = Get-ConfigValue -Key 'OTP_SEND_URL' -LocalProperties $localProperties -DotEnvProperties $dotEnvProperties
-$otpVerifyUrl = Get-ConfigValue -Key 'OTP_VERIFY_URL' -LocalProperties $localProperties -DotEnvProperties $dotEnvProperties
-
-foreach ($key in $playProductEnvKeys) {
-    $value = switch ($key) {
-        'OTP_BASE_URL' { $otpBaseUrl }
-        'OTP_SEND_URL' { $otpSendUrl }
-        'OTP_VERIFY_URL' { $otpVerifyUrl }
-        default { Get-ConfigValue -Key $key -LocalProperties $localProperties -DotEnvProperties $dotEnvProperties }
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($value)) {
-        $buildArgs += "--dart-define=$key=$($value.Trim())"
+if (Test-Path (Join-Path $PSScriptRoot 'android\gradlew.bat')) {
+    Write-Host 'Stopping existing Gradle daemons (if any)...'
+    Push-Location (Join-Path $PSScriptRoot 'android')
+    try {
+        & .\gradlew.bat --stop | Out-Null
+    } finally {
+        Pop-Location
     }
 }
 
@@ -199,18 +146,62 @@ flutter clean
 flutter pub get
 & flutter @buildArgs
 
-if ($isApkBuild) {
-    $apkPath = Join-Path $PSScriptRoot 'build\app\outputs\flutter-apk\app-release.apk'
-    if (Test-Path $apkPath) {
-        $apk = Get-Item $apkPath
-        $apkSizeMb = [math]::Round($apk.Length / 1MB, 2)
-        Write-Host "Built APK: $($apk.FullName) ($apkSizeMb MB)"
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
+Set-Content -Path $lastBuildNumberPath -Value $nextBuildNumber
+Update-PubspecBuildNumber -Path (Join-Path $PSScriptRoot 'pubspec.yaml') -BuildNumber $nextBuildNumber
+
+$aabPath = Join-Path $PSScriptRoot 'build\app\outputs\bundle\release\app-release.aab'
+
+if (-not (Test-Path $aabPath)) {
+    $candidateRoots = @(
+        (Join-Path $PSScriptRoot 'build\app\outputs'),
+        (Join-Path $PSScriptRoot 'android\app\build\outputs')
+    )
+
+    $candidates = foreach ($root in $candidateRoots) {
+        if (Test-Path $root) {
+            Get-ChildItem -Path $root -Recurse -Filter '*.aab' -File -ErrorAction SilentlyContinue
+        }
     }
+
+    $newest = $candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($newest) {
+        $aabPath = $newest.FullName
+    }
+}
+
+if (Test-Path $aabPath) {
+    $releaseArtifactsDir = Join-Path $PSScriptRoot 'release-artifacts'
+    New-Item -ItemType Directory -Path $releaseArtifactsDir -Force | Out-Null
+
+    $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $destAabPath = Join-Path $releaseArtifactsDir ("app-release-$nextBuildNumber-$timestamp.aab")
+
+    $sourceHash = (Get-FileHash -LiteralPath $aabPath -Algorithm SHA256).Hash
+    $copied = $false
+
+    foreach ($attempt in 1..3) {
+        if (Test-Path $destAabPath) {
+            Remove-Item -LiteralPath $destAabPath -Force
+        }
+
+        [System.IO.File]::Copy($aabPath, $destAabPath, $true)
+        $destHash = (Get-FileHash -LiteralPath $destAabPath -Algorithm SHA256).Hash
+
+        if ($destHash -eq $sourceHash) {
+            $copied = $true
+            break
+        }
+    }
+
+    if (-not $copied) {
+        throw "Copied AAB failed integrity verification. Source hash: $sourceHash"
+    }
+
+    Write-Host "Saved AAB to $destAabPath"
 } else {
-    $bundlePath = Join-Path $PSScriptRoot 'build\app\outputs\bundle\release\app-release.aab'
-    if (Test-Path $bundlePath) {
-        $bundle = Get-Item $bundlePath
-        $bundleSizeMb = [math]::Round($bundle.Length / 1MB, 2)
-        Write-Host "Built AAB: $($bundle.FullName) ($bundleSizeMb MB)"
-    }
+    Write-Warning "Build succeeded but expected AAB not found at: $aabPath"
 }

@@ -22,7 +22,8 @@ class TwilioLoginScreen extends StatefulWidget {
   State<TwilioLoginScreen> createState() => _TwilioLoginScreenState();
 }
 
-class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTickerProviderStateMixin {
+class _TwilioLoginScreenState extends State<TwilioLoginScreen>
+    with SingleTickerProviderStateMixin {
   final TwilioService _twilioService = TwilioService();
   late AnimationController _fadeController;
 
@@ -254,23 +255,31 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
               child: Card(
                 elevation: 8,
                 color: cardColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
                 child: Padding(
                   padding: const EdgeInsets.all(32.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.phone_android, size: 64, color: Colors.blue.shade600),
+                      Icon(Icons.phone_android,
+                          size: 64, color: Colors.blue.shade600),
                       const SizedBox(height: 20),
                       Text(
                         title,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         description,
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(color: Colors.grey.shade600),
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -280,11 +289,15 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue.shade600,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           child: Text(
                             buttonLabel,
-                            style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Colors.white),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelLarge
+                                ?.copyWith(color: Colors.white),
                           ),
                         ),
                       ),
@@ -305,9 +318,12 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox(height: 40),
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).height < 760 ? 4 : 40,
+                ),
 
                 // Logo/Title Animation
                 Column(
@@ -329,17 +345,28 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                         size: 40,
                       ),
                     )
-                        .animate(onPlay: (controller) => controller.repeat(reverse: true))
-                        .scale(duration: const Duration(milliseconds: 2000), begin: const Offset(0.95, 0.95), end: const Offset(1.05, 1.05))
+                        .animate(
+                            onPlay: (controller) =>
+                                controller.repeat(reverse: true))
+                        .scale(
+                            duration: const Duration(milliseconds: 2000),
+                            begin: const Offset(0.95, 0.95),
+                            end: const Offset(1.05, 1.05))
                         .then()
-                        .scale(duration: const Duration(milliseconds: 2000), begin: const Offset(1.05, 1.05), end: const Offset(0.95, 0.95)),
+                        .scale(
+                            duration: const Duration(milliseconds: 2000),
+                            begin: const Offset(1.05, 1.05),
+                            end: const Offset(0.95, 0.95)),
                     const SizedBox(height: 24),
                     Text(
                       'Secure Login',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ).animate().fadeIn(duration: const Duration(milliseconds: 600)),
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                    )
+                        .animate()
+                        .fadeIn(duration: const Duration(milliseconds: 600)),
                     const SizedBox(height: 8),
                     Text(
                       _isPhoneEntered
@@ -355,7 +382,9 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                   ],
                 ),
 
-                const SizedBox(height: 48),
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).height < 760 ? 10 : 48,
+                ),
 
                 // Card Container with Animation
                 if (_isSuccess)
@@ -384,7 +413,9 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                     ),
                   ),
 
-                const SizedBox(height: 32),
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).height < 760 ? 0 : 24,
+                ),
 
                 // ── Social Login ────────────────────────────────
                 if (!_isPhoneEntered && !_isLoading && !_isSuccess)
@@ -436,7 +467,9 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                     },
                   ),
 
-                const SizedBox(height: 24),
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).height < 760 ? 4 : 24,
+                ),
 
                 // Footer
                 if (!_isSuccess && !_isLoading)
@@ -463,10 +496,11 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                           const SizedBox(width: 6),
                           Text(
                             'End-to-End Encrypted',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.green.shade600,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.green.shade600,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                           ),
                         ],
                       ).animate().fadeIn(
@@ -506,9 +540,11 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
+                  border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.4), width: 2),
                 ),
-                child: const Icon(Icons.verified_user, color: Colors.white, size: 52),
+                child: const Icon(Icons.verified_user,
+                    color: Colors.white, size: 52),
               )
                   .animate(onPlay: (c) => c.repeat(reverse: true))
                   .scale(
@@ -530,7 +566,10 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
-              ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, duration: 500.ms),
+              )
+                  .animate()
+                  .fadeIn(delay: 200.ms)
+                  .slideY(begin: 0.2, duration: 500.ms),
 
               const SizedBox(height: 12),
 
@@ -552,7 +591,8 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen> with SingleTicker
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
                     backgroundColor: Colors.white.withValues(alpha: 0.2),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
                     minHeight: 6,
                   ),
                 ),

@@ -16,7 +16,8 @@ import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/ai_review_notice.dart';
 import '../../../shared/widgets/feature_gate.dart';
 import '../../home/screens/home_screen.dart' show resumesProvider;
-import '../../editor/screens/resume_editor_screen.dart' show currentResumeProvider;
+import '../../editor/screens/resume_editor_screen.dart'
+    show currentResumeProvider;
 
 /// Screen to generate AI-powered resume content
 class AiContentEnhancerScreen extends ConsumerStatefulWidget {
@@ -25,10 +26,12 @@ class AiContentEnhancerScreen extends ConsumerStatefulWidget {
   const AiContentEnhancerScreen({super.key, this.resumeId});
 
   @override
-  ConsumerState<AiContentEnhancerScreen> createState() => _AiContentEnhancerScreenState();
+  ConsumerState<AiContentEnhancerScreen> createState() =>
+      _AiContentEnhancerScreenState();
 }
 
-class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScreen> {
+class _AiContentEnhancerScreenState
+    extends ConsumerState<AiContentEnhancerScreen> {
   static const String _createNewResumeValue = '__create_new_resume__';
 
   final _industryController = TextEditingController();
@@ -224,7 +227,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
       if (bullets.isNotEmpty) {
         if (updated.experience.isNotEmpty) {
           // Apply all bullets as achievements to the first experience entry
-          final updatedFirst = updated.experience.first.copyWith(achievements: bullets);
+          final updatedFirst =
+              updated.experience.first.copyWith(achievements: bullets);
           final newExps = [updatedFirst, ...updated.experience.skip(1)];
           updated = updated.copyWith(experience: newExps);
         } else {
@@ -233,7 +237,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
             id: const Uuid().v4(),
             company: 'Your Company',
             position: _selectedJobTitle,
-            startDate: DateTime.now().subtract(Duration(days: 365 * _experienceYears)),
+            startDate:
+                DateTime.now().subtract(Duration(days: 365 * _experienceYears)),
             isCurrentlyWorking: true,
             description: '',
             achievements: bullets,
@@ -245,7 +250,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
 
       // 3. Add ATS keywords to skills (skip duplicates)
       if (keywords.isNotEmpty) {
-        final existingNames = updated.skills.map((s) => s.name.toLowerCase()).toSet();
+        final existingNames =
+            updated.skills.map((s) => s.name.toLowerCase()).toSet();
         final newSkills = List<Skill>.from(updated.skills);
         for (final kw in keywords) {
           if (!existingNames.contains(kw.toLowerCase())) {
@@ -295,7 +301,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
         id: const Uuid().v4(),
         company: '',
         position: _selectedJobTitle,
-        startDate: DateTime.now().subtract(Duration(days: 365 * _experienceYears)),
+        startDate:
+            DateTime.now().subtract(Duration(days: 365 * _experienceYears)),
         isCurrentlyWorking: true,
         description: bulletsText,
         location: '',
@@ -320,12 +327,14 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
         objective: summary,
         experience: [exp],
         education: [],
-        skills: allSkillNames.map((name) => Skill(
-          id: const Uuid().v4(),
-          name: name,
-          proficiency: 3,
-          category: 'Technical',
-        )).toList(),
+        skills: allSkillNames
+            .map((name) => Skill(
+                  id: const Uuid().v4(),
+                  name: name,
+                  proficiency: 3,
+                  category: 'Technical',
+                ))
+            .toList(),
         projects: [],
         certifications: [],
         languages: [],
@@ -494,7 +503,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
           children: [
             // Handle bar
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
                 color: AppColors.border,
@@ -508,7 +518,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                 color: AppColors.success.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Iconsax.tick_circle, color: AppColors.success, size: 36),
+              child: const Icon(Iconsax.tick_circle,
+                  color: AppColors.success, size: 36),
             ),
             const SizedBox(height: 16),
             Text(
@@ -521,7 +532,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                   ? 'A new resume "$resumeTitle" was created with your AI-generated content.'
                   : 'Summary, experience bullets & ATS keywords were saved to "$resumeTitle".',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 24),
             // Primary button — View Summary
@@ -534,10 +546,15 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                   context.push('/editor/$resumeId/summary');
                 },
                 icon: const Icon(Iconsax.document_text_1, color: Colors.white),
-                label: const Text('View Summary', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white)),
+                label: const Text('View Summary',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
               ),
             ),
@@ -552,10 +569,15 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                   context.push('/editor/$resumeId/experience');
                 },
                 icon: const Icon(Iconsax.briefcase, color: Colors.white),
-                label: const Text('View Experience', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white)),
+                label: const Text('View Experience',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.secondary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
               ),
             ),
@@ -567,10 +589,14 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
               child: OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                   side: const BorderSide(color: AppColors.border),
                 ),
-                child: const Text('Stay Here', style: TextStyle(fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                child: const Text('Stay Here',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary)),
               ),
             ),
           ],
@@ -580,51 +606,36 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
   }
 
   void _showApiKeyDialog() {
-    final controller = TextEditingController(text: _apiKey);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Iconsax.key, color: AppColors.primary),
+            Icon(Iconsax.cpu, color: AppColors.primary),
             SizedBox(width: 10),
-            Text('Groq API Key (Free)'),
+            Text('AI Service'),
           ],
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Get a completely FREE key at:\nconsole.groq.com → API Keys\n(No credit card required!)',
+            Text(
+              'AI access is managed by the app. You do not need to create, paste, or manage a personal API key.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Paste API Key',
-                prefixIcon: const Icon(Iconsax.key),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+            SizedBox(height: 10),
+            Text(
+              'If AI is unavailable right now, the app has not been configured yet. Please try again later.',
+              style: TextStyle(
+                  color: AppColors.textSecondary, fontSize: 12, height: 1.5),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final key = controller.text.trim();
-              if (key.isNotEmpty) {
-                await AiApiKeyStorageService.save(key);
-                setState(() => _apiKey = key);
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
         ],
       ),
     );
@@ -645,7 +656,9 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
         title: const Text('AI Content Enhancer'),
         actions: [
           AdaptiveTooltip(
-            message: _apiKey.isNotEmpty ? 'API Key configured' : 'Add API Key',
+            message: _apiKey.isNotEmpty
+                ? 'AI service ready'
+                : 'AI service unavailable',
             button: true,
             child: IconButton(
               onPressed: _showApiKeyDialog,
@@ -668,10 +681,14 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [const Color(0xFF8B5CF6).withValues(alpha: 0.1), AppColors.primary.withValues(alpha: 0.05)],
+                  colors: [
+                    const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                    AppColors.primary.withValues(alpha: 0.05)
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.2)),
+                border: Border.all(
+                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
@@ -681,18 +698,22 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                       color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Iconsax.magic_star, color: Color(0xFF8B5CF6), size: 24),
+                    child: const Icon(Iconsax.magic_star,
+                        color: Color(0xFF8B5CF6), size: 24),
                   ),
                   const SizedBox(width: 14),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('AI Content Generator', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text('AI Content Generator',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 15)),
                         SizedBox(height: 2),
                         Text(
                           'Generate professional summaries, bullet points, and ATS keywords.',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 12),
                         ),
                       ],
                     ),
@@ -705,7 +726,10 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
 
             // Apply to resume (optional)
             Text('Apply To (optional)',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               key: ValueKey(
@@ -715,8 +739,10 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
               decoration: InputDecoration(
                 prefixIcon: const Icon(Iconsax.document_text_1),
                 hintText: 'Select existing resume to update',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               isExpanded: true,
               items: [
@@ -728,13 +754,14 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                   ),
                 ),
                 ..._allResumes.map((r) => DropdownMenuItem(
-                  value: r.id,
-                  child: Text(r.title, overflow: TextOverflow.ellipsis),
-                )),
+                      value: r.id,
+                      child: Text(r.title, overflow: TextOverflow.ellipsis),
+                    )),
               ],
               onChanged: _handleResumeSelection,
             ),
-            if (_selectedResume == null && (_newResumeTitle?.trim().isNotEmpty ?? false)) ...[
+            if (_selectedResume == null &&
+                (_newResumeTitle?.trim().isNotEmpty ?? false)) ...[
               const SizedBox(height: 8),
               Text(
                 'New resume name: ${_newResumeTitle!.trim()}',
@@ -749,16 +776,22 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
 
             // Job Title
             Text('Target Job Title',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              initialValue: SkillSuggestionsService.allRoles.contains(_selectedJobTitle)
-                  ? _selectedJobTitle
-                  : SkillSuggestionsService.allRoles.first,
+              initialValue:
+                  SkillSuggestionsService.allRoles.contains(_selectedJobTitle)
+                      ? _selectedJobTitle
+                      : SkillSuggestionsService.allRoles.first,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Iconsax.briefcase),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               isExpanded: true,
               items: SkillSuggestionsService.allRoles
@@ -775,22 +808,29 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
 
             // Industry
             Text('Industry / Company Type',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             TextField(
               controller: _industryController,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Iconsax.building_4),
                 hintText: 'e.g. FinTech, Healthcare, E-Commerce...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // Experience 
+            // Experience
             Text('Years of Experience: $_experienceYears years',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             Slider(
               value: _experienceYears.toDouble(),
@@ -809,13 +849,18 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Your Skills (${_selectedSkills.length})',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600)),
                 if (_selectedSkills.isNotEmpty)
                   TextButton.icon(
                     onPressed: () => setState(() => _selectedSkills.clear()),
                     icon: const Icon(Iconsax.close_circle, size: 14),
                     label: const Text('Clear'),
-                    style: TextButton.styleFrom(foregroundColor: AppColors.error, padding: EdgeInsets.zero),
+                    style: TextButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        padding: EdgeInsets.zero),
                   ),
               ],
             ),
@@ -835,12 +880,16 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                   }),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary : AppColors.cardBackground,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.cardBackground,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.border,
+                        color:
+                            isSelected ? AppColors.primary : AppColors.border,
                       ),
                     ),
                     child: Text(
@@ -848,7 +897,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: isSelected ? Colors.white : AppColors.textSecondary,
+                        color:
+                            isSelected ? Colors.white : AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -860,15 +910,20 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
 
             // Existing description (optional)
             Text('Existing Summary to Improve (optional)',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             TextField(
               controller: _existingDescController,
               maxLines: 3,
               decoration: InputDecoration(
                 hintText: 'Paste your current summary for AI to improve...',
-                hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                hintStyle: const TextStyle(
+                    color: AppColors.textTertiary, fontSize: 12),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 contentPadding: const EdgeInsets.all(12),
               ),
             ),
@@ -880,14 +935,18 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                 decoration: BoxDecoration(
                   color: AppColors.error.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                  border:
+                      Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Iconsax.warning_2, color: AppColors.error, size: 18),
+                    const Icon(Iconsax.warning_2,
+                        color: AppColors.error, size: 18),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(_errorMessage!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+                      child: Text(_errorMessage!,
+                          style: const TextStyle(
+                              color: AppColors.error, fontSize: 13)),
                     ),
                   ],
                 ),
@@ -904,14 +963,22 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                 onPressed: _isGenerating ? null : _generateContent,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF8B5CF6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
                 icon: _isGenerating
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
                     : const Icon(Iconsax.magic_star, color: Colors.white),
                 label: Text(
                   _isGenerating ? 'Generating content...' : 'Generate with AI',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: Colors.white),
                 ),
               ),
             ),
@@ -945,7 +1012,10 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
             const Icon(Iconsax.magic_star, color: Color(0xFF8B5CF6), size: 20),
             const SizedBox(width: 8),
             Text('Generated Content',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
           ],
         ).animate().fadeIn(),
         const SizedBox(height: 16),
@@ -958,7 +1028,9 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
             icon: Iconsax.document_text_1,
             title: 'Professional Summary',
             color: AppColors.primary,
-            child: Text(summary, style: const TextStyle(fontSize: 13, height: 1.5, color: AppColors.textSecondary)),
+            child: Text(summary,
+                style: const TextStyle(
+                    fontSize: 13, height: 1.5, color: AppColors.textSecondary)),
           ),
 
         const SizedBox(height: 12),
@@ -971,17 +1043,25 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
             color: AppColors.secondary,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: bullets.map((b) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('•', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.secondary)),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(b.toString(), style: const TextStyle(fontSize: 13, height: 1.4))),
-                  ],
-                ),
-              )).toList(),
+              children: bullets
+                  .map((b) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('•',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.secondary)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(b.toString(),
+                                    style: const TextStyle(
+                                        fontSize: 13, height: 1.4))),
+                          ],
+                        ),
+                      ))
+                  .toList(),
             ),
           ),
 
@@ -994,15 +1074,23 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
             title: 'ATS Keywords',
             color: AppColors.info,
             child: Wrap(
-              spacing: 6, runSpacing: 6,
-              children: keywords.map((k) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(k.toString(), style: const TextStyle(fontSize: 12, color: AppColors.info, fontWeight: FontWeight.w500)),
-              )).toList(),
+              spacing: 6,
+              runSpacing: 6,
+              children: keywords
+                  .map((k) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(k.toString(),
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.info,
+                                fontWeight: FontWeight.w500)),
+                      ))
+                  .toList(),
             ),
           ),
 
@@ -1016,16 +1104,21 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
             color: AppColors.warning,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: metrics.map((m) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    const Icon(Iconsax.arrow_up_2, size: 14, color: AppColors.warning),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(m.toString(), style: const TextStyle(fontSize: 13))),
-                  ],
-                ),
-              )).toList(),
+              children: metrics
+                  .map((m) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            const Icon(Iconsax.arrow_up_2,
+                                size: 14, color: AppColors.warning),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(m.toString(),
+                                    style: const TextStyle(fontSize: 13))),
+                          ],
+                        ),
+                      ))
+                  .toList(),
             ),
           ),
 
@@ -1039,7 +1132,8 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
             onPressed: _applyToResume,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.success,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             icon: const Icon(Iconsax.document_download, color: Colors.white),
             label: Text(
@@ -1048,7 +1142,10 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
                   : ((_newResumeTitle?.trim().isNotEmpty ?? false)
                       ? 'Create "${_newResumeTitle!.trim()}"'
                       : 'Create New Resume'),
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: Colors.white),
             ),
           ),
         ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
@@ -1056,7 +1153,11 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
     );
   }
 
-  Widget _buildCard({required IconData icon, required String title, required Color color, required Widget child}) {
+  Widget _buildCard(
+      {required IconData icon,
+      required String title,
+      required Color color,
+      required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1070,7 +1171,9 @@ class _AiContentEnhancerScreenState extends ConsumerState<AiContentEnhancerScree
           Row(children: [
             Icon(icon, color: color, size: 16),
             const SizedBox(width: 8),
-            Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: color)),
+            Text(title,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 13, color: color)),
           ]),
           const SizedBox(height: 10),
           child,

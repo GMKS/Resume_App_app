@@ -5,15 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'ai_api_key_storage_service.dart';
 
-/// AI Resume Service using Groq API (completely free, no credit card required)
-/// Provides AI-powered resume content generation and job tailoring
+/// AI Resume Service for resume content generation and job tailoring.
 class AiResumeService {
-  // Groq endpoint - 100% free, no credit card required
-  // Get free key at: console.groq.com
-  static const _groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+  // Configured AI endpoint for chat completions.
+  static const _groqEndpoint =
+      'https://api.groq.com/openai/v1/chat/completions';
 
   /// Always returns true — no usage limits, AI is free and unlimited.
-  static Future<bool> hasRemainingUsage({required bool isPremium}) async => true;
+  static Future<bool> hasRemainingUsage({required bool isPremium}) async =>
+      true;
 
   /// Returns -1 (unlimited) for all users.
   static Future<int> getRemainingUsage({required bool isPremium}) async => -1;
@@ -45,9 +45,10 @@ class AiResumeService {
     }
 
     final skillsText = skillsList.join(', ');
-    final existingContext = existingDescription != null && existingDescription.isNotEmpty
-        ? '\n\nExisting description to improve: $existingDescription'
-        : '';
+    final existingContext =
+        existingDescription != null && existingDescription.isNotEmpty
+            ? '\n\nExisting description to improve: $existingDescription'
+            : '';
 
     final prompt = '''
 You are an expert resume writer and career coach. Generate professional resume content for the following profile:
@@ -106,7 +107,8 @@ Respond ONLY with valid JSON, no markdown code blocks or additional text.
     }
 
     // Extract comprehensive resume data
-    final personalInfo = resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
+    final personalInfo =
+        resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
     final objective = resumeJson['objective'] as String? ?? '';
     final experiences = resumeJson['experience'] as List? ?? [];
     final skills = resumeJson['skills'] as List? ?? [];
@@ -147,9 +149,12 @@ Respond ONLY with valid JSON, no markdown code blocks or additional text.
             return cert['name'] ?? '';
           }).join(', ');
 
-    final certLine = certificationsText.isNotEmpty ? '\nCertifications: $certificationsText' : '';
+    final certLine = certificationsText.isNotEmpty
+        ? '\nCertifications: $certificationsText'
+        : '';
 
-    final prompt = '''Analyze this resume against a job description and provide tailoring recommendations in valid JSON format.
+    final prompt =
+        '''Analyze this resume against a job description and provide tailoring recommendations in valid JSON format.
 
 RESUME DATA:
 Current Title: $currentJobTitle
@@ -214,17 +219,19 @@ RESPOND WITH ONLY THIS JSON STRUCTURE (no markdown, no extra text):
       );
     }
 
-    final personalInfo = resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
-    final currentTitle = personalInfo['jobTitle']?.toString().trim().isNotEmpty == true
-        ? personalInfo['jobTitle'].toString().trim()
-        : 'Professional';
+    final personalInfo =
+        resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
+    final currentTitle =
+        personalInfo['jobTitle']?.toString().trim().isNotEmpty == true
+            ? personalInfo['jobTitle'].toString().trim()
+            : 'Professional';
     final currentSummary = resumeJson['objective'] as String? ?? '';
     final experiences = (resumeJson['experience'] as List? ?? const <dynamic>[])
         .whereType<Map>()
         .map((item) => item.map(
               (key, value) => MapEntry(key.toString(), value),
             ))
-      .take(4)
+        .take(4)
         .toList(growable: false);
     final skills = (resumeJson['skills'] as List? ?? const <dynamic>[])
         .map((item) {
@@ -255,13 +262,13 @@ RESPOND WITH ONLY THIS JSON STRUCTURE (no markdown, no extra text):
         ? 'No experience provided.'
         : experiences.asMap().entries.map((entry) {
             final exp = entry.value;
-            final achievements = (exp['achievements'] as List? ?? const <dynamic>[])
-                .map((item) => item.toString().trim())
-                .where((item) => item.isNotEmpty)
-                .join(' | ');
-            final achievementText = achievements.isEmpty
-                ? ''
-                : '\n   Achievements: $achievements';
+            final achievements =
+                (exp['achievements'] as List? ?? const <dynamic>[])
+                    .map((item) => item.toString().trim())
+                    .where((item) => item.isNotEmpty)
+                    .join(' | ');
+            final achievementText =
+                achievements.isEmpty ? '' : '\n   Achievements: $achievements';
             return '${entry.key + 1}. ${exp['position'] ?? ''} at ${exp['company'] ?? ''}\n'
                 '   Description: ${exp['description'] ?? ''}$achievementText';
           }).join('\n');
@@ -287,7 +294,8 @@ RESPOND WITH ONLY THIS JSON STRUCTURE (no markdown, no extra text):
         ? 'No explicit missing keywords were detected by the local analyzer.'
         : missingKeywords.join(', ');
 
-    final prompt = '''You are an expert ATS resume strategist. Rewrite this resume so it aligns better with the target job while remaining truthful.
+    final prompt =
+        '''You are an expert ATS resume strategist. Rewrite this resume so it aligns better with the target job while remaining truthful.
 
 Rules:
 - Do not invent employers, titles, dates, degrees, certifications, or metrics.
@@ -381,7 +389,8 @@ Respond with strict JSON only in this exact structure:
         ? 'No explicit missing keywords were detected by the local analyzer.'
         : missingKeywords.join(', ');
 
-    final prompt = '''You are an expert ATS resume strategist. Rewrite the resume draft below for the target job.
+    final prompt =
+        '''You are an expert ATS resume strategist. Rewrite the resume draft below for the target job.
 
 Rules:
 - Keep the candidate truthful. Do not invent employers, degrees, dates, or metrics.
@@ -451,7 +460,8 @@ Respond with strict JSON only in this exact structure:
       );
     }
 
-    final personalInfo = resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
+    final personalInfo =
+        resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
     final currentTitle = targetJobTitle?.isNotEmpty == true
         ? targetJobTitle!
         : (personalInfo['jobTitle'] ?? 'Professional');
@@ -525,7 +535,8 @@ Respond ONLY with valid JSON. No markdown, no preamble, no trailing text.
     required String apiKey,
     required String resumeText,
   }) async {
-    final prompt = '''You are an expert resume parser. Extract ALL information from the following resume text and return it as structured JSON. Be thorough — extract every detail you can find.
+    final prompt =
+        '''You are an expert resume parser. Extract ALL information from the following resume text and return it as structured JSON. Be thorough — extract every detail you can find.
 
 RESUME TEXT:
 $resumeText
@@ -660,10 +671,10 @@ Rules:
 
     return <String, dynamic>{
       'fullName': _firstString(
-        payload,
-        const <String>['fullName', 'name', 'candidateName'],
-        extraMaps: <Map<String, dynamic>>[personalInfo],
-      ) ??
+            payload,
+            const <String>['fullName', 'name', 'candidateName'],
+            extraMaps: <Map<String, dynamic>>[personalInfo],
+          ) ??
           '',
       'email': _firstString(
             payload,
@@ -749,7 +760,8 @@ Rules:
         ),
       ),
       'languages': _normalizeLanguages(
-        _firstPresent(payload, const <String>['languages', 'languageProficiencies']),
+        _firstPresent(
+            payload, const <String>['languages', 'languageProficiencies']),
       ),
       'projects': _normalizeProjects(
         _firstPresent(
@@ -763,8 +775,7 @@ Rules:
     };
   }
 
-  static const Map<String, String> _extraCustomSectionLabels =
-      <String, String>{
+  static const Map<String, String> _extraCustomSectionLabels = <String, String>{
     'awards': 'Awards',
     'honors': 'Honors',
     'publications': 'Publications',
@@ -795,7 +806,8 @@ Rules:
     return <String, dynamic>{};
   }
 
-  static dynamic _firstPresent(Map<String, dynamic> payload, List<String> keys) {
+  static dynamic _firstPresent(
+      Map<String, dynamic> payload, List<String> keys) {
     for (final key in keys) {
       if (payload.containsKey(key) && payload[key] != null) {
         return payload[key];
@@ -834,8 +846,11 @@ Rules:
         'location': _stringValue(entry['location']) ??
             _stringValue(entry['city']) ??
             '',
-        'startYear': _intValue(entry['startYear']) ?? _intValue(entry['fromYear']),
-        'startMonth': _intValue(entry['startMonth']) ?? _intValue(entry['fromMonth']) ?? 1,
+        'startYear':
+            _intValue(entry['startYear']) ?? _intValue(entry['fromYear']),
+        'startMonth': _intValue(entry['startMonth']) ??
+            _intValue(entry['fromMonth']) ??
+            1,
         'endYear': _intValue(entry['endYear']) ?? _intValue(entry['toYear']),
         'endMonth': _intValue(entry['endMonth']) ?? _intValue(entry['toMonth']),
         'isCurrentlyWorking': _boolValue(entry['isCurrentlyWorking']) ??
@@ -878,9 +893,13 @@ Rules:
         'isCurrentlyStudying': _boolValue(entry['isCurrentlyStudying']) ??
             _boolValue(entry['current']) ??
             false,
-        'grade': _stringValue(entry['grade']) ?? _stringValue(entry['gpa']) ?? '',
-        'description': _joinedText(entry['description'] ?? entry['details']) ?? '',
-        'location': _stringValue(entry['location']) ?? _stringValue(entry['city']) ?? '',
+        'grade':
+            _stringValue(entry['grade']) ?? _stringValue(entry['gpa']) ?? '',
+        'description':
+            _joinedText(entry['description'] ?? entry['details']) ?? '',
+        'location': _stringValue(entry['location']) ??
+            _stringValue(entry['city']) ??
+            '',
       };
     }).where((entry) {
       return (entry['institution'] as String).isNotEmpty ||
@@ -930,7 +949,8 @@ Rules:
   static List<Map<String, dynamic>> _normalizeCertifications(dynamic value) {
     return _mapList(value).map((entry) {
       return <String, dynamic>{
-        'name': _stringValue(entry['name']) ?? _stringValue(entry['title']) ?? '',
+        'name':
+            _stringValue(entry['name']) ?? _stringValue(entry['title']) ?? '',
         'issuer': _stringValue(entry['issuer']) ??
             _stringValue(entry['organization']) ??
             '',
@@ -948,27 +968,33 @@ Rules:
   }
 
   static List<Map<String, dynamic>> _normalizeLanguages(dynamic value) {
-    return _listValue(value).map((entry) {
-      if (entry is Map) {
-        final map = Map<String, dynamic>.from(entry);
-        return <String, dynamic>{
-          'name': _stringValue(map['name']) ?? _stringValue(map['language']) ?? '',
-          'proficiency': _stringValue(map['proficiency']) ??
-              _stringValue(map['level']) ??
-              'Professional',
-        };
-      }
-      return <String, dynamic>{
-        'name': _stringValue(entry) ?? '',
-        'proficiency': 'Professional',
-      };
-    }).where((entry) => (entry['name'] as String).isNotEmpty).toList(growable: false);
+    return _listValue(value)
+        .map((entry) {
+          if (entry is Map) {
+            final map = Map<String, dynamic>.from(entry);
+            return <String, dynamic>{
+              'name': _stringValue(map['name']) ??
+                  _stringValue(map['language']) ??
+                  '',
+              'proficiency': _stringValue(map['proficiency']) ??
+                  _stringValue(map['level']) ??
+                  'Professional',
+            };
+          }
+          return <String, dynamic>{
+            'name': _stringValue(entry) ?? '',
+            'proficiency': 'Professional',
+          };
+        })
+        .where((entry) => (entry['name'] as String).isNotEmpty)
+        .toList(growable: false);
   }
 
   static List<Map<String, dynamic>> _normalizeProjects(dynamic value) {
     return _mapList(value).map((entry) {
       return <String, dynamic>{
-        'title': _stringValue(entry['title']) ?? _stringValue(entry['name']) ?? '',
+        'title':
+            _stringValue(entry['title']) ?? _stringValue(entry['name']) ?? '',
         'description': _joinedText(
               entry['description'] ?? entry['summary'] ?? entry['details'],
             ) ??
@@ -996,9 +1022,8 @@ Rules:
         final map = Map<String, dynamic>.from(entry);
         return <String, dynamic>{
           'name': _stringValue(map['name']) ?? '',
-          'position': _stringValue(map['position']) ??
-              _stringValue(map['title']) ??
-              '',
+          'position':
+              _stringValue(map['position']) ?? _stringValue(map['title']) ?? '',
           'company': _stringValue(map['company']) ??
               _stringValue(map['organization']) ??
               '',
@@ -1031,7 +1056,8 @@ Rules:
     final sections = <Map<String, dynamic>>[];
 
     for (final section in _mapList(
-      _firstPresent(payload, const <String>['customSections', 'additionalSections']),
+      _firstPresent(
+          payload, const <String>['customSections', 'additionalSections']),
     )) {
       final normalized = _normalizeCustomSection(section, fallbackTitle: null);
       if (normalized != null) {
@@ -1105,31 +1131,37 @@ Rules:
     };
   }
 
-  static List<Map<String, dynamic>> _normalizeCustomSectionItems(dynamic value) {
+  static List<Map<String, dynamic>> _normalizeCustomSectionItems(
+      dynamic value) {
     if (value is Map) {
       final item = _normalizeCustomSectionItem(
         Map<String, dynamic>.from(value),
       );
-      return item == null ? const <Map<String, dynamic>>[] : <Map<String, dynamic>>[item];
+      return item == null
+          ? const <Map<String, dynamic>>[]
+          : <Map<String, dynamic>>[item];
     }
 
-    return _listValue(value).map((entry) {
-      if (entry is Map) {
-        return _normalizeCustomSectionItem(
-          Map<String, dynamic>.from(entry),
-        );
-      }
-      final text = _stringValue(entry);
-      if (text == null) {
-        return null;
-      }
-      return <String, dynamic>{
-        'title': text,
-        'subtitle': '',
-        'description': '',
-        'date': '',
-      };
-    }).whereType<Map<String, dynamic>>().toList(growable: false);
+    return _listValue(value)
+        .map((entry) {
+          if (entry is Map) {
+            return _normalizeCustomSectionItem(
+              Map<String, dynamic>.from(entry),
+            );
+          }
+          final text = _stringValue(entry);
+          if (text == null) {
+            return null;
+          }
+          return <String, dynamic>{
+            'title': text,
+            'subtitle': '',
+            'description': '',
+            'date': '',
+          };
+        })
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
   }
 
   static Map<String, dynamic>? _normalizeCustomSectionItem(
@@ -1151,7 +1183,8 @@ Rules:
         '';
     final date = _stringValue(item['date']) ?? _stringValue(item['year']) ?? '';
 
-    if ([title, subtitle, description, date].every((value) => (value ?? '').isEmpty)) {
+    if ([title, subtitle, description, date]
+        .every((value) => (value ?? '').isEmpty)) {
       return null;
     }
 
@@ -1168,7 +1201,8 @@ Rules:
       return _extraCustomSectionLabels[key]!;
     }
     final words = key
-        .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (match) => '${match.group(1)} ${match.group(2)}')
+        .replaceAllMapped(RegExp(r'([a-z])([A-Z])'),
+            (match) => '${match.group(1)} ${match.group(2)}')
         .replaceAll('_', ' ')
         .trim()
         .split(RegExp(r'\s+'));
@@ -1291,7 +1325,8 @@ Rules:
         ? '\n\nExisting description to improve: $existingDescription'
         : '';
 
-    final prompt = '''You are an expert resume writer. Generate 5 powerful, ATS-optimised bullet points for the following work experience entry.
+    final prompt =
+        '''You are an expert resume writer. Generate 5 powerful, ATS-optimised bullet points for the following work experience entry.
 
 Job Title: $jobTitle
 Company: $company
@@ -1324,31 +1359,42 @@ RESPOND ONLY with this JSON:
     required Map<String, dynamic> resumeJson,
     bool isPremium = false,
   }) async {
-    final personalInfo = resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
-    final currentTitle = personalInfo['jobTitle'] ?? resumeJson['title'] ?? 'Professional';
-    final summary = resumeJson['objective'] as String? ?? resumeJson['summary'] as String? ?? '';
+    final personalInfo =
+        resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
+    final currentTitle =
+        personalInfo['jobTitle'] ?? resumeJson['title'] ?? 'Professional';
+    final summary = resumeJson['objective'] as String? ??
+        resumeJson['summary'] as String? ??
+        '';
     final experiences = resumeJson['experience'] as List? ?? [];
     final skills = resumeJson['skills'] as List? ?? [];
     final education = resumeJson['education'] as List? ?? [];
 
-    final expText = experiences.isEmpty ? 'None' : experiences.take(4).map((e) {
-      if (e is String) return e;
-      final m = e as Map<String, dynamic>;
-      return '${m['position'] ?? ''} at ${m['company'] ?? ''}: ${m['description'] ?? ''}';
-    }).join(' | ');
+    final expText = experiences.isEmpty
+        ? 'None'
+        : experiences.take(4).map((e) {
+            if (e is String) return e;
+            final m = e as Map<String, dynamic>;
+            return '${m['position'] ?? ''} at ${m['company'] ?? ''}: ${m['description'] ?? ''}';
+          }).join(' | ');
 
-    final skillsText = skills.isEmpty ? 'None' : skills.take(12).map((s) {
-      if (s is Map<String, dynamic>) return s['name'] ?? '';
-      return s.toString();
-    }).join(', ');
+    final skillsText = skills.isEmpty
+        ? 'None'
+        : skills.take(12).map((s) {
+            if (s is Map<String, dynamic>) return s['name'] ?? '';
+            return s.toString();
+          }).join(', ');
 
-    final eduText = education.isEmpty ? 'None' : education.take(2).map((e) {
-      if (e is String) return e;
-      final m = e as Map<String, dynamic>;
-      return '${m['degree'] ?? ''} from ${m['institution'] ?? ''}';
-    }).join(' | ');
+    final eduText = education.isEmpty
+        ? 'None'
+        : education.take(2).map((e) {
+            if (e is String) return e;
+            final m = e as Map<String, dynamic>;
+            return '${m['degree'] ?? ''} from ${m['institution'] ?? ''}';
+          }).join(' | ');
 
-    final prompt = '''You are a brutally honest, witty resume critic — like a Gordon Ramsay for resumes. Roast this resume with sharp, funny, but constructive criticism. Be entertaining, not mean-spirited.
+    final prompt =
+        '''You are a brutally honest, witty resume critic — like a Gordon Ramsay for resumes. Roast this resume with sharp, funny, but constructive criticism. Be entertaining, not mean-spirited.
 
 RESUME:
 Title: $currentTitle
@@ -1393,11 +1439,16 @@ RESPOND ONLY with this JSON (no markdown):
     required String targetCountry,
     bool isPremium = false,
   }) async {
-    final personalInfo = resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
-    final currentTitle = personalInfo['jobTitle'] ?? resumeJson['title'] ?? 'Professional';
-    final summary = resumeJson['objective'] as String? ?? resumeJson['summary'] as String? ?? '';
+    final personalInfo =
+        resumeJson['personalInfo'] as Map<String, dynamic>? ?? {};
+    final currentTitle =
+        personalInfo['jobTitle'] ?? resumeJson['title'] ?? 'Professional';
+    final summary = resumeJson['objective'] as String? ??
+        resumeJson['summary'] as String? ??
+        '';
 
-    final prompt = '''You are an expert in international resume standards. Adapt this resume for the job market in $targetCountry.
+    final prompt =
+        '''You are an expert in international resume standards. Adapt this resume for the job market in $targetCountry.
 
 Resume title: $currentTitle
 Current summary: $summary
@@ -1440,11 +1491,13 @@ RESPOND ONLY with this JSON (no markdown):
     // alongside the key will cause "String contains non ISO-8859-1 code point".
     final trimmedKey = _normalizeApiKey(apiKey);
     if (trimmedKey.isEmpty) {
-      throw AiConfigException('API key is not configured. Please add your Groq API key in settings.\n\nGet a completely free key at: console.groq.com');
+      throw AiConfigException(
+        'AI service is currently unavailable. Please try again later.',
+      );
     }
     if (!_looksLikeGroqApiKey(trimmedKey)) {
       throw AiConfigException(
-        'This does not look like a Groq API key. Groq keys start with gsk_.\n\nDo not paste Firebase or Google API keys from google-services.json / Firebase console.\n\nGet a Groq key at: console.groq.com',
+        'AI service configuration is invalid right now. Please try again later.',
       );
     }
 
@@ -1455,7 +1508,8 @@ RESPOND ONLY with this JSON (no markdown):
       'messages': [
         {
           'role': 'system',
-          'content': 'You are an expert resume writer. Always respond with a single valid JSON object only, with no markdown and no extra text.',
+          'content':
+              'You are an expert resume writer. Always respond with a single valid JSON object only, with no markdown and no extra text.',
         },
         {
           'role': 'user',
@@ -1487,65 +1541,71 @@ RESPOND ONLY with this JSON (no markdown):
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final choices = data['choices'] as List?;
-        
+
         if (choices == null || choices.isEmpty) {
           throw AiResponseException('No response generated. Please try again.');
         }
 
         final message = choices[0]['message'] as Map<String, dynamic>?;
-        
+
         if (message == null) {
-          throw AiResponseException('Invalid API response format. Please try again.');
+          throw AiResponseException(
+              'Invalid API response format. Please try again.');
         }
-        
+
         final text = _extractMessageContent(message, choices[0]);
-        
+
         if (text == null || text.isEmpty) {
-          throw AiResponseException('Empty response received. Please ensure your API key is valid and try again.');
+          throw AiResponseException(
+              'Empty response received. Please ensure your API key is valid and try again.');
         }
-        
+
         // Parse the JSON response
         try {
           final cleanText = _cleanJsonResponseText(text);
 
           return _decodeJsonObjectResponse(cleanText);
         } catch (e) {
-          throw AiResponseException('Failed to parse AI response. Please try again.');
+          throw AiResponseException(
+              'Failed to parse AI response. Please try again.');
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         String errorMsg =
-            'Invalid API key. Please check your Groq API key in settings.\n\nGet a completely free key at: console.groq.com';
+            'AI service is currently unavailable. Please try again later.';
         try {
           final errorData = jsonDecode(response.body);
-          final detail = (errorData['error']?['message'] ?? errorData['message'])
-              ?.toString();
+          final detail =
+              (errorData['error']?['message'] ?? errorData['message'])
+                  ?.toString();
           if (detail != null && detail.isNotEmpty) {
-            if (detail.toLowerCase().contains('api key') ||
-                detail.toLowerCase().contains('authentication') ||
-                detail.toLowerCase().contains('unauthorized')) {
-              errorMsg =
-                  'Groq rejected the API key. Make sure you pasted your Groq key that starts with gsk_, not a Firebase/Google key.\n\nGroq message: $detail';
-            } else {
-              errorMsg = 'Groq request was rejected: $detail';
+            final lowerDetail = detail.toLowerCase();
+            if (!(lowerDetail.contains('api key') ||
+                lowerDetail.contains('authentication') ||
+                lowerDetail.contains('unauthorized'))) {
+              errorMsg = 'AI service request was rejected: $detail';
             }
           }
         } catch (_) {}
         throw AiConfigException(errorMsg);
       } else if (response.statusCode == 429) {
-        throw AiRateLimitException('API rate limit exceeded. Please wait a few minutes and try again.');
+        throw AiRateLimitException(
+            'API rate limit exceeded. Please wait a few minutes and try again.');
       } else if (response.statusCode == 400) {
         // Parse error message from response body
         String errorMsg = 'Bad request (400).';
         dynamic errorData;
         try {
           errorData = jsonDecode(response.body);
-          final detail = errorData['error']?['message'] ?? errorData['message'] ?? errorData.toString();
+          final detail = errorData['error']?['message'] ??
+              errorData['message'] ??
+              errorData.toString();
           errorMsg = 'API Error: $detail';
         } catch (_) {
           errorMsg = 'API Error (400): ${response.body}';
         }
 
-        if (preferJsonObjectMode && _isJsonGenerationFailure(errorData, response.body)) {
+        if (preferJsonObjectMode &&
+            _isJsonGenerationFailure(errorData, response.body)) {
           final fallbackTemperature = temperature > 0.35 ? 0.35 : temperature;
           return _callGeminiApi(
             apiKey,
@@ -1653,7 +1713,8 @@ RESPOND ONLY with this JSON (no markdown):
     ].map((value) => value.toLowerCase()).toList(growable: false);
 
     return candidates.any(
-      (value) => value.contains('failed to generate json') ||
+      (value) =>
+          value.contains('failed to generate json') ||
           value.contains('failed_generation') ||
           value.contains('json_object'),
     );
@@ -1703,7 +1764,7 @@ RESPOND ONLY with this JSON (no markdown):
 abstract class AiException implements Exception {
   final String message;
   AiException(this.message);
-  
+
   @override
   String toString() => message;
 }
@@ -1731,15 +1792,8 @@ final aiApiKeyProvider = FutureProvider<String>((ref) async {
   return AiApiKeyStorageService.read();
 });
 
-/// Provider to save AI API key
-final saveAiApiKeyProvider = Provider<Future<void> Function(String)>((ref) {
-  return (String apiKey) async {
-    await AiApiKeyStorageService.save(apiKey);
-    ref.invalidate(aiApiKeyProvider);
-  };
-});
-
 /// Provider for remaining AI usage
-final aiRemainingUsageProvider = FutureProvider.family<int, bool>((ref, isPremium) async {
+final aiRemainingUsageProvider =
+    FutureProvider.family<int, bool>((ref, isPremium) async {
   return AiResumeService.getRemainingUsage(isPremium: isPremium);
 });

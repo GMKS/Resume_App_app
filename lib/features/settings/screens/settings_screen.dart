@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,13 +7,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_info.dart';
+import '../../../core/services/app_config_service.dart';
+import '../../../core/services/app_version_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/data_deletion_service.dart';
-import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/supabase_sync_service.dart';
-import '../../../core/services/sync_status_service.dart';
 import '../../../core/utils/cloud_resume_sync.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/feature_gate.dart';
@@ -63,7 +60,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final String _appVersion = '1.0.1';
+  String _appVersionLabel = 'Loading...';
   int _resumeCount = 0;
 
   @override
@@ -73,8 +70,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _loadInfo() async {
-    // App version is set statically for now
+    final versionInfo = await AppVersionService.load();
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
+      _appVersionLabel = versionInfo.shortLabel;
       _resumeCount = StorageService.getAllResumes().length;
     });
   }
@@ -84,17 +86,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          24,
-          24,
-          24 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,6 +152,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  void _handleAiServiceTap() {
+    if (AppConfigService.read('GROQ_API_KEY').isNotEmpty) {
+      context.push('/ai-assistant');
+      return;
+    }
+
+    _showAiApiKeySheet();
+  }
+
   void _showBackupSyncSheet() {
     if (!FreePlanService.canUseCloudSync) {
       showUpgradePromptSheet(
@@ -188,7 +192,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showDeleteAllDialog() {
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
@@ -198,26 +202,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
         content: const Text(
-            'Users can delete their data anytime. Delete your resumes, job tracker entries, saved settings, AI preferences, and any synced cloud backup for this app? You will be signed out on this device.'),
+            'Are you sure you want to delete all resumes? This action cannot be undone.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () => Navigator.pop(context),
               child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await DataDeletionService.deleteUserData();
-              if (!mounted) {
-                return;
-              }
+            onPressed: () {
+              StorageService.deleteAllResumes();
+              Navigator.pop(context);
               setState(() => _resumeCount = 0);
-              ref.read(resumesProvider.notifier).loadResumes();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                    content: Text('Your app data has been deleted.'),
+                    content: Text('All data deleted'),
                     backgroundColor: AppColors.success),
               );
-              context.go('/login');
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Delete All'),
@@ -249,17 +248,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   color: Colors.white, size: 40),
             ),
             const SizedBox(height: 16),
-            Text(AppInfo.appName,
+            Text('Resume Builder',
                 style: Theme.of(context)
                     .textTheme
                     .headlineSmall
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text('Version $_appVersion',
+            Text('Version $_appVersionLabel',
                 style: const TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: 16),
             const Text(
-              'Build polished, ATS-aware resumes with AI assistance, premium templates, and export tools.',
+              'Create professional resumes with ease. Choose from beautiful templates, customize colors, and export to PDF.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary),
             ),
@@ -268,16 +267,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildSocialButton(
-                    Iconsax.global, 'Website', AppInfo.websiteUrl),
+                    Iconsax.global, 'Website', 'https://example.com'),
                 const SizedBox(width: 16),
                 _buildSocialButton(
-                    Iconsax.shield_tick, 'Privacy', AppInfo.privacyPolicyUrl),
+                    Iconsax.instagram, 'Instagram', 'https://instagram.com'),
                 const SizedBox(width: 16),
-                _buildSocialButton(
-                  Iconsax.message,
-                  'Support',
-                  'mailto:${AppInfo.supportEmail}',
-                ),
+                _buildSocialButton(Iconsax.message, 'Support',
+                    'mailto:${AppInfo.supportEmail}'),
               ],
             ),
             const SizedBox(height: 24),
@@ -336,7 +332,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       (
         'Is my data saved automatically?',
-        'Yes, all changes are saved automatically to your device. Resume and job data stay local unless you manually use Backup & Sync or use a feature that clearly requires network processing, such as OTP or AI generation.'
+        'Yes, all changes are saved automatically to your device. Data is stored locally and not uploaded to any server.'
       ),
       (
         'Will I lose my data if I reinstall?',
@@ -433,41 +429,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            const Text('Last updated: February 2026',
+            const Text('Last updated: January 2025',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 16),
             ...[
               (
-                'Data We Process',
-                'The app stores resume content, portfolio items, job tracker entries, settings, and subscription state locally on your device. Resume and job data stay on this device unless you manually use Backup & Sync. Cloud backup is optional and is not uploaded automatically when you edit a resume.'
+                'Data Collection',
+                'Resume Builder does not collect or transmit any personal data. All resume information you enter is stored locally on your device only.'
               ),
               (
-                'Cloud Backup Consent',
-                'Resumes are not stored in the cloud without your action. Tapping Backup to Cloud is the explicit action that uploads your current resume and job-tracker data snapshot for cross-device restore.'
+                'Local Storage',
+                'Your resumes and preferences are saved in your device\'s internal storage using Hive (a local NoSQL database). No data is sent to external servers.'
               ),
               (
-                'Sign-In And Verification',
-                'Phone numbers are sent to the configured verification provider only to send and verify OTP codes. Phone number is used only for authentication (OTP) and is not stored or shared as a full number after verification. Social sign-in providers may return profile data such as your email, display name, and profile photo. Limited session details such as a masked contact label may be stored locally so you can stay signed in.'
+                'Permissions',
+                'The app may request storage access to export PDF resumes, camera/gallery access for profile photos, and internet access only for optional features like sharing.'
               ),
               (
-                'Data Safety Summary',
-                'Data collected: Phone number\nPurpose: Authentication\nSharing: Not shared\nSecurity: Encrypted in transit'
-              ),
-              (
-                'AI Features',
-                'When you use AI-powered tools, the text you submit can be sent to the configured AI provider so the app can generate suggestions or rewritten content. AI-generated content should always be reviewed before use. The app does not promise interviews, job offers, or guaranteed resume success.'
-              ),
-              (
-                'Permissions And Network Access',
-                'The app may request camera or gallery access for profile photos, file access for import and export actions, and internet access for OTP, AI requests, cloud sync, sign-in, and sharing features.'
-              ),
-              (
-                'Third-Party Services',
-                'The app integrates with a configured OTP delivery provider, Firebase for authentication and cloud sync, optional AI providers for content generation, and platform billing or app-store services for subscriptions. We do not sell your data.'
+                'Third Parties',
+                'We do not sell, trade, or share your personal data with any third parties.'
               ),
               (
                 'Data Deletion',
-                'Users can delete their data anytime. Use Settings → Delete All Data to remove local app data and request deletion of synced backups tied to your current device or sync code. Uninstalling the app removes local data stored on the device.'
+                'You can delete all your data at any time via Settings → Delete All Data. Uninstalling the app also removes all stored data.'
               ),
               (
                 'Contact',
@@ -490,20 +474,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ],
                   ),
                 )),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final uri = Uri.parse(AppInfo.privacyPolicyUrl);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-                icon: const Icon(Iconsax.export_1),
-                label: const Text('Open Full Privacy Policy'),
-              ),
-            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -544,13 +514,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            const Text('Effective: February 2026',
+            const Text('Effective: January 2025',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             const SizedBox(height: 16),
             ...[
               (
                 'Acceptance',
-                'By using ${AppInfo.appName}, you agree to these terms. If you do not agree, please stop using the app.'
+                'By using Resume Builder, you agree to these terms. If you do not agree, please uninstall the app.'
               ),
               (
                 'License',
@@ -634,10 +604,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 24),
             _buildSectionHeader('AI FEATURES'),
             _buildSettingTile(
-              icon: Iconsax.key,
-              title: 'Groq API Key (Free)',
-              subtitle: 'Free AI — No credit card required',
-              onTap: _showAiApiKeySheet,
+              icon: Iconsax.cpu,
+              title: 'AI Service',
+              subtitle: AppConfigService.read('GROQ_API_KEY').isNotEmpty
+                  ? 'Managed by the app. No personal API key needed'
+                  : 'Managed by the app. AI is unavailable right now',
+              onTap: _handleAiServiceTap,
             ),
             _buildSettingTile(
               icon: Iconsax.magic_star,
@@ -677,7 +649,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Iconsax.trash,
               iconColor: AppColors.error,
               title: 'Delete All Data',
-              subtitle: 'Clear local data and synced app backups',
+              subtitle: 'Remove all resumes and settings',
               onTap: _showDeleteAllDialog,
             ),
 
@@ -688,7 +660,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: 'Rate App',
               subtitle: 'Love the app? Give us 5 stars!',
               onTap: () async {
-                final uri = Uri.parse(AppInfo.playStoreUrl);
+                // Opens Play Store page for the app
+                const storeUrl =
+                    'https://play.google.com/store/apps/details?id=com.resumebuilder.app';
+                final uri = Uri.parse(storeUrl);
                 final messenger = ScaffoldMessenger.of(context);
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -753,8 +728,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: 'Tell your friends about us',
               onTap: () {
                 Share.share(
-                  'Check out ${AppInfo.appName}: smart resume building with AI tools and premium templates.\n${AppInfo.playStoreUrl}',
-                  subject: '${AppInfo.appName} App',
+                  'Check out this awesome Resume Builder app!\nhttps://play.google.com/store/apps/details?id=com.resumebuilder.app',
+                  subject: 'Resume Builder App',
                 );
               },
             ),
@@ -764,7 +739,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildSettingTile(
               icon: Iconsax.info_circle,
               title: 'About',
-              subtitle: 'Version $_appVersion',
+              subtitle: 'Version $_appVersionLabel',
               onTap: _showAboutDialog,
             ),
             _buildSettingTile(
@@ -874,9 +849,6 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
   String? _currentCode; // what's saved in prefs
   String? _deviceId; // per-device fallback UUID
   bool _editingCode = false;
-  String? _lastSyncSummary;
-  DateTime? _lastBackupAt;
-  DateTime? _lastRestoreAt;
 
   @override
   void initState() {
@@ -887,36 +859,13 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
   Future<void> _loadSyncInfo() async {
     final code = await SupabaseSyncService.getSyncCode();
     final deviceId = await SupabaseSyncService.getDeviceId();
-    final syncStatus = await SyncStatusService.load();
     if (mounted) {
       setState(() {
         _currentCode = code;
         _deviceId = deviceId;
-        _lastSyncSummary = syncStatus.lastSummary;
-        _lastBackupAt = syncStatus.lastBackupAt;
-        _lastRestoreAt = syncStatus.lastRestoreAt;
         if (code != null) _codeController.text = code;
       });
     }
-  }
-
-  String _formatSyncTimestamp(DateTime? timestamp) {
-    if (timestamp == null) {
-      return 'Never';
-    }
-    return DateFormat('dd MMM yyyy, hh:mm a').format(timestamp);
-  }
-
-  DateTime? get _lastSyncedAt {
-    final backupAt = _lastBackupAt;
-    final restoreAt = _lastRestoreAt;
-    if (backupAt == null) {
-      return restoreAt;
-    }
-    if (restoreAt == null) {
-      return backupAt;
-    }
-    return backupAt.isAfter(restoreAt) ? backupAt : restoreAt;
   }
 
   @override
@@ -938,21 +887,11 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
           Row(
             children: [
               IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(
-                  Iconsax.arrow_left,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 36,
-                  height: 36,
-                ),
+                onPressed: () => Navigator.maybePop(context),
+                icon: const Icon(Iconsax.arrow_left_2),
                 tooltip: 'Back',
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -999,7 +938,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  '1. Set the same Sync Code on every device you want to connect.',
+                  '1. Set the exact same Sync Code on every device you want to connect.',
                   style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -1028,16 +967,15 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Cloud backup and restore are manual. Resume restore is also checked on app launch, but uploads are never pushed automatically in the background.',
+                  'Different Sync Codes create different cloud spaces, so your devices must use the same code to share data.',
                   style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.info,
+                      color: AppColors.textSecondary,
                       height: 1.5),
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Resumes stay on this device unless you tap Backup to Cloud. Restore keeps the most recently updated local or cloud version to avoid overwriting newer edits.',
+                  'This is manual sync right now. It does not auto-sync in the background.',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1213,7 +1151,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                               _currentCode = code.toLowerCase();
                               _editingCode = false;
                               _statusMessage =
-                                  'Sync code set. Set the same code on your other device, then use Backup or Restore.';
+                                  '✅ Sync code set! Set the same code on your other device, then Backup/Restore.';
                             });
                           }
                         },
@@ -1239,49 +1177,6 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                         fontSize: 11,
                         color: AppColors.textSecondary,
                         height: 1.5),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Sync Status',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                _buildStatusRow(
-                    'Last synced', _formatSyncTimestamp(_lastSyncedAt)),
-                const SizedBox(height: 8),
-                _buildStatusRow(
-                    'Last cloud backup', _formatSyncTimestamp(_lastBackupAt)),
-                const SizedBox(height: 8),
-                _buildStatusRow(
-                    'Last restore', _formatSyncTimestamp(_lastRestoreAt)),
-                if (_lastSyncSummary != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    _lastSyncSummary!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
                   ),
                 ],
               ],
@@ -1325,7 +1220,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _inProgress ? null : _doBackup,
+              onPressed: _inProgress ? null : _confirmBackup,
               icon: _inProgress
                   ? const SizedBox(
                       width: 16,
@@ -1333,8 +1228,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Iconsax.cloud_add),
-              label: Text(
-                  _inProgress ? 'Processing...' : 'Manual Backup to Cloud'),
+              label: Text(_inProgress ? 'Processing...' : 'Backup to Cloud'),
             ),
           ),
           const SizedBox(height: 10),
@@ -1343,7 +1237,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _inProgress ? null : _doRestore,
+              onPressed: _inProgress ? null : _confirmRestore,
               icon: const Icon(Icons.cloud_download_outlined),
               label: const Text('Restore from Cloud'),
             ),
@@ -1354,27 +1248,58 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
     );
   }
 
-  Widget _buildStatusRow(String label, String value) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
+  Future<void> _confirmBackup() async {
+    final confirmed = await _confirmSyncAction(
+      title: 'Backup to Cloud?',
+      message:
+          'This uploads the latest resumes and job tracker updates from this device. Use the same Sync Code on your other device, then tap Restore there.',
+      confirmLabel: 'Backup Now',
     );
+    if (confirmed) {
+      await _doBackup();
+    }
+  }
+
+  Future<void> _confirmRestore() async {
+    final confirmed = await _confirmSyncAction(
+      title: 'Restore from Cloud?',
+      message:
+          'This pulls the latest cloud backup for this Sync Code and updates this device. Newer cloud items will be merged into your local data.',
+      confirmLabel: 'Restore Now',
+    );
+    if (confirmed) {
+      await _doRestore();
+    }
+  }
+
+  Future<bool> _confirmSyncAction({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(title),
+        content: Text(
+          message,
+          style: const TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+
+    return confirmed ?? false;
   }
 
   Future<void> _doBackup() async {
@@ -1387,7 +1312,8 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
     if (resumes.isEmpty && jobs.isEmpty) {
       setState(() {
         _inProgress = false;
-        _statusMessage = 'ℹ️ No resumes or tracked jobs to back up.';
+        _statusMessage =
+            'ℹ️ Nothing to back up yet. Create or edit a resume or tracked job first, then try again.';
       });
       return;
     }
@@ -1414,29 +1340,14 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
       if (resumeError != null) 'Resumes: $resumeError',
       if (jobError != null) 'Job tracker: $jobError',
     ];
-    final nextStatusMessage = failures.isEmpty
-        ? '✅ Backed up ${backedUp.join(' and ')} to $label.'
-        : backedUp.isEmpty
-            ? '❌ ${failures.join('\n')}'
-            : '✅ Backed up ${backedUp.join(' and ')} to $label.\n${failures.join('\n')}';
-    final backupRecordedAt = DateTime.now();
-
-    if (failures.isEmpty || backedUp.isNotEmpty) {
-      await SyncStatusService.recordBackup(
-        nextStatusMessage,
-        at: backupRecordedAt,
-      );
-    } else {
-      await SyncStatusService.recordStatus(nextStatusMessage);
-    }
 
     setState(() {
       _inProgress = false;
-      _statusMessage = nextStatusMessage;
-      _lastSyncSummary = nextStatusMessage;
-      if (failures.isEmpty || backedUp.isNotEmpty) {
-        _lastBackupAt = backupRecordedAt;
-      }
+      _statusMessage = failures.isEmpty
+          ? '✅ Backup complete. Saved ${backedUp.join(' and ')} to $label. Open the same Sync Code on your other device, then tap Restore from Cloud there.'
+          : backedUp.isEmpty
+              ? '❌ Backup could not finish. Please try again.\n${failures.join('\n')}'
+              : '✅ Backup saved ${backedUp.join(' and ')} to $label, but some items still need attention.\n${failures.join('\n')}';
     });
   }
 
@@ -1449,14 +1360,12 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
       final cloudResumes = await SupabaseSyncService.manualRestoreAll();
       int created = 0;
       int updated = 0;
-      int keptLocalResumes = 0;
       for (final resume in cloudResumes) {
         final local = StorageService.getResume(resume.id);
         if (!shouldApplyCloudResume(
           localResume: local,
           cloudResume: resume,
         )) {
-          keptLocalResumes++;
           continue;
         }
 
@@ -1482,15 +1391,12 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
 
       int createdJobs = 0;
       int updatedJobs = 0;
-      int keptLocalJobs = 0;
       for (final job in cloudJobs) {
         final local = localJobsById[job.jobId];
         if (local == null) {
           createdJobs++;
         } else if (job.updatedAt.isAfter(local.updatedAt)) {
           updatedJobs++;
-        } else {
-          keptLocalJobs++;
         }
       }
 
@@ -1509,41 +1415,26 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
       final summaries = <String>[
         if (cloudResumes.isNotEmpty)
           created == 0 && updated == 0
-              ? keptLocalResumes > 0
-                  ? 'resumes: kept $keptLocalResumes newer local version(s)'
-                  : 'resumes already up to date'
-              : 'resumes: $created new, $updated updated${keptLocalResumes > 0 ? ', $keptLocalResumes kept local' : ''}',
+              ? 'resumes already up to date'
+              : 'resumes: $created new, $updated updated',
         if (cloudJobs.isNotEmpty)
           createdJobs == 0 && updatedJobs == 0
-              ? keptLocalJobs > 0
-                  ? 'job tracker: kept $keptLocalJobs newer local item(s)'
-                  : 'job tracker already up to date'
-              : 'job tracker: $createdJobs new, $updatedJobs updated${keptLocalJobs > 0 ? ', $keptLocalJobs kept local' : ''}',
+              ? 'job tracker already up to date'
+              : 'job tracker: $createdJobs new, $updatedJobs updated',
       ];
-      final nextStatusMessage = summaries.isEmpty
-          ? 'ℹ️ No backups found.$hint'
-          : '✅ Restore complete: ${summaries.join(' • ')}.';
-      final restoreRecordedAt = DateTime.now();
-      await SyncStatusService.recordRestore(
-        nextStatusMessage,
-        at: restoreRecordedAt,
-      );
-
       if (!mounted) return;
       setState(() {
         _inProgress = false;
-        _statusMessage = nextStatusMessage;
-        _lastSyncSummary = nextStatusMessage;
-        _lastRestoreAt = restoreRecordedAt;
+        _statusMessage = summaries.isEmpty
+            ? 'ℹ️ No cloud backup was found for this Sync Code/device.$hint'
+            : '✅ Restore complete. ${summaries.join(' • ')}. If another device has newer changes, run Backup there first and Restore here again.';
       });
     } catch (e) {
-      final nextStatusMessage = '❌ Restore failed: $e';
-      await SyncStatusService.recordStatus(nextStatusMessage);
       if (!mounted) return;
       setState(() {
         _inProgress = false;
-        _statusMessage = nextStatusMessage;
-        _lastSyncSummary = nextStatusMessage;
+        _statusMessage =
+            '❌ Restore could not finish. Check your internet connection and Sync Code, then try again.\n$e';
       });
     }
   }
@@ -1558,111 +1449,12 @@ class _AiApiKeySheet extends StatefulWidget {
 }
 
 class _AiApiKeySheetState extends State<_AiApiKeySheet> {
-  final _controller = TextEditingController();
-  bool _obscure = true;
-  bool _saved = false;
-
-  static final Uri _groqConsoleUri = Uri.parse('https://console.groq.com');
-
-  @override
-  void initState() {
-    super.initState();
-    _loadKey();
-  }
-
-  Future<void> _loadKey() async {
-    final key = await AiApiKeyStorageService.read();
-    if (!mounted) return;
-    setState(() => _controller.text = key);
-  }
-
-  Future<void> _saveKey() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final key = String.fromCharCodes(
-      _controller.text.trim().codeUnits.where((c) => c >= 0x20 && c <= 0x7E),
-    );
-    if (key.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Paste your Groq API key first'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    if (!key.startsWith('gsk_')) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'This does not look like a Groq key. Use the key from console.groq.com that starts with gsk_, not a Firebase/Google key.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    await AiApiKeyStorageService.save(key);
-    setState(() => _saved = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) Navigator.pop(context);
-  }
-
-  Future<void> _clearKey() async {
-    await AiApiKeyStorageService.clear();
-    setState(() {
-      _controller.clear();
-      _saved = false;
-    });
-  }
-
-  Future<void> _openGroqConsole() async {
-    final messenger = ScaffoldMessenger.of(context);
-    if (await canLaunchUrl(_groqConsoleUri)) {
-      await launchUrl(_groqConsoleUri, mode: LaunchMode.externalApplication);
-      return;
-    }
-
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text('Could not open Groq console'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  Future<void> _pasteFromClipboard() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final data = await Clipboard.getData('text/plain');
-    final text = data?.text?.trim() ?? '';
-
-    if (text.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Clipboard is empty'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _controller.text = text;
-      _controller.selection = TextSelection.collapsed(offset: text.length);
-      _saved = false;
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.viewInsets.bottom;
     final safeBottom = mediaQuery.viewPadding.bottom;
+    final isConfigured = AppConfigService.read('GROQ_API_KEY').isNotEmpty;
 
     return SafeArea(
       top: false,
@@ -1699,7 +1491,7 @@ class _AiApiKeySheetState extends State<_AiApiKeySheet> {
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Iconsax.key, color: AppColors.primary),
+                    child: const Icon(Iconsax.cpu, color: AppColors.primary),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -1707,15 +1499,17 @@ class _AiApiKeySheetState extends State<_AiApiKeySheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Groq API Key',
+                          'AI Service',
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                        const Text(
-                          '100% Free • No credit card needed',
-                          style: TextStyle(
+                        Text(
+                          isConfigured
+                              ? 'Configured by the app'
+                              : 'Currently unavailable',
+                          style: const TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,
                           ),
@@ -1737,141 +1531,68 @@ class _AiApiKeySheetState extends State<_AiApiKeySheet> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.08),
+                  color: (isConfigured ? AppColors.success : AppColors.info)
+                      .withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: AppColors.info.withValues(alpha: 0.2),
+                    color: (isConfigured ? AppColors.success : AppColors.info)
+                        .withValues(alpha: 0.2),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: EdgeInsets.only(top: 1),
+                      padding: const EdgeInsets.only(top: 1),
                       child: Icon(
-                        Iconsax.information,
-                        color: AppColors.info,
+                        isConfigured
+                            ? Iconsax.tick_circle
+                            : Iconsax.information,
+                        color:
+                            isConfigured ? AppColors.success : AppColors.info,
                         size: 16,
                       ),
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Free key at: console.groq.com\n(Sign up → API Keys → Create key)',
-                        style: TextStyle(color: AppColors.info, fontSize: 12),
+                        isConfigured
+                            ? 'AI requests are handled by the app configuration. Users do not need to create, paste, or manage a personal API key.'
+                            : 'AI access is managed by the app configuration. Personal Groq keys are no longer required, and AI features will show a friendly error until the service is configured.',
+                        style: TextStyle(
+                          color:
+                              isConfigured ? AppColors.success : AppColors.info,
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _openGroqConsole,
-                      icon: const Icon(Iconsax.export_3),
-                      label: const Text('Open Groq Console'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(46),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _pasteFromClipboard,
-                      icon: const Icon(Iconsax.clipboard_text),
-                      label: const Text('Paste Key'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(46),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _controller,
-                obscureText: _obscure,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  labelText: 'Groq API Key',
-                  helperText:
-                      'Paste the Groq key from console.groq.com. It should start with gsk_.',
-                  prefixIcon: const Icon(Iconsax.key),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AdaptiveTooltip(
-                        message: _obscure ? 'Show API key' : 'Hide API key',
-                        button: true,
-                        child: IconButton(
-                          onPressed: () => setState(() => _obscure = !_obscure),
-                          icon: Icon(
-                            _obscure ? Iconsax.eye : Iconsax.eye_slash,
-                          ),
-                        ),
-                      ),
-                      if (_controller.text.isNotEmpty)
-                        AdaptiveTooltip(
-                          message: 'Clear API key',
-                          button: true,
-                          child: IconButton(
-                            onPressed: _clearKey,
-                            icon: const Icon(
-                              Iconsax.close_circle,
-                              color: AppColors.error,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onChanged: (_) => setState(() => _saved = false),
-              ),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _saveKey,
-                  icon: Icon(
-                    _saved ? Iconsax.tick_circle : Iconsax.key,
-                    color: Colors.white,
-                  ),
-                  label: Text(
-                    _saved ? 'Saved!' : 'Save API Key',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (isConfigured) {
+                      context.push('/ai-assistant');
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        _saved ? AppColors.success : AppColors.primary,
+                    backgroundColor: AppColors.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Center(
-                child: Text(
-                  'Stored securely on your device only',
-                  style: TextStyle(
-                    color: AppColors.textTertiary,
-                    fontSize: 11,
+                  child: Text(
+                    isConfigured ? 'Open AI Assistant' : 'Close',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

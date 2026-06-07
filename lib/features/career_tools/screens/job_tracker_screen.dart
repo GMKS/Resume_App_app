@@ -2197,6 +2197,7 @@ class _JobTrackerFormSheetState extends State<_JobTrackerFormSheet> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<JobApplicationStatus>(
                   initialValue: _status,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Status'),
                   items: availableStatuses
                       .map(
@@ -2215,16 +2216,39 @@ class _JobTrackerFormSheetState extends State<_JobTrackerFormSheet> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String?>(
                   initialValue: _selectedResumeId,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Linked Resume'),
                   items: <DropdownMenuItem<String?>>[
                     const DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('No linked resume'),
+                      child: Text(
+                        'No linked resume',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     ...widget.resumes.map(
                       (resume) => DropdownMenuItem<String?>(
                         value: resume.id,
-                        child: Text(resume.title),
+                        child: Text(
+                          resume.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  selectedItemBuilder: (context) => <Widget>[
+                    const Text(
+                      'No linked resume',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    ...widget.resumes.map(
+                      (resume) => Text(
+                        resume.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -63,13 +62,12 @@ class AIAssistantScreen extends ConsumerWidget {
                 route: '/ai-resume-generator',
               ),
             ).animate().fadeIn(delay: 100.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
-
             _AIFeatureCard(
               icon: Iconsax.user_tick,
               title: 'LinkedIn Import',
-              description: 'Import your LinkedIn profile and turn it into a resume',
+              description:
+                  'Import your LinkedIn profile and turn it into a resume',
               color: const Color(0xFF0A66C2),
               isLocked: !FreePlanService.canAccessAiTool('linkedin_import'),
               onTap: () => _handleToolTap(
@@ -78,9 +76,7 @@ class AIAssistantScreen extends ConsumerWidget {
                 route: '/linkedin-import',
               ),
             ).animate().fadeIn(delay: 175.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
-
             _AIFeatureCard(
               icon: Iconsax.document_text,
               title: 'AI Cover Letter',
@@ -98,13 +94,12 @@ class AIAssistantScreen extends ConsumerWidget {
                     'Cover letter generation is available on premium plans only.',
               ),
             ).animate().fadeIn(delay: 250.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
-
             _AIFeatureCard(
               icon: Iconsax.search_normal_1,
               title: 'Resume Match Analyzer',
-              description: 'Compare your resume with any job posting to see match score, missing skills, and tailored next steps',
+              description:
+                  'Compare your resume with any job posting to see match score, missing skills, and tailored next steps',
               color: AppColors.info,
               isLocked: !FreePlanService.canAccessAiTool('job_tailor'),
               onTap: () => _handleToolTap(
@@ -113,24 +108,22 @@ class AIAssistantScreen extends ConsumerWidget {
                 route: '/ai-job-tailor',
               ),
             ).animate().fadeIn(delay: 325.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
-
             _AIFeatureCard(
               icon: Iconsax.edit_2,
               title: 'AI Content Enhancer',
-              description: 'Generate professional summaries & ATS-optimized bullet points',
+              description:
+                  'Generate professional summaries & ATS-optimized bullet points',
               color: AppColors.warning,
               isLocked: false,
               onTap: () => context.push('/ai-content-enhancer'),
             ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
-
             _AIFeatureCard(
               icon: Iconsax.lamp_charge,
               title: 'Skill Suggestions',
-              description: 'Get role-based skill recommendations for your field',
+              description:
+                  'Get role-based skill recommendations for your field',
               color: const Color(0xFF8B5CF6),
               isLocked: !subscription.hasFeature(
                 SubscriptionFeatures.skillAnalyzer,
@@ -144,9 +137,7 @@ class AIAssistantScreen extends ConsumerWidget {
                     'Role-based skill recommendations are available on premium plans only.',
               ),
             ).animate().fadeIn(delay: 475.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
-
             _AIFeatureCard(
               icon: Iconsax.clipboard_text,
               title: 'Summary Generator',
@@ -155,13 +146,12 @@ class AIAssistantScreen extends ConsumerWidget {
               isLocked: false,
               onTap: () => context.push('/ai-content-enhancer'),
             ).animate().fadeIn(delay: 550.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
-
             _AIFeatureCard(
               icon: Iconsax.refresh_2,
               title: 'AI Resume Rewrite',
-              description: 'Completely rewrite your resume with stronger language, metrics and ATS keywords',
+              description:
+                  'Completely rewrite your resume with stronger language, metrics and ATS keywords',
               color: const Color(0xFF8B5CF6),
               isLocked: !FreePlanService.canAccessAiTool('resume_rewrite'),
               onTap: () => _handleToolTap(
@@ -170,23 +160,22 @@ class AIAssistantScreen extends ConsumerWidget {
                 route: '/ai-resume-rewrite',
               ),
             ).animate().fadeIn(delay: 625.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
-
             _AIFeatureCard(
               icon: Iconsax.tag_right,
               title: 'AI Bullet Generator',
-              description: 'Generate powerful ATS-optimised bullet points for experience entries',
+              description:
+                  'Generate powerful ATS-optimised bullet points for experience entries',
               color: const Color(0xFF10B981),
               isLocked: false,
               onTap: () => context.push('/ai-bullet-generator'),
             ).animate().fadeIn(delay: 700.ms).slideX(begin: -0.1, end: 0),
-
             const SizedBox(height: 16),
             _AIFeatureCard(
               icon: Iconsax.magic_star,
               title: 'Resume Auto-Optimization (RAOE 2)',
-              description: 'Auto-optimize your resume for any job description with keyword gap analysis, AI rewriting, and before/after preview.',
+              description:
+                  'Auto-optimize your resume for any job description with keyword gap analysis, AI rewriting, and before/after preview.',
               color: Colors.teal,
               isLocked: false,
               onTap: () => context.push('/raoe2?resumeText=&jobDescription='),
@@ -232,7 +221,6 @@ class AIAssistantScreen extends ConsumerWidget {
 
     context.push(route);
   }
-
 }
 
 class _AIFeatureCard extends StatelessWidget {

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +18,7 @@ import '../../../core/services/pricing_region_service.dart';
 import '../../../core/services/subscription_service.dart';
 import '../../../core/services/subscription_pricing_service.dart';
 import '../../../core/services/razorpay_service.dart';
+import '../../../core/services/user_session_service.dart';
 import '../widgets/subscription_pricing_card.dart';
 
 class SubscriptionScreen extends ConsumerStatefulWidget {
@@ -49,18 +49,19 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   bool get _canUseGooglePlayTestFallback =>
       PlayBillingService.canUseTestPurchaseFallback;
 
-  bool get _canUseDummyPaymentFallback => AppConfigService.readBool(
-        'ENABLE_DUMMY_PAYMENTS',
-        defaultValue: !kReleaseMode,
-      );
+  bool get _canUseDummyPaymentFallback =>
+      AppConfigService.readBool('ENABLE_DUMMY_PAYMENTS');
 
-  bool get _canUseGooglePlayDummyFallback =>
-      _usesGooglePlayBilling &&
-      _selectedPlan != null &&
-      !_playProducts.containsKey(_selectedPlan) &&
-      _canUseDummyPaymentFallback;
+  bool get _shouldUseLiveGooglePlayPricesOnly =>
+      _usesGooglePlayBilling && !_canUseGooglePlayTestFallback;
 
   List<SubscriptionPricingOption> get _visiblePlans {
+    if (_shouldUseLiveGooglePlayPricesOnly) {
+      return _plans
+          .where((plan) => _playProducts.containsKey(plan.plan))
+          .toList(growable: false);
+    }
+
     return _plans;
   }
 
@@ -356,27 +357,70 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                   const SizedBox(height: 16),
 
                   // Pricing Cards
-                  ...List.generate(_visiblePlans.length, (index) {
-                    final plan = _visiblePlans[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: SubscriptionPricingCard(
-                        pricing: plan,
-                        currentPrice: _priceForPlan(plan.plan),
-                        originalPrice: plan.price.formatOriginal(),
-                        isSelected: _selectedPlan == plan.plan,
-                        isEnabled: !_usesGooglePlayBilling ||
-                            _playProducts.containsKey(plan.plan) ||
-                            _canUseGooglePlayTestFallback ||
-                            _canUseDummyPaymentFallback,
-                        availabilityLabel: _availabilityLabelForPlan(plan.plan),
-                        onTap: () => setState(() => _selectedPlan = plan.plan),
+                  if (_shouldUseLiveGooglePlayPricesOnly &&
+                      _visiblePlans.isEmpty)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Iconsax.warning_2,
+                                  color: AppColors.warning,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'No Google Play subscriptions are available for this install yet.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Install the app from your Play testing track, sign in with an enrolled tester account, and verify that the subscription products and base plans are active for this application ID.',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: AppColors.textSecondary,
+                                    height: 1.5,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )
-                        .animate()
-                        .fadeIn(delay: (300 + index * 100).ms)
-                        .slideX(begin: -0.1, end: 0);
-                  }),
+                    ).animate().fadeIn(delay: 300.ms)
+                  else
+                    ...List.generate(_visiblePlans.length, (index) {
+                      final plan = _visiblePlans[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: SubscriptionPricingCard(
+                          pricing: plan,
+                          currentPrice: _priceForPlan(plan.plan),
+                          originalPrice: plan.price.formatOriginal(),
+                          isSelected: _selectedPlan == plan.plan,
+                          isEnabled: !_usesGooglePlayBilling ||
+                              _playProducts.containsKey(plan.plan) ||
+                              _canUseGooglePlayTestFallback,
+                          availabilityLabel:
+                              _availabilityLabelForPlan(plan.plan),
+                          onTap: () =>
+                              setState(() => _selectedPlan = plan.plan),
+                        ),
+                      )
+                          .animate()
+                          .fadeIn(delay: (300 + index * 100).ms)
+                          .slideX(begin: -0.1, end: 0);
+                    }),
 
                   const SizedBox(height: 16),
 
@@ -438,8 +482,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                             (_usesGooglePlayBilling && _isStoreLoading) ||
                             (_usesGooglePlayBilling &&
                                 !_playProducts.containsKey(_selectedPlan) &&
-                                !_canUseGooglePlayTestFallback &&
-                                !_canUseDummyPaymentFallback))
+                                !_canUseGooglePlayTestFallback))
                         ? null
                         : _handleUpgrade,
                     icon: _isProcessingPayment
@@ -452,32 +495,26 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                             ),
                           )
                         : Icon(
-                            _canUseGooglePlayDummyFallback
-                                ? Iconsax.card_tick
-                                : _usesGooglePlayBilling
-                                    ? Iconsax.shop
-                                    : _canUseDummyPaymentFallback &&
-                                            !RazorpayService.isConfigured
-                                        ? Iconsax.card_tick
-                                        : Iconsax.card,
+                            _usesGooglePlayBilling
+                                ? Iconsax.shop
+                                : _canUseDummyPaymentFallback &&
+                                        !RazorpayService.isConfigured
+                                    ? Iconsax.card_tick
+                                    : Iconsax.card,
                           ),
                     label: Text(_isProcessingPayment
                         ? (_usesGooglePlayBilling
-                            ? (_canUseGooglePlayDummyFallback
-                                ? 'Opening Test Checkout...'
-                                : 'Connecting to Google Play...')
+                            ? 'Connecting to Google Play...'
                             : _canUseDummyPaymentFallback &&
                                     !RazorpayService.isConfigured
                                 ? 'Opening Test Checkout...'
                                 : 'Opening Payment...')
-                        : (_canUseGooglePlayDummyFallback
-                            ? 'Pay with Test Card'
-                            : _usesGooglePlayBilling
-                                ? 'Subscribe with Google Play'
-                                : _canUseDummyPaymentFallback &&
-                                        !RazorpayService.isConfigured
-                                    ? 'Pay with Test Card'
-                                    : 'Subscribe Now')),
+                        : (_usesGooglePlayBilling
+                            ? 'Subscribe with Google Play'
+                            : _canUseDummyPaymentFallback &&
+                                    !RazorpayService.isConfigured
+                                ? 'Pay with Test Card'
+                                : 'Subscribe Now')),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 54),
                     ),
@@ -495,14 +532,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        _canUseGooglePlayDummyFallback
-                            ? 'Test card fallback • No real charge'
-                            : _usesGooglePlayBilling
-                                ? 'Managed securely by Google Play • Cancel anytime'
-                                : _canUseDummyPaymentFallback &&
-                                        !RazorpayService.isConfigured
-                                    ? 'Local dummy checkout • No real charge'
-                                    : 'Secured by Razorpay • Cancel anytime',
+                        _usesGooglePlayBilling
+                            ? 'Managed securely by Google Play • Cancel anytime'
+                            : _canUseDummyPaymentFallback &&
+                                    !RazorpayService.isConfigured
+                                ? 'Local dummy checkout • No real charge'
+                                : 'Secured by Razorpay • Cancel anytime',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textTertiary,
                             ),
@@ -634,6 +669,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   String _priceForPlan(SubscriptionPlan plan) {
     final pricing = _pricingForPlan(plan);
     if (_usesGooglePlayBilling) {
+      if (_shouldUseLiveGooglePlayPricesOnly) {
+        if (_isStoreLoading) {
+          return 'Loading...';
+        }
+        return _playProducts[plan]?.price ?? 'Unavailable';
+      }
       return _playProducts[plan]?.price ?? pricing.price.formatCurrent();
     }
     return pricing.price.formatCurrent();
@@ -641,7 +682,14 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
 
   String _getPlanPrice(SubscriptionPlan plan) {
     final pricing = _pricingForPlan(plan);
-    return '${_priceForPlan(plan)}${pricing.periodLabel}';
+    final price = _priceForPlan(plan);
+    if (price == 'Loading...') {
+      return 'Loading Google Play price...';
+    }
+    if (price == 'Unavailable') {
+      return 'Unavailable on this install';
+    }
+    return '$price${pricing.periodLabel}';
   }
 
   String _availabilityLabelForPlan(SubscriptionPlan plan) {
@@ -653,9 +701,6 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     }
     if (_playProducts.containsKey(plan)) {
       return 'Managed by Google Play • Cancel anytime';
-    }
-    if (_canUseDummyPaymentFallback) {
-      return 'Test card fallback available for this build';
     }
     if (_canUseGooglePlayTestFallback) {
       return 'Local test activation available • Use Internal Testing for real billing';
@@ -670,10 +715,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
       if (_canUseGooglePlayTestFallback) {
         return 'Google Play products are unavailable in this local build. Install from Play Internal Testing for real billing, or continue with debug test activation to validate the premium flow.';
       }
-      if (_canUseDummyPaymentFallback) {
-        return 'Google Play subscriptions are unavailable in this build, but dummy card checkout is enabled so you can still validate premium unlocks.';
-      }
-      return 'Google Play subscriptions are not available for this build yet. Configure your Play product IDs and Play Console subscriptions to enable purchases.';
+      return 'No Google Play subscriptions were returned for this install. This usually means the app was sideloaded, the current account is not enrolled as a tester, or the Play subscriptions/base plans are not active for this package yet.';
     }
 
     final missingPlans = _plans
@@ -717,12 +759,6 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         if (_canUseGooglePlayTestFallback) {
           setState(() => _isProcessingPayment = false);
           _showGooglePlayDebugFallback();
-          return;
-        }
-
-        if (_canUseDummyPaymentFallback) {
-          setState(() => _isProcessingPayment = false);
-          _showDummyPaymentSheet();
           return;
         }
 
@@ -781,9 +817,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
       return;
     }
 
-    // Load saved phone from SharedPreferences (set during login)
+    // Load the current stored contact for prefill if available.
     final prefs = await SharedPreferences.getInstance();
-    final phone = prefs.getString('saved_phone') ?? '';
+    final phone = UserSessionService.readStoredContact(prefs);
     final opened = _razorpayService.openCheckout(
       plan: _selectedPlan!,
       pricing: _pricingForPlan(_selectedPlan!),
@@ -1081,19 +1117,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       isDismissible: false,
-      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          32,
-          32,
-          32,
-          32 + MediaQuery.viewInsetsOf(ctx).bottom,
-        ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1167,18 +1196,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   void _showWebCheckoutFallback() {
     showModalBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          24,
-          24,
-          24 + MediaQuery.viewInsetsOf(ctx).bottom,
-        ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1277,15 +1299,10 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
       return;
     }
 
-    setState(() => _isProcessingPayment = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red.shade600,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    setState(() {
+      _isProcessingPayment = false;
+      _storeMessage = message;
+    });
   }
 
   void _onPaymentFailure(PaymentFailureResponse response) {

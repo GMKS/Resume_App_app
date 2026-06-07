@@ -72,7 +72,8 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
         try {
           final selected = resumes.firstWhere((r) => r.id == widget.resumeId);
           if (_targetJobTitleController.text.isEmpty) {
-            _targetJobTitleController.text = selected.personalInfo.jobTitle ?? '';
+            _targetJobTitleController.text =
+                selected.personalInfo.jobTitle ?? '';
           }
         } catch (_) {
           // Resume not found, will show empty list
@@ -80,7 +81,8 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
       } else if (_selectedResumeId == null && resumes.isNotEmpty) {
         _selectedResumeId = resumes.first.id;
         if (_targetJobTitleController.text.isEmpty) {
-          _targetJobTitleController.text = resumes.first.personalInfo.jobTitle ?? '';
+          _targetJobTitleController.text =
+              resumes.first.personalInfo.jobTitle ?? '';
         }
       }
     });
@@ -153,7 +155,6 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
         _showResult = true;
         _isRewriting = false;
       });
-
     } on AiUsageLimitException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -191,13 +192,15 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
 
     // Update objective/summary
     ResumeModel updated = resume.copyWith(
-      objective: rewrittenSummary.isNotEmpty ? rewrittenSummary : resume.objective,
+      objective:
+          rewrittenSummary.isNotEmpty ? rewrittenSummary : resume.objective,
       updatedAt: DateTime.now(),
     );
 
     // Update experience descriptions – match by index
     if (rewrittenExp.isNotEmpty && updated.experience.isNotEmpty) {
-      final updatedExperiences = updated.experience.asMap().entries.map((entry) {
+      final updatedExperiences =
+          updated.experience.asMap().entries.map((entry) {
         final i = entry.key;
         final exp = entry.value;
         if (i < rewrittenExp.length) {
@@ -205,7 +208,8 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
           final newDesc = rewritten['description'] as String?;
           final newPos = rewritten['position'] as String?;
           return exp.copyWith(
-            description: newDesc?.isNotEmpty == true ? newDesc! : exp.description,
+            description:
+                newDesc?.isNotEmpty == true ? newDesc! : exp.description,
             position: newPos?.isNotEmpty == true ? newPos! : exp.position,
           );
         }
@@ -216,12 +220,8 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
 
     // Update skills – replace names while preserving other fields (level, category)
     if (rewrittenSkillNames.isNotEmpty) {
-      final newSkills = rewrittenSkillNames
-          .take(12)
-          .toList()
-          .asMap()
-          .entries
-          .map((entry) {
+      final newSkills =
+          rewrittenSkillNames.take(12).toList().asMap().entries.map((entry) {
         final i = entry.key;
         final newName = entry.value.toString().trim();
         if (i < updated.skills.length) {
@@ -264,75 +264,37 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
   }
 
   void _showApiKeyDialog() {
-    final controller = TextEditingController(text: _apiKey);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Iconsax.key, color: _kRewriteColor),
+            Icon(Iconsax.cpu, color: _kRewriteColor),
             SizedBox(width: 10),
-            Text('Groq API Key (Free)'),
+            Text('AI Service'),
           ],
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'AI features require a free Groq API key. No credit card needed!',
+            Text(
+              'AI access is managed by the app. You do not need to create or paste a personal API key.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Visit: console.groq.com → Sign up → API Keys → Create key',
-                    ),
-                  ),
-                );
-              },
-              child: const Text(
-                'Get FREE key → console.groq.com',
-                style: TextStyle(
-                  color: _kRewriteColor,
-                  fontSize: 12,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Paste API Key',
-                prefixIcon: const Icon(Iconsax.key),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            SizedBox(height: 10),
+            Text(
+              'If AI is unavailable right now, the app configuration is missing or temporarily unavailable. Please try again later.',
+              style: TextStyle(
+                  color: AppColors.textSecondary, fontSize: 12, height: 1.5),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final key = controller.text.trim();
-              if (key.isNotEmpty) {
-                await AiApiKeyStorageService.save(key);
-                setState(() => _apiKey = key);
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -355,16 +317,15 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
         actions: [
           AdaptiveTooltip(
             message: _apiKey.isNotEmpty
-                ? 'API Key configured'
-                : 'Add API Key',
+                ? 'AI service ready'
+                : 'AI service unavailable',
             button: true,
             child: IconButton(
               onPressed: _showApiKeyDialog,
               icon: Icon(
                 Iconsax.key,
-                color: _apiKey.isNotEmpty
-                    ? AppColors.success
-                    : AppColors.warning,
+                color:
+                    _apiKey.isNotEmpty ? AppColors.success : AppColors.warning,
               ),
             ),
           ),
@@ -471,8 +432,7 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
                     .toList(),
                 onChanged: (id) {
                   if (id == null) return;
-                  final picked =
-                      _allResumes.firstWhere((r) => r.id == id);
+                  final picked = _allResumes.firstWhere((r) => r.id == id);
                   setState(() {
                     _selectedResumeId = picked.id;
                     _targetJobTitleController.text =
@@ -525,7 +485,8 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
                     onTap: () => setState(() => _selectedToneIndex = i),
                     child: AnimatedContainer(
                       duration: 200.ms,
-                      margin: EdgeInsets.only(right: i < _tones.length - 1 ? 8 : 0),
+                      margin:
+                          EdgeInsets.only(right: i < _tones.length - 1 ? 8 : 0),
                       padding: const EdgeInsets.symmetric(
                         vertical: 10,
                         horizontal: 6,
@@ -547,7 +508,8 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
                         children: [
                           Icon(
                             tone.icon,
-                            color: selected ? tone.color : AppColors.textTertiary,
+                            color:
+                                selected ? tone.color : AppColors.textTertiary,
                             size: 20,
                           ),
                           const SizedBox(height: 4),
@@ -609,8 +571,9 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton.icon(
-                onPressed:
-                    (_isRewriting || _allResumes.isEmpty) ? null : () => _rewriteResume(_allResumes),
+                onPressed: (_isRewriting || _allResumes.isEmpty)
+                    ? null
+                    : () => _rewriteResume(_allResumes),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kRewriteColor,
                   disabledBackgroundColor:
@@ -683,8 +646,7 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
             ),
             const Spacer(),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: _kRewriteColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
@@ -746,9 +708,7 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
                     children: [
                       if (pos.isNotEmpty || company.isNotEmpty)
                         Text(
-                          [pos, company]
-                              .where((s) => s.isNotEmpty)
-                              .join(' · '),
+                          [pos, company].where((s) => s.isNotEmpty).join(' · '),
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
@@ -795,8 +755,7 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
                         color: AppColors.secondary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color:
-                              AppColors.secondary.withValues(alpha: 0.3),
+                          color: AppColors.secondary.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Text(

@@ -80,6 +80,14 @@ class PlayBillingService {
         yearlyProductId,
       };
 
+  static String get _missingProductsMessage {
+    final configuredIds = _productIds.toList(growable: false)..sort();
+    final configuredList = configuredIds.join(', ');
+    return configuredIds.isEmpty
+        ? 'Google Play product IDs are missing for this build.'
+        : 'Google Play returned no matching subscriptions for this install. Check that the app was installed from the Play testing track, the current account is an enrolled tester, and these products with active base plans exist for this package: $configuredList.';
+  }
+
   Future<Map<SubscriptionPlan, ProductDetails>> initialize() async {
     if (!supportsGooglePlayBilling) {
       return const <SubscriptionPlan, ProductDetails>{};
@@ -106,9 +114,7 @@ class PlayBillingService {
     _productsByPlan.clear();
 
     if (_productIds.isEmpty) {
-      onPurchaseError?.call(
-        'Google Play subscriptions are not configured for this build yet.',
-      );
+      onPurchaseError?.call(_missingProductsMessage);
       return const <SubscriptionPlan, ProductDetails>{};
     }
 
@@ -135,9 +141,7 @@ class PlayBillingService {
     }
 
     if (_productsByPlan.isEmpty) {
-      onPurchaseError?.call(
-        'Google Play subscriptions are not configured for this build yet.',
-      );
+      onPurchaseError?.call(_missingProductsMessage);
     }
 
     return Map<SubscriptionPlan, ProductDetails>.unmodifiable(_productsByPlan);

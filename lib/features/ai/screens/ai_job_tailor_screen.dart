@@ -18,7 +18,8 @@ import '../../../core/services/resume_version_service.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/ai_review_notice.dart';
 import '../../home/screens/home_screen.dart' show resumesProvider;
-import '../../editor/screens/resume_editor_screen.dart' show currentResumeProvider;
+import '../../editor/screens/resume_editor_screen.dart'
+    show currentResumeProvider;
 import '../services/resume_job_match_service.dart';
 
 /// Screen to tailor an existing resume for a specific job description
@@ -62,7 +63,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
 
   @override
   void dispose() {
-    _clearTransientMessages();
     _resetImportSuccessState();
     _jobDescController.dispose();
     super.dispose();
@@ -215,7 +215,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
       return;
     }
     if (_jobDescController.text.trim().length < 50) {
-      setState(() => _errorMessage = 'Please paste a more complete job description (at least 50 characters).');
+      setState(() => _errorMessage =
+          'Please paste a more complete job description (at least 50 characters).');
       return;
     }
 
@@ -238,7 +239,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
 
       if (_apiKey.isEmpty) {
         result['analysisNotice'] =
-            'Match analysis is ready. Add a Groq API key to generate tailored summary and experience rewrites.';
+            'Match analysis is ready. AI tailoring is unavailable right now because the app AI service is not configured.';
       } else {
         try {
           await ResumeVersionService.saveVersion(
@@ -289,7 +290,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
 
   Future<void> _parseResume() async {
     if (_jobDescController.text.trim().length < 50) {
-      setState(() => _errorMessage = 'Please paste more resume content (at least 50 characters).');
+      setState(() => _errorMessage =
+          'Please paste more resume content (at least 50 characters).');
       return;
     }
     if (_apiKey.isEmpty) {
@@ -358,7 +360,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
 
     _importSuccessTimer?.cancel();
     setState(() {
-      _importSuccessMessage = 'Resume imported. Review the extracted sections or keep editing.';
+      _importSuccessMessage =
+          'Resume imported. Review the extracted sections or keep editing.';
       _importSuccessResumeId = resumeId;
     });
     _importSuccessTimer = Timer(const Duration(seconds: 3), () {
@@ -406,15 +409,18 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
 
     // Update objective/summary
     ResumeModel updated = resume.copyWith(
-      objective: tailoredSummary.isNotEmpty ? tailoredSummary : resume.objective,
+      objective:
+          tailoredSummary.isNotEmpty ? tailoredSummary : resume.objective,
     );
 
     // Update experience descriptions with tailored content
-    if (tailoredExpList != null && tailoredExpList.isNotEmpty && updated.experience.isNotEmpty) {
+    if (tailoredExpList != null &&
+        tailoredExpList.isNotEmpty &&
+        updated.experience.isNotEmpty) {
       final updatedExps = updated.experience.asMap().entries.map((entry) {
         final i = entry.key;
         final exp = entry.value;
-        
+
         try {
           if (i < tailoredExpList.length) {
             final tailoredItem = tailoredExpList[i] as Map<String, dynamic>?;
@@ -424,7 +430,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             }
           }
         } catch (_) {}
-        
+
         return exp;
       }).toList();
       updated = updated.copyWith(experience: updatedExps);
@@ -439,7 +445,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             'level': 'Expert',
           };
         }).toList();
-        
+
         if (newSkills.isNotEmpty) {
           // Create Skill objects from the map data
           // For now, just keep the existing approach
@@ -482,66 +488,36 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
   }
 
   void _showApiKeyDialog() {
-    final controller = TextEditingController(text: _apiKey);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Iconsax.key, color: AppColors.primary),
+            Icon(Iconsax.cpu, color: AppColors.primary),
             SizedBox(width: 10),
-            Text('Groq API Key (Free)'),
+            Text('AI Service'),
           ],
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'AI features require a free Groq API key. No credit card needed!',
+            Text(
+              'AI access is managed by the app. You do not need to create or paste a personal API key.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
-            const SizedBox(height: 8),
-            InkWell(
-              onTap: () async {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Visit: console.groq.com → Sign up → API Keys → Create key')),
-                );
-              },
-              child: const Text(
-                'Get FREE key → console.groq.com',
-                style: TextStyle(color: AppColors.primary, fontSize: 12, decoration: TextDecoration.underline),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Paste API Key',
-                prefixIcon: const Icon(Iconsax.key),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+            SizedBox(height: 10),
+            Text(
+              'If AI is unavailable right now, the app configuration is missing or temporarily unavailable. Please try again later.',
+              style: TextStyle(
+                  color: AppColors.textSecondary, fontSize: 12, height: 1.5),
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final key = controller.text.trim();
-              if (key.isNotEmpty) {
-                await AiApiKeyStorageService.save(key);
-                setState(() => _apiKey = key);
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
+              onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
         ],
       ),
     );
@@ -562,7 +538,9 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
         title: Text(_importMode ? 'Import Resume' : 'Resume Match & Tailor'),
         actions: [
           AdaptiveTooltip(
-            message: _apiKey.isNotEmpty ? 'API Key configured' : 'Add API Key',
+            message: _apiKey.isNotEmpty
+                ? 'AI service ready'
+                : 'AI service unavailable',
             button: true,
             child: IconButton(
               onPressed: _showApiKeyDialog,
@@ -595,7 +573,9 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: !_importMode ? AppColors.info : Colors.transparent,
+                          color: !_importMode
+                              ? AppColors.info
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(11),
                         ),
                         child: Row(
@@ -603,13 +583,17 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                           children: [
                             Icon(Iconsax.search_normal_1,
                                 size: 16,
-                                color: !_importMode ? Colors.white : AppColors.textSecondary),
+                                color: !_importMode
+                                    ? Colors.white
+                                    : AppColors.textSecondary),
                             const SizedBox(width: 6),
                             Text('Match Job',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
-                                  color: !_importMode ? Colors.white : AppColors.textSecondary,
+                                  color: !_importMode
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
                                 )),
                           ],
                         ),
@@ -622,7 +606,9 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: _importMode ? AppColors.primary : Colors.transparent,
+                          color: _importMode
+                              ? AppColors.primary
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(11),
                         ),
                         child: Row(
@@ -630,13 +616,17 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                           children: [
                             Icon(Iconsax.import,
                                 size: 16,
-                                color: _importMode ? Colors.white : AppColors.textSecondary),
+                                color: _importMode
+                                    ? Colors.white
+                                    : AppColors.textSecondary),
                             const SizedBox(width: 6),
                             Text('Import Resume',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
-                                  color: _importMode ? Colors.white : AppColors.textSecondary,
+                                  color: _importMode
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
                                 )),
                           ],
                         ),
@@ -655,8 +645,14 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: _importMode
-                      ? [AppColors.primary.withValues(alpha: 0.1), AppColors.secondary.withValues(alpha: 0.05)]
-                      : [AppColors.info.withValues(alpha: 0.1), AppColors.primary.withValues(alpha: 0.05)],
+                      ? [
+                          AppColors.primary.withValues(alpha: 0.1),
+                          AppColors.secondary.withValues(alpha: 0.05)
+                        ]
+                      : [
+                          AppColors.info.withValues(alpha: 0.1),
+                          AppColors.primary.withValues(alpha: 0.05)
+                        ],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
@@ -687,15 +683,19 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _importMode ? 'Import from Resume Text' : 'Resume Match Analysis',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          _importMode
+                              ? 'Import from Resume Text'
+                              : 'Resume Match Analysis',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           _importMode
                               ? 'Paste your existing resume (from Word, PDF, or LinkedIn) and AI will extract all fields and fill your template automatically.'
                               : 'Paste a job description to get a match score, section-by-section gaps, missing skills, and optional AI-tailored rewrites.',
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                          style: const TextStyle(
+                              color: AppColors.textSecondary, fontSize: 12),
                         ),
                       ],
                     ),
@@ -709,7 +709,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             // Resume selector
             Text(
               'Select Resume',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             if (_allResumes.isEmpty)
@@ -724,7 +727,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                   children: [
                     Icon(Iconsax.document_text, color: AppColors.textTertiary),
                     SizedBox(width: 12),
-                    Text('No resumes yet. Create one first.', style: TextStyle(color: AppColors.textSecondary)),
+                    Text('No resumes yet. Create one first.',
+                        style: TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),
               )
@@ -733,14 +737,18 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                 initialValue: _selectedResume?.id,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Iconsax.document_text_1),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
                 isExpanded: true,
-                items: _allResumes.map((r) => DropdownMenuItem(
-                  value: r.id,
-                  child: Text(r.title, overflow: TextOverflow.ellipsis),
-                )).toList(),
+                items: _allResumes
+                    .map((r) => DropdownMenuItem(
+                          value: r.id,
+                          child: Text(r.title, overflow: TextOverflow.ellipsis),
+                        ))
+                    .toList(),
                 onChanged: (id) {
                   setState(() {
                     _resetImportSuccessState();
@@ -756,14 +764,18 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             // Text input
             Text(
               _importMode ? 'Paste Your Resume Here' : 'Job Description',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             if (_importMode) ...[
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _isImportingFile || _isParsing ? null : _pickResumeFile,
+                  onPressed:
+                      _isImportingFile || _isParsing ? null : _pickResumeFile,
                   icon: _isImportingFile
                       ? const SizedBox(
                           width: 16,
@@ -774,7 +786,9 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                   label: Text(
                     _isImportingFile
                         ? 'Opening file explorer...'
-                        : (_importedFileName == null ? 'Choose Resume File' : 'Choose Another Resume File'),
+                        : (_importedFileName == null
+                            ? 'Choose Resume File'
+                            : 'Choose Another Resume File'),
                   ),
                 ),
               ),
@@ -782,7 +796,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Selected file: $_importedFileName',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
               const SizedBox(height: 12),
@@ -794,8 +809,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                 hintText: _importMode
                     ? 'Paste your full resume text here...\n\nAI will extract your name, contact info, work experience, education, skills, projects, and more — and fill all fields automatically.'
                     : 'Paste the full job description here...\n\nThe match engine will extract keywords, score each resume section, flag missing skills, and optionally generate AI rewrites.',
-                hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                hintStyle: const TextStyle(
+                    color: AppColors.textTertiary, fontSize: 13),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 contentPadding: const EdgeInsets.all(16),
               ),
             ),
@@ -807,14 +824,18 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.error.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                  border:
+                      Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Iconsax.warning_2, color: AppColors.error, size: 18),
+                    const Icon(Iconsax.warning_2,
+                        color: AppColors.error, size: 18),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(_errorMessage!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+                      child: Text(_errorMessage!,
+                          style: const TextStyle(
+                              color: AppColors.error, fontSize: 13)),
                     ),
                   ],
                 ),
@@ -828,14 +849,16 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.success.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.success.withValues(alpha: 0.28)),
+                  border: Border.all(
+                      color: AppColors.success.withValues(alpha: 0.28)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Padding(
                       padding: EdgeInsets.only(top: 1),
-                      child: Icon(Iconsax.tick_circle, color: AppColors.success, size: 18),
+                      child: Icon(Iconsax.tick_circle,
+                          color: AppColors.success, size: 18),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -860,12 +883,15 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                                     ? null
                                     : () {
                                         _clearImportSuccessBanner();
-                                        context.push('/editor/${_importSuccessResumeId!}');
+                                        context.push(
+                                            '/editor/${_importSuccessResumeId!}');
                                       },
                                 style: TextButton.styleFrom(
                                   foregroundColor: AppColors.success,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                   minimumSize: Size.zero,
                                 ),
                                 child: const Text('Edit Resume'),
@@ -874,8 +900,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                                 onPressed: _clearImportSuccessBanner,
                                 style: TextButton.styleFrom(
                                   foregroundColor: AppColors.textSecondary,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                   minimumSize: Size.zero,
                                 ),
                                 child: const Text('Dismiss'),
@@ -901,25 +929,35 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                     ? null
                     : (_importMode ? _parseResume : _tailorResume),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _importMode ? AppColors.primary : AppColors.info,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  backgroundColor:
+                      _importMode ? AppColors.primary : AppColors.info,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
                 icon: (_isTailoring || _isParsing || _isImportingFile)
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : Icon(_importMode ? Iconsax.import : Iconsax.magic_star, color: Colors.white),
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : Icon(_importMode ? Iconsax.import : Iconsax.magic_star,
+                        color: Colors.white),
                 label: Text(
                   _isImportingFile
                       ? 'Loading resume file...'
                       : _isParsing
-                      ? 'Analyzing resume...'
-                      : _isTailoring
-                          ? 'Analyzing resume match...'
-                          : (_importMode
-                              ? 'Analyze & Import Resume'
-                              : (_apiKey.isEmpty
-                                  ? 'Analyze Resume Match'
-                                  : 'Analyze Match & Tailor with AI')),
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white),
+                          ? 'Analyzing resume...'
+                          : _isTailoring
+                              ? 'Analyzing resume match...'
+                              : (_importMode
+                                  ? 'Analyze & Import Resume'
+                                  : (_apiKey.isEmpty
+                                      ? 'Analyze Resume Match'
+                                      : 'Analyze Match & Tailor with AI')),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: Colors.white),
                 ),
               ),
             ),
@@ -974,16 +1012,21 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             const SizedBox(width: 8),
             Text(
               'Resume Match Results',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const Spacer(),
             if (matchScore != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: _matchColor(matchScore).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _matchColor(matchScore).withValues(alpha: 0.4)),
+                  border: Border.all(
+                      color: _matchColor(matchScore).withValues(alpha: 0.4)),
                 ),
                 child: Text(
                   '$matchScore% Match',
@@ -999,7 +1042,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
         const SizedBox(height: 12),
         const AiReviewNotice(),
         const SizedBox(height: 12),
-
         if (matchAssessment.isNotEmpty)
           Container(
             padding: const EdgeInsets.all(12),
@@ -1010,10 +1052,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             ),
             child: Text(
               matchAssessment,
-              style: const TextStyle(fontSize: 13, height: 1.5, color: AppColors.textSecondary),
+              style: const TextStyle(
+                  fontSize: 13, height: 1.5, color: AppColors.textSecondary),
             ),
           ),
-
         if (analysisNotice.isNotEmpty) ...[
           const SizedBox(height: 12),
           Container(
@@ -1021,26 +1063,29 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             decoration: BoxDecoration(
               color: AppColors.warning.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.warning.withValues(alpha: 0.22)),
+              border:
+                  Border.all(color: AppColors.warning.withValues(alpha: 0.22)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Iconsax.info_circle, color: AppColors.warning, size: 18),
+                const Icon(Iconsax.info_circle,
+                    color: AppColors.warning, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     analysisNotice,
-                    style: const TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                        fontSize: 12.5,
+                        height: 1.5,
+                        color: AppColors.textSecondary),
                   ),
                 ),
               ],
             ),
           ),
         ],
-
         const SizedBox(height: 16),
-
         if (sectionScores.isNotEmpty)
           _buildCard(
             icon: Iconsax.chart_21,
@@ -1061,11 +1106,17 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                         children: [
                           Text(
                             label,
-                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                            style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary),
                           ),
                           Text(
                             '$score%',
-                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _matchColor(score)),
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: _matchColor(score)),
                           ),
                         ],
                       ),
@@ -1075,15 +1126,20 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                         child: LinearProgressIndicator(
                           value: score / 100,
                           minHeight: 8,
-                          backgroundColor: _matchColor(score).withValues(alpha: 0.12),
-                          valueColor: AlwaysStoppedAnimation<Color>(_matchColor(score)),
+                          backgroundColor:
+                              _matchColor(score).withValues(alpha: 0.12),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(_matchColor(score)),
                         ),
                       ),
                       if (summary.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
                           summary,
-                          style: const TextStyle(fontSize: 12, height: 1.45, color: AppColors.textSecondary),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.45,
+                              color: AppColors.textSecondary),
                         ),
                       ],
                     ],
@@ -1092,9 +1148,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
               }).toList(growable: false),
             ),
           ),
-
         if (sectionScores.isNotEmpty) const SizedBox(height: 12),
-
         if (keywordsExtracted.isNotEmpty)
           _buildCard(
             icon: Iconsax.tag,
@@ -1103,20 +1157,26 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: keywordsExtracted.map((keyword) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.24)),
-                ),
-                child: Text(keyword, style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w500)),
-              )).toList(growable: false),
+              children: keywordsExtracted
+                  .map((keyword) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.24)),
+                        ),
+                        child: Text(keyword,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500)),
+                      ))
+                  .toList(growable: false),
             ),
           ),
-
         if (keywordsExtracted.isNotEmpty) const SizedBox(height: 12),
-
         if (missingSkills.isNotEmpty)
           _buildCard(
             icon: Iconsax.search_status,
@@ -1125,20 +1185,26 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: missingSkills.map((skill) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.22)),
-                ),
-                child: Text(skill, style: const TextStyle(fontSize: 12, color: AppColors.error, fontWeight: FontWeight.w600)),
-              )).toList(growable: false),
+              children: missingSkills
+                  .map((skill) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.error.withValues(alpha: 0.22)),
+                        ),
+                        child: Text(skill,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.error,
+                                fontWeight: FontWeight.w600)),
+                      ))
+                  .toList(growable: false),
             ),
           ),
-
         if (missingSkills.isNotEmpty) const SizedBox(height: 12),
-
         if (missingKeywords.isNotEmpty)
           _buildCard(
             icon: Iconsax.close_circle,
@@ -1147,20 +1213,27 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: missingKeywords.take(12).map((keyword) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.24)),
-                ),
-                child: Text(keyword, style: const TextStyle(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w500)),
-              )).toList(growable: false),
+              children: missingKeywords
+                  .take(12)
+                  .map((keyword) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.warning.withValues(alpha: 0.24)),
+                        ),
+                        child: Text(keyword,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.w500)),
+                      ))
+                  .toList(growable: false),
             ),
           ),
-
         if (missingKeywords.isNotEmpty) const SizedBox(height: 12),
-
         if (tailoredSummary.isNotEmpty)
           _buildCard(
             icon: Iconsax.document_text_1,
@@ -1168,12 +1241,11 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             color: AppColors.primary,
             child: Text(
               tailoredSummary,
-              style: const TextStyle(fontSize: 13, height: 1.6, color: AppColors.textSecondary),
+              style: const TextStyle(
+                  fontSize: 13, height: 1.6, color: AppColors.textSecondary),
             ),
           ),
-
         const SizedBox(height: 12),
-
         if (tailoredExperience.isNotEmpty)
           _buildCard(
             icon: Iconsax.briefcase,
@@ -1193,13 +1265,19 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                       if (original.isNotEmpty)
                         Text(
                           original,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              color: AppColors.textPrimary),
                         ),
                       if (original.isNotEmpty) const SizedBox(height: 6),
                       if (tailored.isNotEmpty)
                         Text(
                           tailored,
-                          style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.5,
+                              color: AppColors.textSecondary),
                         ),
                     ],
                   ),
@@ -1207,9 +1285,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
               }).toList(),
             ),
           ),
-
         const SizedBox(height: 12),
-
         if (topSkills.isNotEmpty)
           _buildCard(
             icon: Iconsax.code,
@@ -1218,20 +1294,28 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: topSkills.cast<String>().map((skill) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
-                ),
-                child: Text(skill, style: const TextStyle(fontSize: 12, color: AppColors.secondary, fontWeight: FontWeight.w500)),
-              )).toList(),
+              children: topSkills
+                  .cast<String>()
+                  .map((skill) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color:
+                                  AppColors.secondary.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(skill,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.w500)),
+                      ))
+                  .toList(),
             ),
           ),
-
         const SizedBox(height: 12),
-
         if (keywordsCovered.isNotEmpty)
           _buildCard(
             icon: Iconsax.tag,
@@ -1240,20 +1324,27 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: keywordsCovered.cast<String>().map((kw) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                ),
-                child: Text(kw, style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w500)),
-              )).toList(),
+              children: keywordsCovered
+                  .cast<String>()
+                  .map((kw) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: AppColors.success.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(kw,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.success,
+                                fontWeight: FontWeight.w500)),
+                      ))
+                  .toList(),
             ),
           ),
-
         const SizedBox(height: 12),
-
         if (suggestions.isNotEmpty)
           _buildCard(
             icon: Iconsax.lamp_charge,
@@ -1274,7 +1365,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                   decoration: BoxDecoration(
                     color: priorityColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: priorityColor.withValues(alpha: 0.2)),
+                    border:
+                        Border.all(color: priorityColor.withValues(alpha: 0.2)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1284,18 +1376,25 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                           Expanded(
                             child: Text(
                               title,
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                              style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary),
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: priorityColor.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               priority.toUpperCase(),
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: priorityColor),
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: priorityColor),
                             ),
                           ),
                         ],
@@ -1304,7 +1403,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                         const SizedBox(height: 6),
                         Text(
                           description,
-                          style: const TextStyle(fontSize: 12, height: 1.45, color: AppColors.textSecondary),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.45,
+                              color: AppColors.textSecondary),
                         ),
                       ],
                       if (_selectedResume != null && sectionKey.isNotEmpty) ...[
@@ -1315,7 +1417,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                             onPressed: () => _openSuggestionSection(sectionKey),
                             style: TextButton.styleFrom(
                               foregroundColor: priorityColor,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
@@ -1330,9 +1433,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
               }).toList(growable: false),
             ),
           ),
-
         const SizedBox(height: 20),
-
         if (hasTailoredOutput)
           SizedBox(
             width: double.infinity,
@@ -1341,16 +1442,19 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
               onPressed: _applyToResume,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
               icon: const Icon(Iconsax.tick_circle, color: Colors.white),
               label: const Text(
                 'Apply AI Tailoring to Resume',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white),
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: Colors.white),
               ),
             ),
           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
-
         if (!hasTailoredOutput && _selectedResume != null)
           SizedBox(
             width: double.infinity,
@@ -1361,9 +1465,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
               label: const Text('Open Resume to Improve Match'),
             ),
           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
-
         const SizedBox(height: 8),
-
         Center(
           child: Text(
             engineId.isEmpty
@@ -1371,7 +1473,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                     ? 'Previous version saved automatically'
                     : 'Apply the suggestions above, then preview the resume again to verify the changes.')
                 : 'Engine: $engineId • $engineVersion',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textTertiary),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppColors.textTertiary),
           ),
         ),
       ],
@@ -1400,7 +1505,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: color),
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 13, color: color),
               ),
             ],
           ),
@@ -1490,7 +1596,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
       children: [
         Text(
           'Extracted Resume Data',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(fontWeight: FontWeight.bold),
         ).animate().fadeIn(),
         const SizedBox(height: 4),
         const Text(
@@ -1507,14 +1616,20 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (fullName.isNotEmpty) _importRow(Iconsax.user, 'Name', fullName),
+              if (fullName.isNotEmpty)
+                _importRow(Iconsax.user, 'Name', fullName),
               if (email.isNotEmpty) _importRow(Iconsax.sms, 'Email', email),
               if (phone.isNotEmpty) _importRow(Iconsax.call, 'Phone', phone),
-              if (address.isNotEmpty) _importRow(Iconsax.location, 'Address', address),
-              if (jobTitle.isNotEmpty) _importRow(Iconsax.briefcase, 'Job Title', jobTitle),
-              if (linkedIn.isNotEmpty) _importRow(Iconsax.link, 'LinkedIn', linkedIn),
-              if (github.isNotEmpty) _importRow(Iconsax.code_1, 'GitHub', github),
-              if (website.isNotEmpty) _importRow(Iconsax.global, 'Website', website),
+              if (address.isNotEmpty)
+                _importRow(Iconsax.location, 'Address', address),
+              if (jobTitle.isNotEmpty)
+                _importRow(Iconsax.briefcase, 'Job Title', jobTitle),
+              if (linkedIn.isNotEmpty)
+                _importRow(Iconsax.link, 'LinkedIn', linkedIn),
+              if (github.isNotEmpty)
+                _importRow(Iconsax.code_1, 'GitHub', github),
+              if (website.isNotEmpty)
+                _importRow(Iconsax.global, 'Website', website),
               if (fullName.isEmpty &&
                   email.isEmpty &&
                   phone.isEmpty &&
@@ -1523,7 +1638,9 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                   linkedIn.isEmpty &&
                   github.isEmpty &&
                   website.isEmpty)
-                const Text('No personal info found', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+                const Text('No personal info found',
+                    style:
+                        TextStyle(fontSize: 12, color: AppColors.textTertiary)),
             ],
           ),
         ),
@@ -1534,7 +1651,9 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             icon: Iconsax.document_text_1,
             title: 'Professional Summary',
             color: AppColors.info,
-            child: Text(objective, style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+            child: Text(objective,
+                style: const TextStyle(
+                    fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
           ),
         ],
 
@@ -1542,7 +1661,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           const SizedBox(height: 10),
           _buildCard(
             icon: Iconsax.briefcase,
-            title: '${experiences.length} Work Experience${experiences.length > 1 ? 's' : ''} Found',
+            title:
+                '${experiences.length} Work Experience${experiences.length > 1 ? 's' : ''} Found',
             color: AppColors.success,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1552,18 +1672,21 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                 final company = exp['company'] as String? ?? '';
                 final isCurrent = exp['isCurrentlyWorking'] as bool? ?? false;
                 final endYear = exp['endYear'] as int?;
-                final period = isCurrent ? 'Present' : (endYear?.toString() ?? '');
+                final period =
+                    isCurrent ? 'Present' : (endYear?.toString() ?? '');
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Iconsax.record_circle, size: 12, color: AppColors.success),
+                      const Icon(Iconsax.record_circle,
+                          size: 12, color: AppColors.success),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '$pos at $company${period.isNotEmpty ? ' · $period' : ''}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textPrimary),
                         ),
                       ),
                     ],
@@ -1578,7 +1701,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           const SizedBox(height: 10),
           _buildCard(
             icon: Iconsax.teacher,
-            title: '${educations.length} Education Entr${educations.length > 1 ? 'ies' : 'y'} Found',
+            title:
+                '${educations.length} Education Entr${educations.length > 1 ? 'ies' : 'y'} Found',
             color: AppColors.warning,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1592,12 +1716,14 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Iconsax.record_circle, size: 12, color: AppColors.warning),
+                      const Icon(Iconsax.record_circle,
+                          size: 12, color: AppColors.warning),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '$degree${field.isNotEmpty ? ' in $field' : ''} – $institution',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textPrimary),
                         ),
                       ),
                     ],
@@ -1617,15 +1743,24 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: skills.map((skill) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
-                ),
-                child: Text(skill, style: const TextStyle(fontSize: 12, color: AppColors.secondary, fontWeight: FontWeight.w500)),
-              )).toList(),
+              children: skills
+                  .map((skill) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color:
+                                  AppColors.secondary.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(skill,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.w500)),
+                      ))
+                  .toList(),
             ),
           ),
         ],
@@ -1634,7 +1769,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           const SizedBox(height: 10),
           _buildCard(
             icon: Iconsax.medal,
-            title: '${certifications.length} Certification${certifications.length > 1 ? 's' : ''} Found',
+            title:
+                '${certifications.length} Certification${certifications.length > 1 ? 's' : ''} Found',
             color: const Color(0xFF8B5CF6),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1644,7 +1780,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     '• ${cert['name'] ?? ''} – ${cert['issuer'] ?? ''}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
                   ),
                 );
               }).toList(),
@@ -1656,23 +1793,33 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           const SizedBox(height: 10),
           _buildCard(
             icon: Iconsax.heart,
-            title: '${hobbies.length} Hobby${hobbies.length > 1 ? 'ies' : ''} / Interest${hobbies.length > 1 ? 's' : ''} Found',
+            title:
+                '${hobbies.length} Hobby${hobbies.length > 1 ? 'ies' : ''} / Interest${hobbies.length > 1 ? 's' : ''} Found',
             color: const Color(0xFFEC4899),
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: hobbies.map((hobby) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEC4899).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.28)),
-                ),
-                child: Text(
-                  hobby,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFFBE185D), fontWeight: FontWeight.w500),
-                ),
-              )).toList(),
+              children: hobbies
+                  .map((hobby) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color:
+                              const Color(0xFFEC4899).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: const Color(0xFFEC4899)
+                                  .withValues(alpha: 0.28)),
+                        ),
+                        child: Text(
+                          hobby,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFBE185D),
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ))
+                  .toList(),
             ),
           ),
         ],
@@ -1681,7 +1828,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           const SizedBox(height: 10),
           _buildCard(
             icon: Iconsax.people,
-            title: '${references.length} Reference${references.length > 1 ? 's' : ''} Found',
+            title:
+                '${references.length} Reference${references.length > 1 ? 's' : ''} Found',
             color: const Color(0xFF0F766E),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1702,12 +1850,14 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Iconsax.record_circle, size: 12, color: Color(0xFF0F766E)),
+                      const Icon(Iconsax.record_circle,
+                          size: 12, color: Color(0xFF0F766E)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           details.isEmpty ? name : '$name · $details',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textPrimary),
                         ),
                       ),
                     ],
@@ -1722,7 +1872,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           const SizedBox(height: 10),
           _buildCard(
             icon: Iconsax.document_copy,
-            title: '${customSections.length} Additional Section${customSections.length > 1 ? 's' : ''} Preserved',
+            title:
+                '${customSections.length} Additional Section${customSections.length > 1 ? 's' : ''} Preserved',
             color: AppColors.primary,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1731,8 +1882,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                 final title = section['title'] as String? ?? '';
                 final items = section['items'] as List? ?? [];
                 final preview = items.isNotEmpty
-                    ? (items.first as Map<String, dynamic>)['title'] as String? ??
-                        (items.first as Map<String, dynamic>)['description'] as String? ??
+                    ? (items.first as Map<String, dynamic>)['title']
+                            as String? ??
+                        (items.first as Map<String, dynamic>)['description']
+                            as String? ??
                         ''
                     : '';
 
@@ -1741,14 +1894,16 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Iconsax.record_circle, size: 12, color: AppColors.primary),
+                      const Icon(Iconsax.record_circle,
+                          size: 12, color: AppColors.primary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           preview.isEmpty
                               ? '$title${items.isNotEmpty ? ' · ${items.length} item${items.length == 1 ? '' : 's'}' : ''}'
                               : '$title · $preview',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textPrimary),
                         ),
                       ),
                     ],
@@ -1771,13 +1926,15 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                 if (languages.isNotEmpty)
                   Text(
                     'Languages: ${(languages).map((l) => '${(l as Map)['name']}').join(', ')}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
                   ),
                 if (projects.isNotEmpty) ...[
                   if (languages.isNotEmpty) const SizedBox(height: 4),
                   Text(
                     'Projects: ${projects.length} found',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ],
               ],
@@ -1795,12 +1952,16 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
             onPressed: _applyParsedResume,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             icon: const Icon(Iconsax.tick_circle, color: Colors.white),
             label: const Text(
               'Apply to Resume — Fill All Fields',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white),
+              style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: Colors.white),
             ),
           ),
         ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
@@ -1824,13 +1985,18 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
         children: [
           Icon(icon, size: 14, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text('$label: ',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary)),
           Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
           ),
         ],
       ),
     );
   }
 }
-

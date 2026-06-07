@@ -80,14 +80,16 @@ class HelpSupportScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
           // Contact cards
-          const _SectionHeader(title: 'Contact Us').animate().fadeIn(delay: 50.ms),
+          const _SectionHeader(title: 'Contact Us')
+              .animate()
+              .fadeIn(delay: 50.ms),
           Row(
             children: [
               Expanded(
                 child: _ContactCard(
                   icon: Iconsax.sms,
                   title: 'Email Us',
-                  subtitle: 'support@\nresumebuilder.app',
+                  subtitle: AppInfo.supportEmail,
                   color: AppColors.primary,
                   onTap: _launchEmail,
                 ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1, end: 0),
@@ -127,7 +129,9 @@ class HelpSupportScreen extends ConsumerWidget {
           const SizedBox(height: 20),
 
           // Quick links
-          const _SectionHeader(title: 'Resources').animate().fadeIn(delay: 200.ms),
+          const _SectionHeader(title: 'Resources')
+              .animate()
+              .fadeIn(delay: 200.ms),
           _buildLinkTile(
             context,
             icon: Iconsax.book_1,
@@ -266,8 +270,8 @@ class HelpSupportScreen extends ConsumerWidget {
                 hintText: isReport
                     ? 'Describe the bug you encountered...'
                     : 'Share your thoughts...',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
             const SizedBox(height: 16),

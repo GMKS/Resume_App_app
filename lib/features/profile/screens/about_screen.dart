@@ -4,16 +4,14 @@ import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_info.dart';
+import '../../../core/services/app_version_service.dart';
 import '../../../core/theme/app_theme.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
-  static const String _appVersion = '1.0.0';
-  static const String _buildNumber = '1';
   static const String _developer = 'Seenai GMK';
-  static const String _linkedinUrl = 'https://linkedin.com';
-  static const String _twitterUrl = 'https://twitter.com';
+  static const String _linkedinUrl = 'https://www.linkedin.com/in/seenai';
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
@@ -26,7 +24,8 @@ class AboutScreen extends StatelessWidget {
     final uri = Uri(
       scheme: 'mailto',
       path: AppInfo.supportEmail,
-      query: 'subject=${Uri.encodeQueryComponent('Inquiry - ${AppInfo.appName} App')}',
+      query:
+          'subject=${Uri.encodeQueryComponent('Inquiry - ${AppInfo.appName} App')}',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -43,7 +42,6 @@ class AboutScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         children: [
-          // App Logo & Name
           Column(
             children: [
               Container(
@@ -74,20 +72,31 @@ class AboutScreen extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 6),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Version $_appVersion (Build $_buildNumber)',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
+              FutureBuilder<AppVersionInfo>(
+                future: AppVersionService.load(),
+                builder: (context, snapshot) {
+                  final label = switch (snapshot.connectionState) {
+                    ConnectionState.waiting => 'Version loading...',
+                    _ => (snapshot.data ?? AppVersionService.unavailable)
+                        .displayLabel,
+                  };
+
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      label,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 8),
               Text(
@@ -99,33 +108,20 @@ class AboutScreen extends StatelessWidget {
               ),
             ],
           ).animate().fadeIn(delay: 50.ms).slideY(begin: 0.05, end: 0),
-
           const SizedBox(height: 28),
-
-          // Stats Row
           const Row(
             children: [
-              _StatCard(
-                  value: '20+',
-                  label: 'Templates',
-                  icon: Iconsax.layer),
+              _StatCard(value: '20+', label: 'Templates', icon: Iconsax.layer),
               SizedBox(width: 10),
-              _StatCard(
-                  value: 'AI',
-                  label: 'Powered',
-                  icon: Iconsax.cpu),
+              _StatCard(value: 'AI', label: 'Powered', icon: Iconsax.cpu),
               SizedBox(width: 10),
-              _StatCard(
-                  value: 'ATS',
-                  label: 'Optimised',
-                  icon: Iconsax.chart),
+              _StatCard(value: 'ATS', label: 'Optimised', icon: Iconsax.chart),
             ],
           ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.05, end: 0),
-
           const SizedBox(height: 24),
-
-          // Developer Info
-          const _SectionHeader(title: 'Developer').animate().fadeIn(delay: 200.ms),
+          const _SectionHeader(title: 'Developer')
+              .animate()
+              .fadeIn(delay: 200.ms),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -144,17 +140,21 @@ class AboutScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_developer,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        Text(
+                          _developer,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
                         const SizedBox(height: 2),
-                        Text(AppInfo.supportEmail,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: AppColors.textSecondary)),
+                        Text(
+                          AppInfo.supportEmail,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
                       ],
                     ),
                   ),
@@ -167,10 +167,7 @@ class AboutScreen extends StatelessWidget {
               ),
             ),
           ).animate().fadeIn(delay: 250.ms).slideX(begin: -0.05, end: 0),
-
           const SizedBox(height: 20),
-
-          // Links
           const _SectionHeader(title: 'Links').animate().fadeIn(delay: 300.ms),
           _buildLinkTile(
             context,
@@ -196,11 +193,10 @@ class AboutScreen extends StatelessWidget {
             delay: 450,
             onTap: () => _launchUrl(AppInfo.playStoreUrl),
           ),
-
           const SizedBox(height: 20),
-
-          // Social Links
-          const _SectionHeader(title: 'Follow Us').animate().fadeIn(delay: 500.ms),
+          const _SectionHeader(title: 'Follow Us')
+              .animate()
+              .fadeIn(delay: 500.ms),
           Row(
             children: [
               Expanded(
@@ -211,21 +207,9 @@ class AboutScreen extends StatelessWidget {
                   onTap: () => _launchUrl(_linkedinUrl),
                 ).animate().fadeIn(delay: 550.ms),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _SocialButton(
-                  label: 'Twitter / X',
-                  icon: Icons.close,
-                  color: Colors.black87,
-                  onTap: () => _launchUrl(_twitterUrl),
-                ).animate().fadeIn(delay: 600.ms),
-              ),
             ],
           ),
-
           const SizedBox(height: 30),
-
-          // Copyright
           Center(
             child: Column(
               children: [

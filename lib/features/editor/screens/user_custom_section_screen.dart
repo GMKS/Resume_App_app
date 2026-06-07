@@ -31,9 +31,44 @@ class UserCustomSectionScreen extends ConsumerStatefulWidget {
 
 class _UserCustomSectionScreenState
     extends ConsumerState<UserCustomSectionScreen> {
+  bool _isDisposing = false;
+
+  bool get _canInteract => mounted && !_isDisposing;
+
+  void _unfocus(BuildContext context) {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _closeScreen() {
+    if (!_canInteract) {
+      return;
+    }
+
+    _unfocus(context);
+
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
+    context.go('/editor/${widget.resumeId}');
+  }
+
+  void _dismissSheet(BuildContext sheetContext) {
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    _unfocus(sheetContext);
+    final navigator = Navigator.of(sheetContext);
+    if (navigator.canPop()) {
+      navigator.pop();
+    }
+  }
+
   void _showSheetSnackBar(BuildContext sheetContext, String message) {
     final messenger = ScaffoldMessenger.maybeOf(sheetContext) ??
-        ScaffoldMessenger.maybeOf(context);
+        (mounted ? ScaffoldMessenger.maybeOf(context) : null);
     if (messenger == null) {
       return;
     }
@@ -41,6 +76,11 @@ class _UserCustomSectionScreenState
     messenger
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _waitForBottomSheetToSettle() async {
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    await WidgetsBinding.instance.endOfFrame;
   }
 
   CustomSection? _currentSection(ResumeModel resume) {
@@ -54,6 +94,11 @@ class _UserCustomSectionScreenState
 
   Future<void> _persistSection(
       ResumeModel resume, CustomSection updated) async {
+    if (!_canInteract) {
+      return;
+    }
+
+    final notifier = ref.read(currentResumeProvider(widget.resumeId).notifier);
     final latestResume =
         ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
     final userSections = orderedUserCustomSections(latestResume);
@@ -66,17 +111,14 @@ class _UserCustomSectionScreenState
     final nextUserSections = List<CustomSection>.from(userSections);
     nextUserSections[index] =
         updated.copyWith(order: userSections[index].order);
-
-    await ref
-        .read(currentResumeProvider(widget.resumeId).notifier)
-        .updateResume(
-          latestResume.copyWith(
-            customSections: mergeUserCustomSections(
-              existingSections: latestResume.customSections,
-              orderedUserSections: nextUserSections,
-            ),
-          ),
-        );
+    await notifier.updateResume(
+      latestResume.copyWith(
+        customSections: mergeUserCustomSections(
+          existingSections: latestResume.customSections,
+          orderedUserSections: nextUserSections,
+        ),
+      ),
+    );
   }
 
   Future<void> _showTitleEditor(
@@ -86,108 +128,111 @@ class _UserCustomSectionScreenState
   ) async {
     final controller = TextEditingController(text: section.title);
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return KeyboardSafeBottomSheet(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Edit Section Title',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(sheetContext),
-                    icon: const Icon(Iconsax.close_circle),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              CustomTextField(
-                controller: controller,
-                label: 'Section Title',
-                hint: 'Awards, Publications, Leadership Experience...',
-                prefixIcon: Iconsax.text,
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final title = normalizeUserCustomSectionTitle(
-                      controller.text,
-                    );
-                    if (title.isEmpty) {
-                      _showSheetSnackBar(
-                        sheetContext,
-                        'Section title is required',
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          return KeyboardSafeBottomSheet(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Edit Section Title',
+                      style: Theme.of(sheetContext)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => _dismissSheet(sheetContext),
+                      icon: const Icon(Iconsax.close_circle),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  controller: controller,
+                  label: 'Section Title',
+                  hint: 'Awards, Publications, Leadership Experience...',
+                  prefixIcon: Iconsax.text,
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final title = normalizeUserCustomSectionTitle(
+                        controller.text,
                       );
-                      return;
-                    }
-                    if (hasDuplicateUserCustomSectionTitle(
-                      resume.customSections,
-                      title,
-                      excludingId: section.id,
-                    )) {
-                      _showSheetSnackBar(
-                        sheetContext,
-                        'A custom section with this title already exists',
-                      );
-                      return;
-                    }
+                      if (title.isEmpty) {
+                        _showSheetSnackBar(
+                          sheetContext,
+                          'Section title is required',
+                        );
+                        return;
+                      }
+                      if (hasDuplicateUserCustomSectionTitle(
+                        resume.customSections,
+                        title,
+                        excludingId: section.id,
+                      )) {
+                        _showSheetSnackBar(
+                          sheetContext,
+                          'A custom section with this title already exists',
+                        );
+                        return;
+                      }
 
-                    try {
-                      await _persistSection(
-                        resume,
-                        section.copyWith(title: title),
-                      );
-                    } catch (error, stackTrace) {
-                      debugPrint(
-                        'UserCustomSectionScreen._showTitleEditor save failed: $error',
-                      );
-                      FlutterError.reportError(
-                        FlutterErrorDetails(
-                          exception: error,
-                          stack: stackTrace,
-                          library: 'user_custom_section_screen',
-                          context: ErrorDescription(
-                            'while renaming a user custom section',
+                      try {
+                        await _persistSection(
+                          resume,
+                          section.copyWith(title: title),
+                        );
+                      } catch (error, stackTrace) {
+                        debugPrint(
+                          'UserCustomSectionScreen._showTitleEditor save failed: $error',
+                        );
+                        FlutterError.reportError(
+                          FlutterErrorDetails(
+                            exception: error,
+                            stack: stackTrace,
+                            library: 'user_custom_section_screen',
+                            context: ErrorDescription(
+                              'while renaming a user custom section',
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                        if (!sheetContext.mounted) {
+                          return;
+                        }
+                        _showSheetSnackBar(
+                          sheetContext,
+                          'Unable to save the section title. Please try again.',
+                        );
+                        return;
+                      }
                       if (!sheetContext.mounted) {
                         return;
                       }
-                      _showSheetSnackBar(
-                        sheetContext,
-                        'Unable to save the section title. Please try again.',
-                      );
-                      return;
-                    }
-                    if (!sheetContext.mounted) {
-                      return;
-                    }
-                    Navigator.of(sheetContext).pop();
-                  },
-                  child: const Text('Save Title'),
+                      _dismissSheet(sheetContext);
+                    },
+                    child: const Text('Save Title'),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    controller.dispose();
+              ],
+            ),
+          );
+        },
+      );
+    } finally {
+      await _waitForBottomSheetToSettle();
+      controller.dispose();
+    }
   }
 
   Future<void> _showItemEditor(
@@ -202,111 +247,114 @@ class _UserCustomSectionScreenState
           : userCustomSectionItemLines(existing).join('\n'),
     );
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return KeyboardSafeBottomSheet(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    existing == null ? 'Add Entry' : 'Edit Entry',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(sheetContext),
-                    icon: const Icon(Iconsax.close_circle),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              CustomTextField(
-                controller: contentController,
-                label: 'Description / Content',
-                hint: 'Add text or bullet points for this section entry',
-                prefixIcon: Iconsax.document_text,
-                maxLines: 6,
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final content = contentController.text.trim();
-                    if (content.isEmpty) {
-                      _showSheetSnackBar(
-                        sheetContext,
-                        'Entry content is required',
-                      );
-                      return;
-                    }
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          return KeyboardSafeBottomSheet(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      existing == null ? 'Add Entry' : 'Edit Entry',
+                      style: Theme.of(sheetContext)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => _dismissSheet(sheetContext),
+                      icon: const Icon(Iconsax.close_circle),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  controller: contentController,
+                  label: 'Description / Content',
+                  hint: 'Add text or bullet points for this section entry',
+                  prefixIcon: Iconsax.document_text,
+                  maxLines: 6,
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final content = contentController.text.trim();
+                      if (content.isEmpty) {
+                        _showSheetSnackBar(
+                          sheetContext,
+                          'Entry content is required',
+                        );
+                        return;
+                      }
 
-                    final item = buildUserCustomSectionItem(
-                      id: existing?.id,
-                      content: content,
-                    );
-
-                    final items = List<CustomSectionItem>.from(section.items);
-                    final index = items.indexWhere(
-                      (entry) => entry.id == item.id,
-                    );
-                    if (index == -1) {
-                      items.add(item);
-                    } else {
-                      items[index] = item;
-                    }
-
-                    try {
-                      await _persistSection(
-                        resume,
-                        section.copyWith(items: items),
+                      final item = buildUserCustomSectionItem(
+                        id: existing?.id,
+                        content: content,
                       );
-                    } catch (error, stackTrace) {
-                      debugPrint(
-                        'UserCustomSectionScreen._showItemEditor save failed: $error',
+
+                      final items = List<CustomSectionItem>.from(section.items);
+                      final index = items.indexWhere(
+                        (entry) => entry.id == item.id,
                       );
-                      FlutterError.reportError(
-                        FlutterErrorDetails(
-                          exception: error,
-                          stack: stackTrace,
-                          library: 'user_custom_section_screen',
-                          context: ErrorDescription(
-                            'while saving a user custom section entry',
+                      if (index == -1) {
+                        items.add(item);
+                      } else {
+                        items[index] = item;
+                      }
+
+                      try {
+                        await _persistSection(
+                          resume,
+                          section.copyWith(items: items),
+                        );
+                      } catch (error, stackTrace) {
+                        debugPrint(
+                          'UserCustomSectionScreen._showItemEditor save failed: $error',
+                        );
+                        FlutterError.reportError(
+                          FlutterErrorDetails(
+                            exception: error,
+                            stack: stackTrace,
+                            library: 'user_custom_section_screen',
+                            context: ErrorDescription(
+                              'while saving a user custom section entry',
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                        if (!sheetContext.mounted) {
+                          return;
+                        }
+                        _showSheetSnackBar(
+                          sheetContext,
+                          'Unable to save entry. Please try again.',
+                        );
+                        return;
+                      }
                       if (!sheetContext.mounted) {
                         return;
                       }
-                      _showSheetSnackBar(
-                        sheetContext,
-                        'Unable to save entry. Please try again.',
-                      );
-                      return;
-                    }
-                    if (!sheetContext.mounted) {
-                      return;
-                    }
-                    Navigator.of(sheetContext).pop();
-                  },
-                  child: Text(existing == null ? 'Add Entry' : 'Save Entry'),
+                      _dismissSheet(sheetContext);
+                    },
+                    child: Text(existing == null ? 'Add Entry' : 'Save Entry'),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    contentController.dispose();
+              ],
+            ),
+          );
+        },
+      );
+    } finally {
+      await _waitForBottomSheetToSettle();
+      contentController.dispose();
+    }
   }
 
   Future<void> _deleteItem(
@@ -314,6 +362,10 @@ class _UserCustomSectionScreenState
     CustomSection section,
     CustomSectionItem item,
   ) async {
+    if (!_canInteract) {
+      return;
+    }
+
     final items = section.items.where((entry) => entry.id != item.id).toList();
     await _persistSection(resume, section.copyWith(items: items));
   }
@@ -323,6 +375,10 @@ class _UserCustomSectionScreenState
     ResumeModel resume,
     CustomSection section,
   ) async {
+    if (!_canInteract) {
+      return;
+    }
+
     final shouldDelete = await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
@@ -351,27 +407,32 @@ class _UserCustomSectionScreenState
       return;
     }
 
+    final notifier = ref.read(currentResumeProvider(widget.resumeId).notifier);
     final latestResume =
         ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
     final remaining = orderedUserCustomSections(latestResume)
         .where((entry) => entry.id != section.id)
         .toList(growable: false);
 
-    await ref
-        .read(currentResumeProvider(widget.resumeId).notifier)
-        .updateResume(
-          latestResume.copyWith(
-            customSections: mergeUserCustomSections(
-              existingSections: latestResume.customSections,
-              orderedUserSections: remaining,
-            ),
-          ),
-        );
+    await notifier.updateResume(
+      latestResume.copyWith(
+        customSections: mergeUserCustomSections(
+          existingSections: latestResume.customSections,
+          orderedUserSections: remaining,
+        ),
+      ),
+    );
 
-    if (!context.mounted) {
+    if (!_canInteract || !context.mounted) {
       return;
     }
-    context.pop();
+    _closeScreen();
+  }
+
+  @override
+  void dispose() {
+    _isDisposing = true;
+    super.dispose();
   }
 
   @override
@@ -399,7 +460,7 @@ class _UserCustomSectionScreenState
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(
-            onPressed: () => context.pop(),
+            onPressed: _closeScreen,
             icon: const Icon(Iconsax.arrow_left),
           ),
           title: const Text('Custom Section'),
@@ -412,7 +473,7 @@ class _UserCustomSectionScreenState
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          onPressed: () => context.pop(),
+          onPressed: _closeScreen,
           icon: const Icon(Iconsax.arrow_left),
         ),
         title: Text(displayUserCustomSectionTitle(section)),

@@ -31,9 +31,44 @@ class CustomSectionScreen extends ConsumerStatefulWidget {
 }
 
 class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
+  bool _isDisposing = false;
+
+  bool get _canInteract => mounted && !_isDisposing;
+
+  void _unfocus(BuildContext context) {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _closeScreen() {
+    if (!_canInteract) {
+      return;
+    }
+
+    _unfocus(context);
+
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
+    context.go('/editor/${widget.resumeId}');
+  }
+
+  void _dismissSheet(BuildContext sheetContext) {
+    if (!sheetContext.mounted) {
+      return;
+    }
+
+    _unfocus(sheetContext);
+    final navigator = Navigator.of(sheetContext);
+    if (navigator.canPop()) {
+      navigator.pop();
+    }
+  }
+
   void _showSheetSnackBar(BuildContext sheetContext, String message) {
     final messenger = ScaffoldMessenger.maybeOf(sheetContext) ??
-        ScaffoldMessenger.maybeOf(context);
+        (mounted ? ScaffoldMessenger.maybeOf(context) : null);
     if (messenger == null) {
       return;
     }
@@ -41,6 +76,11 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
     messenger
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _waitForBottomSheetToSettle() async {
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    await WidgetsBinding.instance.endOfFrame;
   }
 
   String? _configTitle(Object? config) {
@@ -74,6 +114,11 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
   }
 
   Future<void> _saveSection(ResumeModel resume, CustomSection section) async {
+    if (!_canInteract) {
+      return;
+    }
+
+    final notifier = ref.read(currentResumeProvider(widget.resumeId).notifier);
     final latestResume =
         ref.read(currentResumeProvider(widget.resumeId)) ?? resume;
     final baseResume = latestResume.templateId == 'startup'
@@ -97,10 +142,7 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
     } else {
       sections[index] = section;
     }
-
-    await ref
-        .read(currentResumeProvider(widget.resumeId).notifier)
-        .updateResume(baseResume.copyWith(customSections: sections));
+  await notifier.updateResume(baseResume.copyWith(customSections: sections));
   }
 
   Future<void> _showItemEditor(
@@ -115,128 +157,132 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
     final descriptionController =
         TextEditingController(text: existing?.description ?? '');
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return KeyboardSafeBottomSheet(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    existing == null ? 'Add Item' : 'Edit Item',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(sheetContext),
-                    icon: const Icon(Iconsax.close_circle),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              CustomTextField(
-                controller: titleController,
-                label: 'Title',
-                hint: 'Enter the headline for this item',
-                prefixIcon: Iconsax.document_text,
-              ),
-              CustomTextField(
-                controller: subtitleController,
-                label: 'Subtitle',
-                hint: 'Company, institution, credential, or context',
-                prefixIcon: Iconsax.note,
-              ),
-              CustomTextField(
-                controller: descriptionController,
-                label: 'Description',
-                hint: 'Add details, impact, or supporting notes',
-                maxLines: 4,
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final title = titleController.text.trim();
-                    if (title.isEmpty) {
-                      _showSheetSnackBar(sheetContext, 'Title is required');
-                      return;
-                    }
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          return KeyboardSafeBottomSheet(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      existing == null ? 'Add Item' : 'Edit Item',
+                      style: Theme.of(sheetContext)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => _dismissSheet(sheetContext),
+                      icon: const Icon(Iconsax.close_circle),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                CustomTextField(
+                  controller: titleController,
+                  label: 'Title',
+                  hint: 'Enter the headline for this item',
+                  prefixIcon: Iconsax.document_text,
+                ),
+                CustomTextField(
+                  controller: subtitleController,
+                  label: 'Subtitle',
+                  hint: 'Company, institution, credential, or context',
+                  prefixIcon: Iconsax.note,
+                ),
+                CustomTextField(
+                  controller: descriptionController,
+                  label: 'Description',
+                  hint: 'Add details, impact, or supporting notes',
+                  maxLines: 4,
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final title = titleController.text.trim();
+                      if (title.isEmpty) {
+                        _showSheetSnackBar(sheetContext, 'Title is required');
+                        return;
+                      }
 
-                    final item = CustomSectionItem(
-                      id: existing?.id ?? const Uuid().v4(),
-                      title: title,
-                      subtitle: subtitleController.text.trim().isEmpty
-                          ? null
-                          : subtitleController.text.trim(),
-                      description: descriptionController.text.trim().isEmpty
-                          ? null
-                          : descriptionController.text.trim(),
-                      date: existing?.date,
-                    );
-
-                    final items = List<CustomSectionItem>.from(section.items);
-                    final index =
-                        items.indexWhere((entry) => entry.id == item.id);
-                    if (index == -1) {
-                      items.add(item);
-                    } else {
-                      items[index] = item;
-                    }
-
-                    try {
-                      await _saveSection(
-                        resume,
-                        section.copyWith(items: items),
+                      final item = CustomSectionItem(
+                        id: existing?.id ?? const Uuid().v4(),
+                        title: title,
+                        subtitle: subtitleController.text.trim().isEmpty
+                            ? null
+                            : subtitleController.text.trim(),
+                        description: descriptionController.text.trim().isEmpty
+                            ? null
+                            : descriptionController.text.trim(),
+                        date: existing?.date,
                       );
-                    } catch (error, stackTrace) {
-                      debugPrint(
-                        'CustomSectionScreen._showItemEditor save failed: $error',
-                      );
-                      FlutterError.reportError(
-                        FlutterErrorDetails(
-                          exception: error,
-                          stack: stackTrace,
-                          library: 'custom_section_screen',
-                          context: ErrorDescription(
-                            'while saving a built-in custom section item',
+
+                      final items = List<CustomSectionItem>.from(section.items);
+                      final index =
+                          items.indexWhere((entry) => entry.id == item.id);
+                      if (index == -1) {
+                        items.add(item);
+                      } else {
+                        items[index] = item;
+                      }
+
+                      try {
+                        await _saveSection(
+                          resume,
+                          section.copyWith(items: items),
+                        );
+                      } catch (error, stackTrace) {
+                        debugPrint(
+                          'CustomSectionScreen._showItemEditor save failed: $error',
+                        );
+                        FlutterError.reportError(
+                          FlutterErrorDetails(
+                            exception: error,
+                            stack: stackTrace,
+                            library: 'custom_section_screen',
+                            context: ErrorDescription(
+                              'while saving a built-in custom section item',
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                        if (!sheetContext.mounted) {
+                          return;
+                        }
+                        _showSheetSnackBar(
+                          sheetContext,
+                          'Unable to save item. Please try again.',
+                        );
+                        return;
+                      }
+
                       if (!sheetContext.mounted) {
                         return;
                       }
-                      _showSheetSnackBar(
-                        sheetContext,
-                        'Unable to save item. Please try again.',
-                      );
-                      return;
-                    }
-
-                    if (!sheetContext.mounted) {
-                      return;
-                    }
-                    Navigator.of(sheetContext).pop();
-                  },
-                  child: Text(existing == null ? 'Add Item' : 'Save Changes'),
+                      _dismissSheet(sheetContext);
+                    },
+                    child:
+                        Text(existing == null ? 'Add Item' : 'Save Changes'),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    titleController.dispose();
-    subtitleController.dispose();
-    descriptionController.dispose();
+              ],
+            ),
+          );
+        },
+      );
+    } finally {
+      await _waitForBottomSheetToSettle();
+      titleController.dispose();
+      subtitleController.dispose();
+      descriptionController.dispose();
+    }
   }
 
   Future<void> _deleteItem(
@@ -244,8 +290,18 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
     CustomSection section,
     CustomSectionItem item,
   ) async {
+    if (!_canInteract) {
+      return;
+    }
+
     final items = section.items.where((entry) => entry.id != item.id).toList();
     await _saveSection(resume, section.copyWith(items: items));
+  }
+
+  @override
+  void dispose() {
+    _isDisposing = true;
+    super.dispose();
   }
 
   @override
@@ -293,7 +349,7 @@ class _CustomSectionScreenState extends ConsumerState<CustomSectionScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          onPressed: () => context.pop(),
+          onPressed: _closeScreen,
           icon: const Icon(Iconsax.arrow_left),
         ),
         title: Text(title),

@@ -229,39 +229,55 @@ class ResumeCard extends StatelessWidget {
 
                   // Footer
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Iconsax.calendar_1,
-                            size: 14,
-                            color: AppColors.textTertiary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Updated ${_formatDate(resume.updatedAt)}',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                      Expanded(
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Iconsax.calendar_1,
+                              size: 14,
+                              color: AppColors.textTertiary,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Updated ${_formatDate(resume.updatedAt)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
                                       color: AppColors.textTertiary,
                                     ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _getTemplateColor(resume.templateId)
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          _getTemplateName(resume.templateId),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: _getTemplateColor(resume.templateId),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getTemplateColor(resume.templateId)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            _getTemplateName(resume.templateId),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: _getTemplateColor(resume.templateId),
+                            ),
                           ),
                         ),
                       ),

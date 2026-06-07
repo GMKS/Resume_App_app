@@ -9,7 +9,8 @@ import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/resume_version_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../editor/screens/resume_editor_screen.dart' show currentResumeProvider;
+import '../../editor/screens/resume_editor_screen.dart'
+    show currentResumeProvider;
 import '../../home/screens/home_screen.dart' show resumesProvider;
 import '../services/raoe2_service.dart';
 import '../services/raoe2_version_service.dart';
@@ -252,7 +253,8 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
       return;
     }
 
-    final resumeId = _selectedResume?.id ?? _resumeController.text.hashCode.toString();
+    final resumeId =
+        _selectedResume?.id ?? _resumeController.text.hashCode.toString();
     await RAOE2VersionService.saveOptimizedVersion(
       resumeId: resumeId,
       optimizedText: result.optimizedResumeText,
@@ -330,73 +332,45 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
       }
 
       setState(() {
-        _errorMessage = 'Could not apply the optimized result. ${error.toString()}';
+        _errorMessage =
+            'Could not apply the optimized result. ${error.toString()}';
         _isApplying = false;
       });
     }
   }
 
   void _showApiKeyDialog() {
-    final controller = TextEditingController(text: _apiKey);
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Iconsax.key, color: AppColors.primary),
+            Icon(Iconsax.cpu, color: AppColors.primary),
             SizedBox(width: 10),
-            Text('Groq API Key (Free)'),
+            Text('AI Service'),
           ],
         ),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'RAOE2 uses the same free Groq API key as the other AI tools.',
+            Text(
+              'AI access is managed by the app. You do not need to create or paste a personal API key.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Get a key at console.groq.com and paste it here.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Paste API Key',
-                prefixIcon: const Icon(Iconsax.key),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+            SizedBox(height: 10),
+            Text(
+              'If AI is unavailable right now, the app configuration is missing or temporarily unavailable. Please try again later.',
+              style: TextStyle(
+                  color: AppColors.textSecondary, fontSize: 12, height: 1.5),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final key = controller.text.trim();
-              if (key.isNotEmpty) {
-                await AiApiKeyStorageService.save(key);
-                if (mounted) {
-                  setState(() {
-                    _apiKey = key;
-                  });
-                }
-              }
-              if (dialogContext.mounted) {
-                Navigator.pop(dialogContext);
-              }
-            },
-            child: const Text('Save'),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -422,7 +396,9 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
               Iconsax.key,
               color: _apiKey.isNotEmpty ? AppColors.success : AppColors.warning,
             ),
-            tooltip: _apiKey.isNotEmpty ? 'API key configured' : 'Add API key',
+            tooltip: _apiKey.isNotEmpty
+                ? 'AI service ready'
+                : 'AI service unavailable',
           ),
         ],
       ),
@@ -457,7 +433,8 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Iconsax.magic_star),
-                  label: Text(_isOptimizing ? 'Optimizing...' : 'Optimize with AI'),
+                  label: Text(
+                      _isOptimizing ? 'Optimizing...' : 'Optimize with AI'),
                 ),
                 if (result != null)
                   OutlinedButton.icon(
@@ -475,7 +452,8 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Iconsax.document_upload),
-                    label: Text(_isApplying ? 'Applying...' : 'Apply to Resume'),
+                    label:
+                        Text(_isApplying ? 'Applying...' : 'Apply to Resume'),
                   ),
               ],
             ),
@@ -574,20 +552,49 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
         Text('Resume Source', style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
+          isExpanded: true,
           initialValue: _selectedResume?.id ?? _manualSourceValue,
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           ),
+          selectedItemBuilder: (context) => [
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Manual text entry',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            ..._allResumes.map(
+              (resume) => Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  resume.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
           items: [
             const DropdownMenuItem<String>(
               value: _manualSourceValue,
-              child: Text('Manual text entry'),
+              child: Text(
+                'Manual text entry',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             ..._allResumes.map(
               (resume) => DropdownMenuItem<String>(
                 value: resume.id,
-                child: Text(resume.title),
+                child: Text(
+                  resume.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],
@@ -608,7 +615,8 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
         if (isReadOnly)
           Text(
             'This text is generated from the selected saved resume. Switch to Manual text entry if you want to paste a custom draft instead.',
-            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: AppColors.textSecondary),
           ),
         const SizedBox(height: 8),
         TextFormField(
@@ -695,7 +703,8 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
             sortedKeywords.isEmpty
                 ? 'No missing keywords were detected yet. Add a fuller job description or optimize to see AI-guided changes.'
                 : '${sortedKeywords.length} target keywords are missing from the current resume draft.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: AppColors.textSecondary),
           ),
           if (sortedKeywords.isNotEmpty) ...[
             const SizedBox(height: 12),

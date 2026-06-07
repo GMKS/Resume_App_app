@@ -38,6 +38,11 @@ class ResumesNotifier extends StateNotifier<List<ResumeModel>> {
 
   /// Restores resumes from Supabase into local Hive storage then refreshes.
   Future<void> restoreFromCloud() async {
+    final syncCode = await SupabaseSyncService.getSyncCode();
+    if (syncCode == null || syncCode.isEmpty) {
+      return;
+    }
+
     final cloudResumes = await SupabaseSyncService.loadAll();
     for (final resume in cloudResumes) {
       final local = StorageService.getResume(resume.id);

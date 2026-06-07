@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/app_version_service.dart';
 import '../../../core/services/user_session_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/subscription_service.dart';
@@ -30,11 +31,13 @@ class ProfileTabScreen extends ConsumerStatefulWidget {
 
 class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
   late Future<_ProfileIdentity> _profileFuture;
+  late Future<AppVersionInfo> _versionInfoFuture;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = _loadProfileIdentity();
+    _versionInfoFuture = AppVersionService.load();
   }
 
   void _refreshProfile() {
@@ -71,9 +74,12 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                        backgroundImage: _profileImageProvider(profile.photoUrl),
-                        child: profile.photoUrl == null || profile.photoUrl!.isEmpty
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.1),
+                        backgroundImage:
+                            _profileImageProvider(profile.photoUrl),
+                        child: profile.photoUrl == null ||
+                                profile.photoUrl!.isEmpty
                             ? const Icon(
                                 Iconsax.user,
                                 size: 40,
@@ -84,9 +90,10 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
                       const SizedBox(height: 16),
                       Text(
                         profile.displayName,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -152,9 +159,7 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
                           const SizedBox(height: 4),
                           Text(
                             subscription.isPremium()
-                              ? subscription.isStoreManaged
-                                ? 'Managed in Google Play'
-                                : subscription.cancelAtPeriodEnd
+                                ? subscription.cancelAtPeriodEnd
                                     ? 'Cancels ${_formatDate(subscription.expiryDate!)}'
                                     : 'Expires ${_formatDate(subscription.expiryDate!)}'
                                 : 'Upgrade to unlock premium features',
@@ -254,11 +259,22 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
 
           // Version
           Center(
-            child: Text(
-              'Version 1.0.0',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+            child: FutureBuilder<AppVersionInfo>(
+              future: _versionInfoFuture,
+              builder: (context, snapshot) {
+                final label = switch (snapshot.connectionState) {
+                  ConnectionState.waiting => 'Version loading...',
+                  _ => (snapshot.data ?? AppVersionService.unavailable)
+                      .displayLabel,
+                };
+
+                return Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                );
+              },
             ),
           ),
 
@@ -275,17 +291,22 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
   Future<_ProfileIdentity> _loadProfileIdentity() async {
     final prefs = await SharedPreferences.getInstance();
     final rawDisplayName = prefs.getString('display_name')?.trim() ?? '';
-    final rawContact =
-        UserSessionService.formatContactForDisplay(
-          UserSessionService.readStoredContact(prefs),
-        );
+    final rawContact = UserSessionService.readStoredContact(prefs);
     final rawPhotoUrl = prefs.getString('photo_url')?.trim() ?? '';
+    final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
+    final formattedContact = UserSessionService.formatContactForDisplay(
+      rawContact,
+    );
 
     final displayName = rawDisplayName.isNotEmpty
         ? rawDisplayName
         : _fallbackDisplayName(rawContact);
 
-    final contact = rawContact.isNotEmpty ? rawContact : 'Not signed in';
+    final contact = formattedContact.isNotEmpty
+        ? formattedContact
+        : isLoggedIn
+            ? 'Signed in'
+            : 'Not signed in';
 
     return _ProfileIdentity(
       displayName: displayName,
@@ -296,10 +317,6 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
 
   String _fallbackDisplayName(String contact) {
     if (contact.isEmpty) {
-      return 'User';
-    }
-
-    if (contact.contains('•')) {
       return 'User';
     }
 
@@ -379,7 +396,8 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
             Text('Logout'),
           ],
         ),
-        content: const Text('Are you sure you want to logout?\nYou will need to verify your phone again.'),
+        content: const Text(
+            'Are you sure you want to logout?\nYou will need to verify your phone again.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
@@ -396,12 +414,13 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
               await prefs.remove('photo_url');
               await prefs.remove('auth_provider');
               if (outerContext.mounted) {
-                outerContext.go('/login?loggedOut=true');
+                outerContext.go('/login');
               }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Logout', style: TextStyle(color: Colors.white)),
           ),

@@ -142,7 +142,10 @@ class SubscriptionModel {
   }) {
     return SubscriptionModel(
       plan: SubscriptionPlan.weekly,
-      expiryDate: expiryDate ?? DateTime.now().add(const Duration(days: 7)),
+      expiryDate: expiryDate ??
+          (billingProvider == BillingProvider.googlePlay
+              ? null
+              : DateTime.now().add(const Duration(days: 7))),
       isActive: true,
       features: _premiumFeatures,
       cancelAtPeriodEnd: cancelAtPeriodEnd,
@@ -175,7 +178,10 @@ class SubscriptionModel {
   }) {
     return SubscriptionModel(
       plan: SubscriptionPlan.quarterly,
-      expiryDate: expiryDate ?? DateTime.now().add(const Duration(days: 90)),
+      expiryDate: expiryDate ??
+          (billingProvider == BillingProvider.googlePlay
+              ? null
+              : DateTime.now().add(const Duration(days: 90))),
       isActive: true,
       features: _premiumFeatures,
       cancelAtPeriodEnd: cancelAtPeriodEnd,

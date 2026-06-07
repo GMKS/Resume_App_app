@@ -33,7 +33,7 @@ class BusinessManagementResumePdfTemplate extends PdfTemplate {
       allowedKeys: _mainSectionOrder,
     );
 
-    final resolvedAccent = _executiveAccent;
+    const resolvedAccent = _executiveAccent;
     final headerBg = _blend(resolvedAccent, _darkBase, 0.78);
     final accentWash = _blend(resolvedAccent, PdfColors.white, 0.82);
     final strongAccent = _blend(resolvedAccent, _darkBase, 0.22);
@@ -914,7 +914,7 @@ class BusinessManagementResumePdfTemplate extends PdfTemplate {
           pw.Container(
             width: 92,
             padding: const pw.EdgeInsets.fromLTRB(8, 6, 8, 6),
-            decoration: pw.BoxDecoration(
+            decoration: const pw.BoxDecoration(
               color: _panelBg,
             ),
             child: pw.Column(
