@@ -8,62 +8,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/models/subscription_model.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/feature_gate.dart';
-
-class Skill {
-  final String name;
-  final String category;
-  final int currentLevel;
-  final int marketDemand;
-  final String status; // 'Strong', 'Good', 'Needs Improvement'
-
-  Skill({
-    required this.name,
-    required this.category,
-    required this.currentLevel,
-    required this.marketDemand,
-    required this.status,
-  });
-}
-
-final skillsProvider = Provider<List<Skill>>((ref) {
-  return [
-    Skill(
-      name: 'Flutter Development',
-      category: 'Technical',
-      currentLevel: 85,
-      marketDemand: 90,
-      status: 'Strong',
-    ),
-    Skill(
-      name: 'Project Management',
-      category: 'Leadership',
-      currentLevel: 70,
-      marketDemand: 85,
-      status: 'Good',
-    ),
-    Skill(
-      name: 'UI/UX Design',
-      category: 'Design',
-      currentLevel: 60,
-      marketDemand: 95,
-      status: 'Needs Improvement',
-    ),
-    Skill(
-      name: 'Communication',
-      category: 'Soft Skills',
-      currentLevel: 75,
-      marketDemand: 80,
-      status: 'Good',
-    ),
-    Skill(
-      name: 'Data Analysis',
-      category: 'Technical',
-      currentLevel: 50,
-      marketDemand: 90,
-      status: 'Needs Improvement',
-    ),
-  ];
-});
+import '../../editor/widgets/keyboard_safe_bottom_sheet.dart';
+import '../services/skill_analyzer_service.dart';
 
 class SkillAnalyzerScreen extends ConsumerStatefulWidget {
   const SkillAnalyzerScreen({super.key});
@@ -73,19 +19,39 @@ class SkillAnalyzerScreen extends ConsumerStatefulWidget {
 }
 
 class _SkillAnalyzerScreenState extends ConsumerState<SkillAnalyzerScreen> {
-  String _selectedFilter = 'All';
+  static const List<String> _baseFilters = <String>[
+    'All',
+    'Technical',
+    'Leadership',
+    'Design',
+    'Soft Skills',
+    'Domain',
+    'Other',
+  ];
 
-  final List<String> _filters = ['All', 'Technical', 'Leadership', 'Design', 'Soft Skills'];
+  String _selectedFilter = 'All';
 
   @override
   Widget build(BuildContext context) {
-    final skills = ref.watch(skillsProvider);
+    final state = ref.watch(skillAnalyzerControllerProvider);
+    final skills = <AnalyzedSkill>[
+      ...SkillAnalyzerService.defaultSkills,
+      ...state.userSkills,
+    ];
+    final filters = <String>{..._baseFilters, ...skills.map((skill) => skill.category)}
+        .toList(growable: false);
     final filteredSkills = _selectedFilter == 'All'
         ? skills
         : skills.where((s) => s.category == _selectedFilter).toList();
+    final safeBottomInset = MediaQuery.paddingOf(context).bottom;
+    const fabHeight = 56.0;
+    const fabGap = 48.0;
+    final listBottomPadding = 16 + fabHeight + fabGap + safeBottomInset;
 
-    final averageScore = skills.fold<int>(0, (sum, skill) => sum + skill.currentLevel) ~/
-        skills.length;
+    final averageScore = skills.isEmpty
+        ? 0
+        : skills.fold<int>(0, (sum, skill) => sum + skill.currentLevel) ~/
+            skills.length;
 
     return FeatureGate(
       featureName: SubscriptionFeatures.skillAnalyzer,
@@ -113,6 +79,8 @@ class _SkillAnalyzerScreenState extends ConsumerState<SkillAnalyzerScreen> {
         ),
         body: Column(
           children: [
+            if (state.isLoading)
+              const LinearProgressIndicator(minHeight: 2),
             // Overall Score Card
             Padding(
               padding: const EdgeInsets.all(16),
@@ -201,10 +169,10 @@ class _SkillAnalyzerScreenState extends ConsumerState<SkillAnalyzerScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: _filters.length,
+                itemCount: filters.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
-                  final filter = _filters[index];
+                  final filter = filters[index];
                   final isSelected = _selectedFilter == filter;
                   return FilterChip(
                     label: Text(filter),
@@ -227,26 +195,64 @@ class _SkillAnalyzerScreenState extends ConsumerState<SkillAnalyzerScreen> {
 
             // Skills List
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: filteredSkills.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final skill = filteredSkills[index];
-                  return _SkillCard(skill: skill)
-                      .animate()
-                      .fadeIn(delay: (300 + index * 50).ms)
-                      .slideX(begin: -0.05, end: 0);
-                },
-              ),
+              child: filteredSkills.isEmpty && state.errorMessage == null
+                  ? const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, 140),
+                      child: _SkillEmptyState(),
+                    )
+                  : ListView.separated(
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, listBottomPadding),
+                      itemCount:
+                          filteredSkills.length + (state.errorMessage == null ? 0 : 1),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        if (state.errorMessage != null && index == 0) {
+                          return Card(
+                            color: AppColors.error.withValues(alpha: 0.08),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                state.errorMessage!,
+                                style:
+                                    Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: AppColors.error,
+                                        ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final skillIndex =
+                            state.errorMessage == null ? index : index - 1;
+                        final skill = filteredSkills[skillIndex];
+                        return _SkillCard(
+                          skill: skill,
+                          onEdit: skill.isUserAdded ? () => _editSkill(skill) : null,
+                          onDelete:
+                              skill.isUserAdded ? () => _deleteSkill(skill) : null,
+                        )
+                            .animate()
+                            .fadeIn(delay: (300 + skillIndex * 50).ms)
+                            .slideX(begin: -0.05, end: 0);
+                      },
+                    ),
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _showRecommendations,
-          icon: const Icon(Iconsax.lamp_on),
-          label: const Text('Get Recommendations'),
-        ).animate().fadeIn(delay: 400.ms).scale(),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: SafeArea(
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width - 32,
+            ),
+            child: FloatingActionButton.extended(
+              onPressed: _showRecommendations,
+              icon: const Icon(Iconsax.lamp_on),
+              label: const Text('Get Recommendations'),
+            ).animate().fadeIn(delay: 400.ms).scale(),
+          ),
+        ),
       ),
     );
   }
@@ -257,18 +263,146 @@ class _SkillAnalyzerScreenState extends ConsumerState<SkillAnalyzerScreen> {
     return AppColors.error;
   }
 
-  void _addNewSkill() {
-    showDialog(
+  Future<void> _addNewSkill() async {
+    final result = await _showSkillSheet();
+    if (result == null) {
+      return;
+    }
+
+    await ref.read(skillAnalyzerControllerProvider.notifier).saveSkill(result);
+    if (_selectedFilter != 'All' && _selectedFilter != result.category) {
+      setState(() => _selectedFilter = result.category);
+    }
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${result.name} added to Skill Analyzer.'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _editSkill(AnalyzedSkill skill) async {
+    final result = await _showSkillSheet(skill: skill);
+    if (result == null) {
+      return;
+    }
+
+    await ref.read(skillAnalyzerControllerProvider.notifier).saveSkill(result);
+    if (_selectedFilter != 'All' && _selectedFilter != result.category) {
+      setState(() => _selectedFilter = result.category);
+    }
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${result.name} updated successfully.'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _deleteSkill(AnalyzedSkill skill) async {
+    final shouldDelete = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Skill'),
-        content: const Text('Skill addition feature coming soon!'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete skill?'),
+        content: Text('Remove ${skill.name} from your custom skills list?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
           ),
         ],
+      ),
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    await ref.read(skillAnalyzerControllerProvider.notifier).deleteSkill(skill.id);
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${skill.name} deleted.'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<AnalyzedSkill?> _showSkillSheet({AnalyzedSkill? skill}) {
+    final allSkills = <AnalyzedSkill>[
+      ...SkillAnalyzerService.defaultSkills,
+      ...ref.read(skillAnalyzerControllerProvider).userSkills,
+    ];
+    final categories = <String>{
+      'Technical',
+      'Leadership',
+      'Soft Skills',
+      'Domain',
+      'Design',
+      'Other',
+      ...allSkills.map((item) => item.category),
+    }.toList(growable: false);
+
+    return showModalBottomSheet<AnalyzedSkill>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _SkillFormSheet(
+        initialSkill: skill,
+        categories: categories,
+        existingSkills: allSkills,
+        onBuildSkill: ({
+          required String name,
+          required String category,
+          required int currentLevel,
+          double? yearsOfExperience,
+        }) {
+          final service = ref.read(skillAnalyzerServiceProvider);
+          if (skill == null) {
+            return service.buildUserSkill(
+              name: name,
+              category: category,
+              currentLevel: currentLevel,
+              yearsOfExperience: yearsOfExperience,
+            );
+          }
+
+          return skill.copyWith(
+            name: name.trim(),
+            category: category.trim(),
+            currentLevel: currentLevel,
+            marketDemand: SkillAnalyzerService.defaultSkills.firstWhere(
+              (defaultSkill) => defaultSkill.category == category,
+              orElse: () => service.buildUserSkill(
+                name: name,
+                category: category,
+                currentLevel: currentLevel,
+                yearsOfExperience: yearsOfExperience,
+              ),
+            ).marketDemand,
+            yearsOfExperience: yearsOfExperience,
+            clearYearsOfExperience: yearsOfExperience == null,
+            updatedAt: DateTime.now(),
+          );
+        },
       ),
     );
   }
@@ -402,9 +536,15 @@ class _QuickStat extends StatelessWidget {
 }
 
 class _SkillCard extends StatelessWidget {
-  final Skill skill;
+  final AnalyzedSkill skill;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const _SkillCard({required this.skill});
+  const _SkillCard({
+    required this.skill,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -433,12 +573,61 @@ class _SkillCard extends StatelessWidget {
                               color: AppColors.textSecondary,
                             ),
                       ),
+                      if (skill.yearsOfExperience != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${skill.yearsOfExperience!.toStringAsFixed(skill.yearsOfExperience! % 1 == 0 ? 0 : 1)} years experience',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                _StatusBadge(status: skill.status),
+                if (skill.isUserAdded)
+                  PopupMenuButton<_SkillAction>(
+                    tooltip: 'Skill actions',
+                    onSelected: (action) {
+                      switch (action) {
+                        case _SkillAction.edit:
+                          onEdit?.call();
+                          break;
+                        case _SkillAction.delete:
+                          onDelete?.call();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem<_SkillAction>(
+                        value: _SkillAction.edit,
+                        child: ListTile(
+                          leading: Icon(Iconsax.edit),
+                          title: Text('Edit'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      PopupMenuItem<_SkillAction>(
+                        value: _SkillAction.delete,
+                        child: ListTile(
+                          leading: Icon(Iconsax.trash, color: AppColors.error),
+                          title: Text('Delete'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  _StatusBadge(status: skill.status),
               ],
             ),
+            if (skill.isUserAdded) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _StatusBadge(status: skill.status),
+              ),
+            ],
             const SizedBox(height: 16),
             Row(
               children: [
@@ -518,6 +707,272 @@ class _SkillCard extends StatelessWidget {
       default:
         return AppColors.error;
     }
+  }
+}
+
+enum _SkillAction { edit, delete }
+
+class _SkillEmptyState extends StatelessWidget {
+  const _SkillEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            const Icon(Iconsax.chart_1, size: 36, color: AppColors.primary),
+            const SizedBox(height: 12),
+            Text(
+              'No skills match this filter yet.',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Add a new skill to track it here and update your overall score immediately.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkillFormSheet extends StatefulWidget {
+  const _SkillFormSheet({
+    required this.initialSkill,
+    required this.categories,
+    required this.existingSkills,
+    required this.onBuildSkill,
+  });
+
+  final AnalyzedSkill? initialSkill;
+  final List<String> categories;
+  final List<AnalyzedSkill> existingSkills;
+  final AnalyzedSkill Function({
+    required String name,
+    required String category,
+    required int currentLevel,
+    double? yearsOfExperience,
+  }) onBuildSkill;
+
+  @override
+  State<_SkillFormSheet> createState() => _SkillFormSheetState();
+}
+
+class _SkillFormSheetState extends State<_SkillFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _yearsController;
+  late String _selectedCategory;
+  late double _currentLevel;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialSkill?.name ?? '');
+    _yearsController = TextEditingController(
+      text: widget.initialSkill?.yearsOfExperience?.toString() ?? '',
+    );
+    _selectedCategory = widget.initialSkill?.category ?? widget.categories.first;
+    _currentLevel = (widget.initialSkill?.currentLevel ?? 60).toDouble();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _yearsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return KeyboardSafeBottomSheet(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              widget.initialSkill == null ? 'Add New Skill' : 'Edit Skill',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Track your proficiency and keep your skill profile up to date.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Skill Name',
+                hintText: 'e.g. Product Strategy',
+                prefixIcon: Icon(Iconsax.flash_1),
+              ),
+              validator: (value) {
+                final normalized = value?.trim() ?? '';
+                if (normalized.isEmpty) {
+                  return 'Enter a skill name.';
+                }
+
+                final duplicate = widget.existingSkills.any((skill) {
+                  if (widget.initialSkill != null && skill.id == widget.initialSkill!.id) {
+                    return false;
+                  }
+                  return skill.name.toLowerCase() == normalized.toLowerCase();
+                });
+                if (duplicate) {
+                  return 'This skill already exists.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedCategory,
+              decoration: const InputDecoration(
+                labelText: 'Skill Category',
+                prefixIcon: Icon(Iconsax.category),
+              ),
+              items: widget.categories
+                  .map(
+                    (category) => DropdownMenuItem<String>(
+                      value: category,
+                      child: Text(category),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() => _selectedCategory = value);
+              },
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? 'Select a category.' : null,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Current Proficiency Level',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${_currentLevel.round()}%',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+            Slider(
+              value: _currentLevel,
+              min: 0,
+              max: 100,
+              divisions: 20,
+              label: '${_currentLevel.round()}%',
+              onChanged: (value) {
+                setState(() => _currentLevel = value);
+              },
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _yearsController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Years of Experience (optional)',
+                hintText: 'e.g. 3.5',
+                prefixIcon: Icon(Iconsax.timer_1),
+              ),
+              validator: (value) {
+                final normalized = value?.trim() ?? '';
+                if (normalized.isEmpty) {
+                  return null;
+                }
+
+                final parsed = double.tryParse(normalized);
+                if (parsed == null || parsed < 0) {
+                  return 'Enter a valid number of years.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isSaving ? null : _handleSave,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(widget.initialSkill == null ? Iconsax.add : Iconsax.save_2),
+                label: Text(
+                  _isSaving
+                      ? 'Saving...'
+                      : (widget.initialSkill == null ? 'Save Skill' : 'Update Skill'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleSave() {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      return;
+    }
+
+    final yearsText = _yearsController.text.trim();
+    final years = yearsText.isEmpty ? null : double.tryParse(yearsText);
+
+    setState(() => _isSaving = true);
+    final skill = widget.onBuildSkill(
+      name: _nameController.text.trim(),
+      category: _selectedCategory,
+      currentLevel: _currentLevel.round(),
+      yearsOfExperience: years,
+    );
+    Navigator.of(context).pop(skill);
   }
 }
 

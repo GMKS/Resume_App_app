@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_info.dart';
+import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -24,7 +24,7 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _navigateToNext() async {
     await Future.delayed(const Duration(milliseconds: 2500));
     if (mounted) {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = StorageService.prefs;
       final onboardingDone = prefs.getBool('onboarding_complete') ?? false;
       if (!mounted) return;
       if (onboardingDone) {

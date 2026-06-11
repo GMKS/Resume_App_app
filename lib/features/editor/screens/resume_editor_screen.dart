@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
@@ -331,7 +330,7 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
   }
 
   Future<void> _loadSectionPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final orderStr = prefs.getString('section_order_${widget.resumeId}');
     final format =
         prefs.getString('resume_format_${widget.resumeId}') ?? 'chronological';
@@ -367,12 +366,12 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
   }
 
   Future<void> _saveSectionOrder(List<String> order) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     await prefs.setString('section_order_${widget.resumeId}', order.join(','));
   }
 
   Future<void> _saveResumeFormat(String format) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     await prefs.setString('resume_format_${widget.resumeId}', format);
   }
 

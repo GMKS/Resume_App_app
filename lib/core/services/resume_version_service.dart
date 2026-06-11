@@ -1,10 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-
 import '../models/resume_model.dart';
 import 'resume_json.dart';
+import 'supabase_sync_service.dart';
 
 /// Service for managing resume version history in Firestore.
 /// Automatically saves previous versions before AI tailoring.
@@ -12,8 +11,6 @@ class ResumeVersionService {
   static final _auth = FirebaseAuth.instance;
   static final _db = FirebaseFirestore.instance;
   static const _collection = 'resume_versions';
-  static const _prefKey = 'sync_device_id';
-  static const _syncCodeKey = 'sync_account_code';
   static const _maxVersionsPerResume = 10;
 
   static Future<void> _deleteDocumentsInBatches(
@@ -29,28 +26,8 @@ class ResumeVersionService {
     }
   }
 
-  // ── Key Management (reuses sync code logic) ──
-
-  static Future<String?> _getSyncCode() async {
-    final prefs = await SharedPreferences.getInstance();
-    final code = prefs.getString(_syncCodeKey);
-    return (code != null && code.trim().isNotEmpty) ? code.trim() : null;
-  }
-
-  static Future<String> _getDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? id = prefs.getString(_prefKey);
-    if (id == null || id.isEmpty) {
-      id = const Uuid().v4();
-      await prefs.setString(_prefKey, id);
-    }
-    return id;
-  }
-
   static Future<String> _activeKey() async {
-    final code = await _getSyncCode();
-    if (code != null) return 'code_$code';
-    return _getDeviceId();
+    return SupabaseSyncService.currentUserId;
   }
 
   // ── Auth ──

@@ -14,6 +14,7 @@ import '../../../core/models/subscription_model.dart';
 import '../../../core/utils/shareable_export_file.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/feature_gate.dart';
+import '../../../shared/widgets/reading_mode_text.dart';
 
 class CoverLetterScreen extends ConsumerStatefulWidget {
   const CoverLetterScreen({super.key});
@@ -27,14 +28,19 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
   final _companyController = TextEditingController();
   final _jobDescriptionController = TextEditingController();
   final _nameController = TextEditingController();
-  
+
   String _selectedTone = 'Professional';
   String _selectedLength = 'Medium';
   bool _isGenerating = false;
   bool _isExporting = false;
   String? _generatedLetter;
 
-  final List<String> _tones = ['Professional', 'Enthusiastic', 'Formal', 'Creative'];
+  final List<String> _tones = [
+    'Professional',
+    'Enthusiastic',
+    'Formal',
+    'Creative'
+  ];
   final List<String> _lengths = ['Short', 'Medium', 'Long'];
 
   @override
@@ -193,7 +199,8 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
                     backgroundColor: Colors.grey[100],
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.white : AppColors.textPrimary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
                     ),
                   );
                 }).toList(),
@@ -224,7 +231,8 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
                     backgroundColor: Colors.grey[100],
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.white : AppColors.textPrimary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
                     ),
                   );
                 }).toList(),
@@ -241,11 +249,13 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Icon(Iconsax.magic_star),
-                label: Text(_isGenerating ? 'Generating...' : 'Generate Cover Letter'),
+                label: Text(
+                    _isGenerating ? 'Generating...' : 'Generate Cover Letter'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 54),
                 ),
@@ -270,11 +280,13 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        SelectableText(
-                          _generatedLetter!,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                height: 1.6,
-                              ),
+                        ReadingModeText(
+                          text: _generatedLetter!,
+                          fullScreenTitle: 'Cover Letter',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    height: 1.6,
+                                  ),
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -296,13 +308,15 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
                                         height: 18,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
                                             Colors.white,
                                           ),
                                         ),
                                       )
                                     : const Icon(Iconsax.document_download),
-                                label: Text(_isExporting ? 'Exporting...' : 'Export'),
+                                label: Text(
+                                    _isExporting ? 'Exporting...' : 'Export'),
                               ),
                             ),
                           ],
@@ -327,7 +341,8 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
         _nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill in job title, company name, and your name'),
+          content:
+              Text('Please fill in job title, company name, and your name'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -339,7 +354,7 @@ class _CoverLetterScreenState extends ConsumerState<CoverLetterScreen> {
     // Simulate AI generation
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
-      
+
       setState(() {
         _isGenerating = false;
         _generatedLetter = _generateSampleLetter();

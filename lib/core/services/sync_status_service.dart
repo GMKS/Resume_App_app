@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'storage_service.dart';
 
 class SyncStatusSnapshot {
   const SyncStatusSnapshot({
@@ -20,7 +20,7 @@ class SyncStatusService {
   static const String _lastSummaryKey = 'sync_last_summary';
 
   static Future<SyncStatusSnapshot> load() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final lastBackupAt = prefs.getInt(_lastBackupAtKey);
     final lastRestoreAt = prefs.getInt(_lastRestoreAtKey);
     final lastSummary = prefs.getString(_lastSummaryKey)?.trim();
@@ -42,7 +42,7 @@ class SyncStatusService {
     String summary, {
     DateTime? at,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final timestamp = (at ?? DateTime.now()).millisecondsSinceEpoch;
     await prefs.setInt(_lastBackupAtKey, timestamp);
     await prefs.setString(_lastSummaryKey, summary);
@@ -52,14 +52,14 @@ class SyncStatusService {
     String summary, {
     DateTime? at,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final timestamp = (at ?? DateTime.now()).millisecondsSinceEpoch;
     await prefs.setInt(_lastRestoreAtKey, timestamp);
     await prefs.setString(_lastSummaryKey, summary);
   }
 
   static Future<void> recordStatus(String summary) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     await prefs.setString(_lastSummaryKey, summary);
   }
 }

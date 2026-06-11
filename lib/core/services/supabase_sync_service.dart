@@ -1,12 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/resume_model.dart';
+import 'app_scope_service.dart';
 import 'free_plan_service.dart';
 import 'resume_json.dart';
+import 'storage_service.dart';
 
 /// Syncs resumes to/from Firebase Firestore using anonymous authentication.
 ///
@@ -46,7 +47,7 @@ class SupabaseSyncService {
     if (!FreePlanService.canUseCloudSync) {
       return null;
     }
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final code = prefs.getString(_syncCodeKey);
     return (code != null && code.trim().isNotEmpty) ? code.trim() : null;
   }
@@ -57,7 +58,7 @@ class SupabaseSyncService {
     if (!FreePlanService.canUseCloudSync) {
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     if (code == null || code.trim().isEmpty) {
       await prefs.remove(_syncCodeKey);
     } else {
@@ -70,7 +71,7 @@ class SupabaseSyncService {
   /// Returns the persistent device UUID (created once per device/browser).
   /// Used only when no sync code is set.
   static Future<String> getDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     String? id = prefs.getString(_prefKey);
     if (id == null || id.isEmpty) {
       id = const Uuid().v4();
@@ -84,8 +85,10 @@ class SupabaseSyncService {
   /// - The per-device UUID otherwise.
   static Future<String> _activeKey() async {
     final code = await getSyncCode();
-    if (code != null) return 'code_$code';
-    return getDeviceId();
+    if (code != null) {
+      return AppScopeService.cloudNamespaceKey('code_$code');
+    }
+    return AppScopeService.cloudNamespaceKey(await getDeviceId());
   }
 
   // ── Auth ───────────────────────────────────────────────────────────────────

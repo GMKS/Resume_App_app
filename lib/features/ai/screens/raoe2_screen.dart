@@ -9,6 +9,7 @@ import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/resume_version_service.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/reading_mode_text.dart';
 import '../../editor/screens/resume_editor_screen.dart'
     show currentResumeProvider;
 import '../../home/screens/home_screen.dart' show resumesProvider;
@@ -938,8 +939,9 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
             ),
           ),
           const SizedBox(height: 8),
-          SelectableText(
-            text.trim().isEmpty ? 'No content available.' : text.trim(),
+          ReadingModeText(
+            text: text.trim().isEmpty ? 'No content available.' : text.trim(),
+            fullScreenTitle: label,
             style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
           ),
         ],

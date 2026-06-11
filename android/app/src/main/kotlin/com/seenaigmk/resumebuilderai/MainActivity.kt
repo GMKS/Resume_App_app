@@ -20,13 +20,12 @@ class MainActivity : FlutterActivity() {
 				"getConfig" -> {
 					result.success(
 						mapOf(
+							"APP_DATA_NAMESPACE" to readStringResource("app_data_namespace"),
 							"PLAY_WEEKLY_PRODUCT_ID" to readStringResource("play_weekly_product_id"),
 							"PLAY_MONTHLY_PRODUCT_ID" to readStringResource("play_monthly_product_id"),
 							"PLAY_QUARTERLY_PRODUCT_ID" to readStringResource("play_quarterly_product_id"),
 							"PLAY_YEARLY_PRODUCT_ID" to readStringResource("play_yearly_product_id"),
 							"GROQ_API_KEY" to readStringResource("groq_api_key"),
-							"ENABLE_DUMMY_PAYMENTS" to readStringResource("enable_dummy_payments"),
-							"DISABLE_GOOGLE_PLAY_BILLING" to readStringResource("disable_google_play_billing"),
 							"FACEBOOK_APP_ID" to readStringResource("facebook_app_id"),
 							"FACEBOOK_CLIENT_TOKEN" to readStringResource("facebook_client_token"),
 							"ENABLE_FACEBOOK_AUTH" to readStringResource("facebook_auth_enabled"),

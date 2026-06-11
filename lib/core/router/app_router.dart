@@ -3,7 +3,6 @@ import '../../features/ai/screens/raoe2_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../debug/store_screenshot_seed.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
@@ -47,10 +46,11 @@ import '../../features/profile/screens/privacy_security_screen.dart';
 import '../../features/profile/screens/help_support_screen.dart';
 import '../../features/profile/screens/terms_conditions_screen.dart';
 import '../../features/profile/screens/about_screen.dart';
+import '../services/storage_service.dart';
 
 // Onboarding completion provider
 final onboardingCompleteProvider = FutureProvider<bool>((ref) async {
-  final prefs = await SharedPreferences.getInstance();
+  final prefs = StorageService.prefs;
   return prefs.getBool('onboarding_complete') ?? false;
 });
 

@@ -33,12 +33,22 @@ fun signingValue(propertyKey: String, envKey: String): String? {
     return value?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-fun configValue(propertyKey: String, envKey: String = propertyKey): String? {
+fun configValue(
+    propertyKey: String,
+    envKey: String = propertyKey,
+    preferLocal: Boolean = false,
+    includeDotEnv: Boolean = true,
+): String? {
     val gradleValue = project.findProperty(propertyKey)?.toString()
     val localValue = localProperties.getProperty(propertyKey)
     val envValue = System.getenv(envKey)
-    val dotEnvValue = dotEnvProperties.getProperty(propertyKey)
-    return listOf(gradleValue, localValue, envValue, dotEnvValue)
+    val dotEnvValue = if (includeDotEnv) dotEnvProperties.getProperty(propertyKey) else null
+    val candidates = if (preferLocal) {
+        listOf(localValue, gradleValue, envValue, dotEnvValue)
+    } else {
+        listOf(gradleValue, localValue, envValue, dotEnvValue)
+    }
+    return candidates
         .firstOrNull { !it.isNullOrBlank() }
         ?.trim()
 }
@@ -126,13 +136,25 @@ val defaultOtpBaseUrl = "https://bnxdoumofrzfzubsivgs.supabase.co/functions/v1"
 val configuredOtpBaseUrl = configValue("OTP_BASE_URL")
 val configuredOtpSendUrl = configValue("OTP_SEND_URL")
 val configuredOtpVerifyUrl = configValue("OTP_VERIFY_URL")
-val playWeeklyProductId = configValue("PLAY_WEEKLY_PRODUCT_ID") ?: "weekly_pro"
-val playMonthlyProductId = configValue("PLAY_MONTHLY_PRODUCT_ID") ?: "monthly_pro"
-val playQuarterlyProductId = configValue("PLAY_QUARTERLY_PRODUCT_ID") ?: "quarterly_pro"
-val playYearlyProductId = configValue("PLAY_YEARLY_PRODUCT_ID") ?: "yearly_pro"
+val playWeeklyProductId = configValue("PLAY_WEEKLY_PRODUCT_ID", preferLocal = true, includeDotEnv = false) ?: ""
+val playMonthlyProductId = configValue("PLAY_MONTHLY_PRODUCT_ID", preferLocal = true, includeDotEnv = false) ?: ""
+val playQuarterlyProductId = configValue("PLAY_QUARTERLY_PRODUCT_ID", preferLocal = true, includeDotEnv = false) ?: ""
+val playYearlyProductId = configValue("PLAY_YEARLY_PRODUCT_ID", preferLocal = true, includeDotEnv = false) ?: ""
+val configuredAppDataNamespace = configValue("APP_DATA_NAMESPACE", preferLocal = true, includeDotEnv = false) ?: ""
+val appDataNamespace = configuredAppDataNamespace.ifBlank {
+    if (isReleaseTaskRequested) "production" else "debug"
+}
 val groqApiKey = configValue("GROQ_API_KEY") ?: ""
-val dummyPaymentsEnabled = configValue("ENABLE_DUMMY_PAYMENTS") ?: ""
-val googlePlayBillingDisabled = configValue("DISABLE_GOOGLE_PLAY_BILLING") ?: ""
+val dummyPaymentsEnabled = localProperties
+    .getProperty("ENABLE_DUMMY_PAYMENTS")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: "false"
+val googlePlayBillingDisabled = localProperties
+    .getProperty("DISABLE_GOOGLE_PLAY_BILLING")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: "false"
 val otpBaseUrl = when {
     !configuredOtpBaseUrl.isNullOrBlank() -> configuredOtpBaseUrl.trim()
     configuredOtpSendUrl.isNullOrBlank() && configuredOtpVerifyUrl.isNullOrBlank() -> defaultOtpBaseUrl
@@ -163,6 +185,30 @@ if (isReleaseTaskRequested && !hasReleaseSigning) {
     error(
         "Release signing is not configured. Add android/key.properties or set ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD.",
     )
+}
+
+if (isReleaseTaskRequested) {
+    val missingPlayProductIds = listOf(
+        "PLAY_WEEKLY_PRODUCT_ID" to playWeeklyProductId,
+        "PLAY_MONTHLY_PRODUCT_ID" to playMonthlyProductId,
+        "PLAY_QUARTERLY_PRODUCT_ID" to playQuarterlyProductId,
+        "PLAY_YEARLY_PRODUCT_ID" to playYearlyProductId,
+    ).filter { it.second.isBlank() }
+        .map { it.first }
+
+    if (missingPlayProductIds.isNotEmpty()) {
+        error(
+            "Google Play Billing is not production-ready. Configure these release product IDs in android/local.properties or Gradle properties: ${missingPlayProductIds.joinToString(", ")}.",
+        )
+    }
+
+    if (parseBooleanFlag(dummyPaymentsEnabled) == true) {
+        error("Release builds must not enable dummy payments.")
+    }
+
+    if (parseBooleanFlag(googlePlayBillingDisabled) == true) {
+        error("Release builds must not disable Google Play Billing.")
+    }
 }
 
 android {
@@ -202,9 +248,8 @@ android {
         resValue("string", "play_monthly_product_id", playMonthlyProductId)
         resValue("string", "play_quarterly_product_id", playQuarterlyProductId)
         resValue("string", "play_yearly_product_id", playYearlyProductId)
+        resValue("string", "app_data_namespace", appDataNamespace)
         resValue("string", "groq_api_key", groqApiKey)
-        resValue("string", "enable_dummy_payments", dummyPaymentsEnabled)
-        resValue("string", "disable_google_play_billing", googlePlayBillingDisabled)
 
         ndk {
             abiFilters += setOf("armeabi-v7a", "arm64-v8a")

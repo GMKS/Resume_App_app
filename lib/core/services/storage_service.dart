@@ -3,16 +3,80 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/resume_model.dart';
 import '../models/subscription_model.dart';
+import 'app_scope_service.dart';
 import 'resume_version_service.dart';
 import 'supabase_sync_service.dart';
 
+class AppPreferences {
+  AppPreferences(this._prefs);
+
+  final SharedPreferences _prefs;
+
+  String? getString(String key) => _prefs.getString(AppScopeService.prefKey(key));
+
+  int? getInt(String key) => _prefs.getInt(AppScopeService.prefKey(key));
+
+  bool? getBool(String key) => _prefs.getBool(AppScopeService.prefKey(key));
+
+  double? getDouble(String key) => _prefs.getDouble(AppScopeService.prefKey(key));
+
+  Future<bool> setString(String key, String value) {
+    return _prefs.setString(AppScopeService.prefKey(key), value);
+  }
+
+  Future<bool> setInt(String key, int value) {
+    return _prefs.setInt(AppScopeService.prefKey(key), value);
+  }
+
+  Future<bool> setBool(String key, bool value) {
+    return _prefs.setBool(AppScopeService.prefKey(key), value);
+  }
+
+  Future<bool> setDouble(String key, double value) {
+    return _prefs.setDouble(AppScopeService.prefKey(key), value);
+  }
+
+  Future<bool> remove(String key) {
+    return _prefs.remove(AppScopeService.prefKey(key));
+  }
+
+  bool containsKey(String key) {
+    return _prefs.containsKey(AppScopeService.prefKey(key));
+  }
+
+  Set<String> getKeys() {
+    final prefix = AppScopeService.prefPrefix;
+    return _prefs
+        .getKeys()
+        .where((key) => key.startsWith(prefix))
+        .map((key) => key.substring(prefix.length))
+        .toSet();
+  }
+
+  Future<bool> clear() async {
+    final scopedKeys = _prefs
+        .getKeys()
+        .where((key) => key.startsWith(AppScopeService.prefPrefix))
+        .toList(growable: false);
+
+    var success = true;
+    for (final key in scopedKeys) {
+      success = await _prefs.remove(key) && success;
+    }
+    return success;
+  }
+}
+
 class StorageService {
   static late Box<ResumeModel> _resumeBox;
-  static late SharedPreferences _prefs;
+  static late SharedPreferences _rawPrefs;
+  static late AppPreferences _prefs;
 
-  static const String resumeBoxName = 'resumes';
+  static String get resumeBoxName => AppScopeService.boxName('resumes');
 
   static Future<void> init() async {
+    AppScopeService.initialize();
+
     // Guard every registration so hot-restarts in debug mode don't throw
     // "Adapter already registered" errors that prevent the box from opening.
     if (!Hive.isAdapterRegistered(0))  Hive.registerAdapter(ResumeModelAdapter());
@@ -33,7 +97,8 @@ class StorageService {
         : await Hive.openBox<ResumeModel>(resumeBoxName);
 
     // Initialize SharedPreferences
-    _prefs = await SharedPreferences.getInstance();
+    _rawPrefs = await SharedPreferences.getInstance();
+    _prefs = AppPreferences(_rawPrefs);
   }
 
   // Resume operations
@@ -56,6 +121,21 @@ class StorageService {
 
   static List<ResumeModel> getAllResumes() {
     return _resumeBox.values.toList();
+  }
+
+  static bool hasResumeTitle(
+    String title, {
+    String? excludingId,
+  }) {
+    final normalizedTitle = title.trim().toLowerCase();
+    if (normalizedTitle.isEmpty) {
+      return false;
+    }
+
+    return _resumeBox.values.any(
+      (resume) => resume.id != excludingId &&
+          resume.title.trim().toLowerCase() == normalizedTitle,
+    );
   }
 
   static bool isPremiumUser() {
@@ -98,7 +178,9 @@ class StorageService {
   }
 
   // Preferences operations
-  static SharedPreferences get prefs => _prefs;
+  static SharedPreferences get rawPrefs => _rawPrefs;
+
+  static AppPreferences get prefs => _prefs;
 
   static Future<void> setOnboardingComplete(bool value) async {
     await _prefs.setBool('onboarding_complete', value);

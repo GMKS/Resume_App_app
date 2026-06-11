@@ -14,12 +14,34 @@ import '../../../shared/widgets/responsive_content.dart';
 import '../../home/screens/home_screen.dart';
 import '../../home/widgets/resume_card.dart';
 
-class ResumesTabScreen extends ConsumerWidget {
+class ResumesTabScreen extends ConsumerStatefulWidget {
   const ResumesTabScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ResumesTabScreen> createState() => _ResumesTabScreenState();
+}
+
+class _ResumesTabScreenState extends ConsumerState<ResumesTabScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final resumes = ref.watch(resumesProvider);
+    final query = _searchController.text.trim().toLowerCase();
+    final filteredResumes = resumes.where((resume) {
+      if (query.isEmpty) {
+        return true;
+      }
+      final title = resume.title.trim().toLowerCase();
+      final fullName = resume.personalInfo.fullName.trim().toLowerCase();
+      return title.contains(query) || fullName.contains(query);
+    }).toList(growable: false);
 
     return Scaffold(
       body: ResponsiveContent(
@@ -45,6 +67,25 @@ class ResumesTabScreen extends ConsumerWidget {
                 },
                 onCreate: () => _createNewResume(context, ref),
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Iconsax.search_normal),
+                  hintText: 'Search resumes by name',
+                  suffixIcon: query.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Iconsax.close_circle),
+                          tooltip: 'Clear search',
+                        ),
+                ),
+              ),
               const SizedBox(height: 20),
               if (resumes.isEmpty)
                 const AppEmptyStateCard(
@@ -54,8 +95,16 @@ class ResumesTabScreen extends ConsumerWidget {
                   message:
                       'Create your first resume to start editing, previewing, and exporting.',
                 )
+              else if (filteredResumes.isEmpty)
+                const AppEmptyStateCard(
+                  icon: Iconsax.search_normal,
+                  accentColor: AppColors.primary,
+                  title: 'No matching resumes',
+                  message:
+                      'Try a different resume name to find the record you need.',
+                )
               else
-                ...resumes.asMap().entries.map((entry) {
+                ...filteredResumes.asMap().entries.map((entry) {
                   final index = entry.key;
                   final resume = entry.value;
                   return Padding(

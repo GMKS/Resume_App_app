@@ -1,7 +1,8 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_config_service.dart';
+import 'app_scope_service.dart';
+import 'storage_service.dart';
 
 class AiApiKeyStorageService {
   AiApiKeyStorageService._();
@@ -10,24 +11,28 @@ class AiApiKeyStorageService {
   static const String _managedConfigKey = 'GROQ_API_KEY';
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
 
+  static String get _scopedStorageKey =>
+      '${AppScopeService.scopeId}.$_storageKey';
+
   static Future<String> read() async {
     final managedValue = AppConfigService.read(_managedConfigKey);
     if (managedValue.isNotEmpty) {
       return managedValue;
     }
 
-    final storedValue = (await _storage.read(key: _storageKey))?.trim() ?? '';
+    final storedValue =
+      (await _storage.read(key: _scopedStorageKey))?.trim() ?? '';
     if (storedValue.isNotEmpty) {
       return storedValue;
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final legacyValue = prefs.getString(_storageKey)?.trim() ?? '';
     if (legacyValue.isEmpty) {
       return '';
     }
 
-    await _storage.write(key: _storageKey, value: legacyValue);
+    await _storage.write(key: _scopedStorageKey, value: legacyValue);
     await prefs.remove(_storageKey);
     return legacyValue;
   }
@@ -39,14 +44,14 @@ class AiApiKeyStorageService {
       return;
     }
 
-    await _storage.write(key: _storageKey, value: normalized);
-    final prefs = await SharedPreferences.getInstance();
+    await _storage.write(key: _scopedStorageKey, value: normalized);
+    final prefs = StorageService.prefs;
     await prefs.remove(_storageKey);
   }
 
   static Future<void> clear() async {
-    await _storage.delete(key: _storageKey);
-    final prefs = await SharedPreferences.getInstance();
+    await _storage.delete(key: _scopedStorageKey);
+    final prefs = StorageService.prefs;
     await prefs.remove(_storageKey);
   }
 }

@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/models/subscription_model.dart';
 import '../../../core/services/app_version_service.dart';
+import '../../../core/services/storage_service.dart';
 import '../../../core/services/user_session_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/subscription_service.dart';
@@ -158,11 +159,7 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            subscription.isPremium()
-                                ? subscription.cancelAtPeriodEnd
-                                    ? 'Cancels ${_formatDate(subscription.expiryDate!)}'
-                                    : 'Expires ${_formatDate(subscription.expiryDate!)}'
-                                : 'Upgrade to unlock premium features',
+                            _subscriptionStatusLabel(subscription),
                             style:
                                 Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: AppColors.textSecondary,
@@ -288,8 +285,25 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  String _subscriptionStatusLabel(SubscriptionModel subscription) {
+    if (!subscription.isPremium()) {
+      return 'Upgrade to unlock premium features';
+    }
+
+    final expiryDate = subscription.expiryDate;
+    if (expiryDate == null) {
+      return subscription.isStoreManaged
+          ? 'Managed in Google Play'
+          : 'Premium active';
+    }
+
+    return subscription.cancelAtPeriodEnd
+        ? 'Cancels ${_formatDate(expiryDate)}'
+        : 'Expires ${_formatDate(expiryDate)}';
+  }
+
   Future<_ProfileIdentity> _loadProfileIdentity() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final rawDisplayName = prefs.getString('display_name')?.trim() ?? '';
     final rawContact = UserSessionService.readStoredContact(prefs);
     final rawPhotoUrl = prefs.getString('photo_url')?.trim() ?? '';
@@ -362,7 +376,7 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final trimmed = savedName.trim();
     if (trimmed.isEmpty) {
       await prefs.remove('display_name');
@@ -407,7 +421,7 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
             onPressed: () async {
               Navigator.pop(dialogCtx);
               // Clear saved session
-              final prefs = await SharedPreferences.getInstance();
+              final prefs = StorageService.prefs;
               await prefs.setBool('is_logged_in', false);
               await UserSessionService.clearStoredContact(prefs);
               await prefs.remove('display_name');

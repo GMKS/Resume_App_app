@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:resume_builder/core/services/twilio_service.dart';
+import 'package:resume_builder/core/services/storage_service.dart';
 import 'package:resume_builder/core/services/user_session_service.dart';
 import '../widgets/otp_verification_widget.dart';
 import '../widgets/phone_entry_widget.dart';
@@ -45,7 +45,7 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen>
   }
 
   Future<void> _checkSavedSession() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
     final phone = UserSessionService.readStoredContact(prefs);
     if (!mounted) return;
@@ -155,7 +155,7 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen>
         );
 
         // Save login session for flash login
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = StorageService.prefs;
         await UserSessionService.persistPhoneSession(prefs, _phone);
 
         // Navigate to dashboard after success

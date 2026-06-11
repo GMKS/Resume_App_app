@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_config_service.dart';
+import 'storage_service.dart';
 import 'user_session_service.dart';
 
 /// Result object returned by every social sign-in method.
@@ -387,7 +387,7 @@ class SocialAuthService {
 
   Future<void> _persistSession(User? user, String provider) async {
     if (user == null) return;
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     await prefs.setBool('is_logged_in', true);
     await UserSessionService.persistSocialContact(prefs, user.email ?? user.uid);
     await prefs.setString('auth_provider', provider);

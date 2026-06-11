@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/billing_client_wrappers.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 import '../models/subscription_model.dart';
 import 'app_config_service.dart';
@@ -10,10 +12,44 @@ String _readPlayBillingConfig(String key) {
   return AppConfigService.read(key);
 }
 
-class PlayBillingService {
-  static bool get _isDisabledForCurrentBuild =>
-      AppConfigService.readBool('DISABLE_GOOGLE_PLAY_BILLING');
+class PlayPurchaseEntitlement {
+  const PlayPurchaseEntitlement({
+    required this.plan,
+    required this.productId,
+    required this.purchaseToken,
+    required this.orderId,
+    required this.purchaseTime,
+    required this.cancelAtPeriodEnd,
+    required this.purchase,
+  });
 
+  factory PlayPurchaseEntitlement.fromPurchase(
+    GooglePlayPurchaseDetails purchase,
+    SubscriptionPlan plan,
+  ) {
+    return PlayPurchaseEntitlement(
+      plan: plan,
+      productId: purchase.productID,
+      purchaseToken: purchase.verificationData.serverVerificationData,
+      orderId: purchase.purchaseID ?? purchase.productID,
+      purchaseTime: DateTime.fromMillisecondsSinceEpoch(
+        purchase.billingClientPurchase.purchaseTime,
+      ),
+      cancelAtPeriodEnd: !purchase.billingClientPurchase.isAutoRenewing,
+      purchase: purchase,
+    );
+  }
+
+  final SubscriptionPlan plan;
+  final String productId;
+  final String purchaseToken;
+  final String orderId;
+  final DateTime purchaseTime;
+  final bool cancelAtPeriodEnd;
+  final GooglePlayPurchaseDetails purchase;
+}
+
+class PlayBillingService {
   static String get weeklyProductId =>
       _readPlayBillingConfig('PLAY_WEEKLY_PRODUCT_ID');
   static String get monthlyProductId =>
@@ -31,16 +67,12 @@ class PlayBillingService {
 
   void Function(PurchaseDetails purchase, SubscriptionPlan plan)?
       onPurchaseSuccess;
+  void Function(PlayPurchaseEntitlement entitlement)? onEntitlementConfirmed;
   void Function(String message)? onPurchaseError;
   void Function(bool isPending)? onPendingStateChanged;
 
   static bool get supportsGooglePlayBilling =>
-      !_isDisabledForCurrentBuild &&
-      !kIsWeb &&
-      defaultTargetPlatform == TargetPlatform.android;
-
-  static bool get canUseTestPurchaseFallback =>
-      supportsGooglePlayBilling && !kReleaseMode;
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   static String? productIdForPlan(SubscriptionPlan plan) {
     switch (plan) {
@@ -79,6 +111,49 @@ class PlayBillingService {
         if (quarterlyProductId.isNotEmpty) quarterlyProductId,
         yearlyProductId,
       };
+
+  static Future<PlayPurchaseEntitlement?> fetchActiveEntitlement() async {
+    if (!supportsGooglePlayBilling) {
+      return null;
+    }
+
+    final inAppPurchase = InAppPurchase.instance;
+    final isAvailable = await inAppPurchase.isAvailable();
+    if (!isAvailable) {
+      return null;
+    }
+
+    final androidAddition = inAppPurchase
+        .getPlatformAddition<InAppPurchaseAndroidPlatformAddition>();
+    final response = await androidAddition.queryPastPurchases();
+    if (response.error != null) {
+      throw StateError(
+        response.error!.message.isNotEmpty
+            ? response.error!.message
+            : 'Google Play past purchases could not be queried.',
+      );
+    }
+
+    final matchingPurchases = response.pastPurchases
+        .where(_isActiveGooglePlayPurchase)
+        .toList(growable: false)
+      ..sort(
+        (left, right) => right.billingClientPurchase.purchaseTime
+            .compareTo(left.billingClientPurchase.purchaseTime),
+      );
+
+    if (matchingPurchases.isEmpty) {
+      return null;
+    }
+
+    final purchase = matchingPurchases.first;
+    final plan = planForProductId(purchase.productID);
+    if (plan == null) {
+      return null;
+    }
+
+    return PlayPurchaseEntitlement.fromPurchase(purchase, plan);
+  }
 
   static String get _missingProductsMessage {
     final configuredIds = _productIds.toList(growable: false)..sort();
@@ -162,7 +237,21 @@ class PlayBillingService {
       return;
     }
 
-    final purchaseParam = PurchaseParam(productDetails: product);
+    PurchaseParam purchaseParam = PurchaseParam(productDetails: product);
+
+    final previousPurchase = await _findActiveGooglePlayPurchase();
+    if (previousPurchase != null && previousPurchase.productID != product.id) {
+      purchaseParam = GooglePlayPurchaseParam(
+        productDetails: product,
+        changeSubscriptionParam: ChangeSubscriptionParam(
+          oldPurchaseDetails: previousPurchase,
+          replacementMode: ReplacementMode.withTimeProration,
+        ),
+      );
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      purchaseParam = GooglePlayPurchaseParam(productDetails: product);
+    }
+
     final started = await _inAppPurchase.buyNonConsumable(
       purchaseParam: purchaseParam,
     );
@@ -173,11 +262,27 @@ class PlayBillingService {
     }
   }
 
-  Future<void> restorePurchases() async {
+  Future<PlayPurchaseEntitlement?> restorePurchases() async {
     if (!supportsGooglePlayBilling) {
-      return;
+      return null;
     }
     await _inAppPurchase.restorePurchases();
+    return refreshEntitlement();
+  }
+
+  Future<PlayPurchaseEntitlement?> refreshEntitlement() async {
+    try {
+      final entitlement = await fetchActiveEntitlement();
+      if (entitlement != null) {
+        onEntitlementConfirmed?.call(entitlement);
+      }
+      return entitlement;
+    } catch (_) {
+      onPurchaseError?.call(
+        'Could not confirm the current Google Play subscription status.',
+      );
+      return null;
+    }
   }
 
   Future<void> _handlePurchaseUpdates(
@@ -201,6 +306,11 @@ class PlayBillingService {
         case PurchaseStatus.restored:
           onPendingStateChanged?.call(false);
           onPurchaseSuccess?.call(purchase, plan);
+          if (purchase is GooglePlayPurchaseDetails) {
+            onEntitlementConfirmed?.call(
+              PlayPurchaseEntitlement.fromPurchase(purchase, plan),
+            );
+          }
           break;
         case PurchaseStatus.canceled:
           onPendingStateChanged?.call(false);
@@ -221,6 +331,24 @@ class PlayBillingService {
     return error.message.isNotEmpty
         ? error.message
         : 'Google Play could not complete the purchase.';
+  }
+
+  Future<GooglePlayPurchaseDetails?> _findActiveGooglePlayPurchase() async {
+    try {
+      final entitlement = await fetchActiveEntitlement();
+      return entitlement?.purchase;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _isActiveGooglePlayPurchase(GooglePlayPurchaseDetails purchase) {
+    final plan = planForProductId(purchase.productID);
+    return plan != null &&
+        purchase.status != PurchaseStatus.error &&
+        purchase.status != PurchaseStatus.canceled &&
+        purchase.billingClientPurchase.purchaseState ==
+            PurchaseStateWrapper.purchased;
   }
 
   void dispose() {

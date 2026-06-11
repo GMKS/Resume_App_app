@@ -3,9 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/subscription_pricing.dart';
+import 'storage_service.dart';
 import 'subscription_pricing_service.dart';
 import 'user_session_service.dart';
 
@@ -17,7 +17,7 @@ class PricingRegionService {
     Locale? localeOverride,
     bool forceRefresh = false,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     final cachedRegion = _regionFromName(prefs.getString(_regionCacheKey));
     final cachedCountryCode =
         prefs.getString(_countryCacheKey)?.trim().toUpperCase();

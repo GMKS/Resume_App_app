@@ -142,25 +142,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showAiApiKeySheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => const _AiApiKeySheet(),
-    );
-  }
-
-  void _handleAiServiceTap() {
-    if (AppConfigService.read('GROQ_API_KEY').isNotEmpty) {
-      context.push('/ai-assistant');
-      return;
-    }
-
-    _showAiApiKeySheet();
-  }
-
   void _showBackupSyncSheet() {
     if (!FreePlanService.canUseCloudSync) {
       showUpgradePromptSheet(
@@ -604,18 +585,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 24),
             _buildSectionHeader('AI FEATURES'),
             _buildSettingTile(
-              icon: Iconsax.cpu,
-              title: 'AI Service',
-              subtitle: AppConfigService.read('GROQ_API_KEY').isNotEmpty
-                  ? 'Managed by the app. No personal API key needed'
-                  : 'Managed by the app. AI is unavailable right now',
-              onTap: _handleAiServiceTap,
-            ),
-            _buildSettingTile(
               icon: Iconsax.magic_star,
               iconColor: const Color(0xFF8B5CF6),
               title: 'AI Assistant',
-              subtitle: 'Generate & tailor resume content with AI',
+              subtitle: AppConfigService.read('GROQ_API_KEY').isNotEmpty
+                  ? 'Managed by the app. Tap to open assistant'
+                  : 'AI is unavailable right now',
               onTap: () => context.push('/ai-assistant'),
             ),
 
@@ -1589,7 +1564,7 @@ class _AiApiKeySheetState extends State<_AiApiKeySheet> {
                   ),
                   child: Text(
                     isConfigured ? 'Open AI Assistant' : 'Close',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
                     ),

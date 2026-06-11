@@ -51,16 +51,11 @@ class AppConfigService {
       'PLAY_YEARLY_PRODUCT_ID' => const String.fromEnvironment(
           'PLAY_YEARLY_PRODUCT_ID',
         ),
+      'APP_DATA_NAMESPACE' => const String.fromEnvironment(
+          'APP_DATA_NAMESPACE',
+        ),
       'GROQ_API_KEY' => const String.fromEnvironment('GROQ_API_KEY'),
       'RAZORPAY_KEY_ID' => const String.fromEnvironment('RAZORPAY_KEY_ID'),
-      'ENABLE_DUMMY_PAYMENTS' => const String.fromEnvironment(
-          'ENABLE_DUMMY_PAYMENTS',
-          defaultValue: 'false',
-        ),
-      'DISABLE_GOOGLE_PLAY_BILLING' => const String.fromEnvironment(
-          'DISABLE_GOOGLE_PLAY_BILLING',
-          defaultValue: 'false',
-        ),
       'ENABLE_FACEBOOK_AUTH' => const String.fromEnvironment(
           'ENABLE_FACEBOOK_AUTH',
           defaultValue: 'false',

@@ -12,11 +12,16 @@ import '../../../shared/widgets/app_loading_state.dart';
 import '../models/job_tracker_models.dart';
 import '../services/job_tracker_service.dart';
 
-enum _JobTrackerView { table, kanban }
-
-enum _JobDateFilter { all, last7, last30, last90 }
-
 enum _JobAction { details, edit, addNote, tailor, preview, delete }
+
+enum _JobMetricFilter {
+  applied,
+  interviews,
+  offers,
+  rejected,
+  saved,
+  offerRate,
+}
 
 class JobTrackerScreen extends ConsumerStatefulWidget {
   const JobTrackerScreen({super.key});
@@ -26,18 +31,13 @@ class JobTrackerScreen extends ConsumerStatefulWidget {
 }
 
 class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
-  final TextEditingController _searchController = TextEditingController();
   final DateFormat _dateFormat = DateFormat('dd MMM yyyy');
+  final GlobalKey _tableSectionKey = GlobalKey();
 
-  JobApplicationStatus? _statusFilter;
-  String? _companyFilter;
-  String? _roleFilter;
-  _JobDateFilter _dateFilter = _JobDateFilter.all;
-  _JobTrackerView _view = _JobTrackerView.table;
+  _JobMetricFilter? _metricFilter;
 
   @override
   void dispose() {
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -115,23 +115,6 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
       return;
     }
     _showSnackBar('Job removed from tracker.');
-  }
-
-  Future<void> _moveJob(
-    JobApplicationRecord job,
-    JobApplicationStatus nextStatus,
-  ) async {
-    try {
-      await ref
-          .read(jobTrackerProvider.notifier)
-          .moveJob(job.jobId, nextStatus);
-      if (!mounted) {
-        return;
-      }
-      _showSnackBar('${job.company} moved to ${nextStatus.label}.');
-    } catch (error) {
-      _showSnackBar(error.toString(), isError: true);
-    }
   }
 
   Future<void> _showAddNoteDialog(JobApplicationRecord job) async {
@@ -294,55 +277,60 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
 
   void _clearFilters() {
     setState(() {
-      _statusFilter = null;
-      _companyFilter = null;
-      _roleFilter = null;
-      _dateFilter = _JobDateFilter.all;
-      _searchController.clear();
+      _metricFilter = null;
     });
   }
 
-  List<JobApplicationRecord> _applyFilters(List<JobApplicationRecord> jobs) {
-    final query = _searchController.text.trim().toLowerCase();
-    final now = DateTime.now();
-
-    bool matchesDate(JobApplicationRecord job) {
-      if (_dateFilter == _JobDateFilter.all) {
-        return true;
-      }
-      final referenceDate = job.appliedDate ?? job.createdAt;
-      final duration = now.difference(referenceDate);
-      switch (_dateFilter) {
-        case _JobDateFilter.all:
-          return true;
-        case _JobDateFilter.last7:
-          return duration.inDays <= 7;
-        case _JobDateFilter.last30:
-          return duration.inDays <= 30;
-        case _JobDateFilter.last90:
-          return duration.inDays <= 90;
-      }
+  Future<void> _focusTableSection() async {
+    final sectionContext = _tableSectionKey.currentContext;
+    if (sectionContext == null) {
+      return;
     }
+    await Scrollable.ensureVisible(
+      sectionContext,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOut,
+      alignment: 0.08,
+    );
+  }
 
+  String _metricFilterLabel(_JobMetricFilter filter) {
+    switch (filter) {
+      case _JobMetricFilter.applied:
+        return 'Applied jobs';
+      case _JobMetricFilter.interviews:
+        return 'Interview jobs';
+      case _JobMetricFilter.offers:
+        return 'Offer jobs';
+      case _JobMetricFilter.rejected:
+        return 'Rejected jobs';
+      case _JobMetricFilter.saved:
+        return 'Saved jobs';
+      case _JobMetricFilter.offerRate:
+        return 'Offer rate jobs';
+    }
+  }
+
+  Future<void> _activateMetricFilter(_JobMetricFilter filter) async {
+    setState(() {
+      _metricFilter = filter;
+    });
+    await _focusTableSection();
+  }
+
+  List<JobApplicationRecord> _applyFilters(List<JobApplicationRecord> jobs) {
     return jobs.where((job) {
-      final matchesQuery = query.isEmpty ||
-          job.company.toLowerCase().contains(query) ||
-          job.role.toLowerCase().contains(query) ||
-          job.location.toLowerCase().contains(query) ||
-          job.parsedSkills
-              .any((skill) => skill.toLowerCase().contains(query)) ||
-          job.parsedKeywords
-              .any((keyword) => keyword.toLowerCase().contains(query));
-      final matchesStatus =
-          _statusFilter == null || job.status == _statusFilter;
-      final matchesCompany =
-          _companyFilter == null || job.company == _companyFilter;
-      final matchesRole = _roleFilter == null || job.role == _roleFilter;
-      return matchesQuery &&
-          matchesStatus &&
-          matchesCompany &&
-          matchesRole &&
-          matchesDate(job);
+      return switch (_metricFilter) {
+        null => true,
+        _JobMetricFilter.applied => job.status.countsAsApplied,
+        _JobMetricFilter.interviews =>
+          job.status == JobApplicationStatus.interview,
+        _JobMetricFilter.offers => job.status == JobApplicationStatus.offer,
+        _JobMetricFilter.rejected =>
+          job.status == JobApplicationStatus.rejected,
+        _JobMetricFilter.saved => job.status == JobApplicationStatus.saved,
+        _JobMetricFilter.offerRate => job.status == JobApplicationStatus.offer,
+      };
     }).toList(growable: false);
   }
 
@@ -368,18 +356,9 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
     };
     final filteredJobs = _applyFilters(state.jobs);
     final analytics = service.buildAnalytics(state.jobs);
-    final companyOptions = state.jobs
-        .map((job) => job.company)
-        .where((value) => value.trim().isNotEmpty)
-        .toSet()
-        .toList(growable: false)
-      ..sort();
-    final roleOptions = state.jobs
-        .map((job) => job.role)
-        .where((value) => value.trim().isNotEmpty)
-        .toSet()
-        .toList(growable: false)
-      ..sort();
+    final activeTableTitle = _metricFilter == null
+        ? 'Application Table'
+        : _metricFilterLabel(_metricFilter!);
 
     return Scaffold(
       appBar: AppBar(
@@ -407,31 +386,18 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
           children: [
-            _HeroSummaryCard(
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: () => _openJobForm(),
+                icon: const Icon(Iconsax.add),
+                label: const Text('Add New Job'),
+              ),
+            ).animate().fadeIn(duration: 250.ms).slideY(begin: 0.06, end: 0),
+            const SizedBox(height: 16),
+            _AnalyticsGrid(
               analytics: analytics,
-              onAddJob: () => _openJobForm(),
-            ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.08, end: 0),
-            const SizedBox(height: 16),
-            _AnalyticsGrid(analytics: analytics),
-            const SizedBox(height: 16),
-            _FilterPanel(
-              searchController: _searchController,
-              selectedStatus: _statusFilter,
-              selectedCompany: _companyFilter,
-              selectedRole: _roleFilter,
-              selectedDateFilter: _dateFilter,
-              selectedView: _view,
-              companyOptions: companyOptions,
-              roleOptions: roleOptions,
-              onSearchChanged: (_) => setState(() {}),
-              onStatusChanged: (status) =>
-                  setState(() => _statusFilter = status),
-              onCompanyChanged: (company) =>
-                  setState(() => _companyFilter = company),
-              onRoleChanged: (role) => setState(() => _roleFilter = role),
-              onDateFilterChanged: (filter) =>
-                  setState(() => _dateFilter = filter),
-              onViewChanged: (view) => setState(() => _view = view),
+              onMetricTap: _activateMetricFilter,
             ),
             if (analytics.upcomingReminders.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -442,15 +408,14 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
             ],
             const SizedBox(height: 16),
             Row(
+              key: _tableSectionKey,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _view == _JobTrackerView.table
-                            ? 'Application Table'
-                            : 'Kanban Pipeline',
+                        activeTableTitle,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -462,14 +427,26 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
                               color: AppColors.textSecondary,
                             ),
                       ),
+                      if (_metricFilter != null) ...[
+                        const SizedBox(height: 8),
+                        ActionChip(
+                          avatar: const Icon(Iconsax.filter, size: 16),
+                          label: Text(_metricFilterLabel(_metricFilter!)),
+                          onPressed: () {
+                            setState(() => _metricFilter = null);
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                FilledButton.icon(
-                  onPressed: () => _openJobForm(),
-                  icon: const Icon(Iconsax.add),
-                  label: const Text('Add Job'),
-                ),
+                if (_metricFilter != null)
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _metricFilter = null);
+                    },
+                    child: const Text('Show all'),
+                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -485,184 +462,29 @@ class _JobTrackerScreenState extends ConsumerState<JobTrackerScreen> {
               _EmptyTrackerState(onAddJob: () => _openJobForm())
             else if (filteredJobs.isEmpty)
               _FilteredEmptyState(onReset: _clearFilters)
-            else if (_view == _JobTrackerView.table)
+            else
               _TableView(
                 jobs: filteredJobs,
                 resumesById: resumesById,
                 dateFormat: _dateFormat,
                 onActionSelected: (job, action) =>
                     _handleJobAction(job, action, resumesById),
-              )
-            else
-              _KanbanBoard(
-                jobs: filteredJobs,
-                resumesById: resumesById,
-                dateFormat: _dateFormat,
-                service: service,
-                onMove: _moveJob,
-                onOpenDetails: (job) => _openJobDetails(job, resumesById),
-                onAddNote: _showAddNoteDialog,
-                onTailor: _openTailorResume,
               ),
           ],
         ),
-      ),
-      floatingActionButton: SafeArea(
-        minimum: EdgeInsets.only(
-          bottom: kBottomNavigationBarHeight +
-              MediaQuery.paddingOf(context).bottom +
-              16,
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () => _openJobForm(),
-          icon: const Icon(Iconsax.add),
-          label: const Text('Track Job'),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroSummaryCard extends StatelessWidget {
-  const _HeroSummaryCard({
-    required this.analytics,
-    required this.onAddJob,
-  });
-
-  final JobTrackerAnalytics analytics;
-  final VoidCallback onAddJob;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.16),
-            blurRadius: 24,
-            offset: const Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Iconsax.briefcase, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Stay on top of every application',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Track status, reminders, linked resumes, and follow-ups in one place.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.88),
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _SummaryPill(
-                label: 'Total jobs',
-                value: analytics.totalJobs.toString(),
-              ),
-              _SummaryPill(
-                label: 'Applications',
-                value: analytics.totalApplications.toString(),
-              ),
-              _SummaryPill(
-                label: 'Offers',
-                value: analytics.offersCount.toString(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: onAddJob,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.5)),
-              ),
-              icon: const Icon(Iconsax.add),
-              label: const Text('Add new job'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryPill extends StatelessWidget {
-  const _SummaryPill({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.78),
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
       ),
     );
   }
 }
 
 class _AnalyticsGrid extends StatelessWidget {
-  const _AnalyticsGrid({required this.analytics});
+  const _AnalyticsGrid({
+    required this.analytics,
+    required this.onMetricTap,
+  });
 
   final JobTrackerAnalytics analytics;
+  final ValueChanged<_JobMetricFilter> onMetricTap;
 
   @override
   Widget build(BuildContext context) {
@@ -675,36 +497,42 @@ class _AnalyticsGrid extends StatelessWidget {
           value: analytics.totalApplications.toString(),
           icon: Iconsax.send_1,
           color: AppColors.info,
+          onTap: () => onMetricTap(_JobMetricFilter.applied),
         ),
         _MetricCard(
           title: 'Interviews',
           value: analytics.interviewsCount.toString(),
           icon: Iconsax.user_tick,
           color: AppColors.warning,
+          onTap: () => onMetricTap(_JobMetricFilter.interviews),
         ),
         _MetricCard(
           title: 'Offers',
           value: analytics.offersCount.toString(),
           icon: Iconsax.tick_circle,
           color: AppColors.success,
+          onTap: () => onMetricTap(_JobMetricFilter.offers),
         ),
         _MetricCard(
           title: 'Rejected',
           value: analytics.rejectionsCount.toString(),
           icon: Iconsax.close_circle,
           color: AppColors.error,
+          onTap: () => onMetricTap(_JobMetricFilter.rejected),
         ),
         _MetricCard(
           title: 'Saved',
           value: analytics.savedCount.toString(),
           icon: Iconsax.archive,
           color: AppColors.primary,
+          onTap: () => onMetricTap(_JobMetricFilter.saved),
         ),
         _MetricCard(
           title: 'Offer rate',
           value: '${analytics.conversionRate.toStringAsFixed(1)}%',
           icon: Iconsax.chart_1,
           color: AppColors.secondary,
+          onTap: () => onMetricTap(_JobMetricFilter.offerRate),
         ),
       ],
     );
@@ -717,272 +545,61 @@ class _MetricCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
+    required this.onTap,
   });
 
   final String title;
   final String value;
   final IconData icon;
   final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 164,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      child: Material(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
             ),
-            child: Icon(icon, size: 18, color: color),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, size: 18, color: color),
                 ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterPanel extends StatelessWidget {
-  const _FilterPanel({
-    required this.searchController,
-    required this.selectedStatus,
-    required this.selectedCompany,
-    required this.selectedRole,
-    required this.selectedDateFilter,
-    required this.selectedView,
-    required this.companyOptions,
-    required this.roleOptions,
-    required this.onSearchChanged,
-    required this.onStatusChanged,
-    required this.onCompanyChanged,
-    required this.onRoleChanged,
-    required this.onDateFilterChanged,
-    required this.onViewChanged,
-  });
-
-  final TextEditingController searchController;
-  final JobApplicationStatus? selectedStatus;
-  final String? selectedCompany;
-  final String? selectedRole;
-  final _JobDateFilter selectedDateFilter;
-  final _JobTrackerView selectedView;
-  final List<String> companyOptions;
-  final List<String> roleOptions;
-  final ValueChanged<String> onSearchChanged;
-  final ValueChanged<JobApplicationStatus?> onStatusChanged;
-  final ValueChanged<String?> onCompanyChanged;
-  final ValueChanged<String?> onRoleChanged;
-  final ValueChanged<_JobDateFilter> onDateFilterChanged;
-  final ValueChanged<_JobTrackerView> onViewChanged;
-
-  static const double _filterFieldWidth = 220;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Filters and views',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                const SizedBox(height: 14),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                 ),
-              ),
-              SegmentedButton<_JobTrackerView>(
-                segments: const [
-                  ButtonSegment<_JobTrackerView>(
-                    value: _JobTrackerView.table,
-                    icon: Icon(Iconsax.row_vertical),
-                    label: Text('Table'),
-                  ),
-                  ButtonSegment<_JobTrackerView>(
-                    value: _JobTrackerView.kanban,
-                    icon: Icon(Iconsax.category),
-                    label: Text('Kanban'),
-                  ),
-                ],
-                selected: <_JobTrackerView>{selectedView},
-                onSelectionChanged: (selection) {
-                  if (selection.isNotEmpty) {
-                    onViewChanged(selection.first);
-                  }
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: searchController,
-            onChanged: onSearchChanged,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Iconsax.search_normal),
-              hintText: 'Search company, role, location, skill, keyword',
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _buildStatusFilter(),
-              _buildTextFilter(
-                label: 'Company',
-                initialValue: selectedCompany,
-                allLabel: 'All companies',
-                options: companyOptions,
-                onChanged: onCompanyChanged,
-              ),
-              _buildTextFilter(
-                label: 'Role',
-                initialValue: selectedRole,
-                allLabel: 'All roles',
-                options: roleOptions,
-                onChanged: onRoleChanged,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final filter in _JobDateFilter.values)
-                ChoiceChip(
-                  label: Text(_dateFilterLabel(filter)),
-                  selected: filter == selectedDateFilter,
-                  onSelected: (_) => onDateFilterChanged(filter),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                 ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _dateFilterLabel(_JobDateFilter filter) {
-    switch (filter) {
-      case _JobDateFilter.all:
-        return 'All dates';
-      case _JobDateFilter.last7:
-        return 'Last 7 days';
-      case _JobDateFilter.last30:
-        return 'Last 30 days';
-      case _JobDateFilter.last90:
-        return 'Last 90 days';
-    }
-  }
-
-  Widget _buildStatusFilter() {
-    final labels = <String>[
-      'All statuses',
-      ...JobApplicationStatus.values.map((status) => status.label),
-    ];
-
-    return SizedBox(
-      width: _filterFieldWidth,
-      child: DropdownButtonFormField<JobApplicationStatus?>(
-        initialValue: selectedStatus,
-        isExpanded: true,
-        decoration: const InputDecoration(labelText: 'Status'),
-        items: <DropdownMenuItem<JobApplicationStatus?>>[
-          DropdownMenuItem<JobApplicationStatus?>(
-            value: null,
-            child: _dropdownLabel('All statuses'),
-          ),
-          ...JobApplicationStatus.values.map(
-            (status) => DropdownMenuItem<JobApplicationStatus?>(
-              value: status,
-              child: _dropdownLabel(status.label),
+              ],
             ),
           ),
-        ],
-        selectedItemBuilder: (context) =>
-            labels.map(_selectedDropdownLabel).toList(),
-        onChanged: onStatusChanged,
+        ),
       ),
-    );
-  }
-
-  Widget _buildTextFilter({
-    required String label,
-    required String? initialValue,
-    required String allLabel,
-    required List<String> options,
-    required ValueChanged<String?> onChanged,
-  }) {
-    final labels = <String>[allLabel, ...options];
-
-    return SizedBox(
-      width: _filterFieldWidth,
-      child: DropdownButtonFormField<String?>(
-        initialValue: initialValue,
-        isExpanded: true,
-        decoration: InputDecoration(labelText: label),
-        items: <DropdownMenuItem<String?>>[
-          DropdownMenuItem<String?>(
-            value: null,
-            child: _dropdownLabel(allLabel),
-          ),
-          ...options.map(
-            (option) => DropdownMenuItem<String?>(
-              value: option,
-              child: _dropdownLabel(option),
-            ),
-          ),
-        ],
-        selectedItemBuilder: (context) =>
-            labels.map(_selectedDropdownLabel).toList(),
-        onChanged: onChanged,
-      ),
-    );
-  }
-
-  Widget _dropdownLabel(String text) {
-    return Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-
-  Widget _selectedDropdownLabel(String text) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: _dropdownLabel(text),
     );
   }
 }
@@ -1181,37 +798,48 @@ class _TableView extends StatelessWidget {
                 ),
                 DataCell(Text(dateFormat.format(job.updatedAt))),
                 DataCell(
-                  PopupMenuButton<_JobAction>(
-                    onSelected: (action) => onActionSelected(job, action),
-                    itemBuilder: (context) {
-                      return const [
-                        PopupMenuItem<_JobAction>(
-                          value: _JobAction.details,
-                          child: Text('View details'),
-                        ),
-                        PopupMenuItem<_JobAction>(
-                          value: _JobAction.edit,
-                          child: Text('Edit job'),
-                        ),
-                        PopupMenuItem<_JobAction>(
-                          value: _JobAction.addNote,
-                          child: Text('Add note'),
-                        ),
-                        PopupMenuItem<_JobAction>(
-                          value: _JobAction.tailor,
-                          child: Text('Tailor linked resume'),
-                        ),
-                        PopupMenuItem<_JobAction>(
-                          value: _JobAction.preview,
-                          child: Text('Open preview'),
-                        ),
-                        PopupMenuItem<_JobAction>(
-                          value: _JobAction.delete,
-                          child: Text('Delete'),
-                        ),
-                      ];
-                    },
-                    icon: const Icon(Iconsax.more),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Edit job',
+                        onPressed: () =>
+                            onActionSelected(job, _JobAction.edit),
+                        icon: const Icon(Iconsax.edit_2),
+                      ),
+                      IconButton(
+                        tooltip: 'Delete job',
+                        onPressed: () =>
+                            onActionSelected(job, _JobAction.delete),
+                        icon: const Icon(Iconsax.trash),
+                        color: AppColors.error,
+                      ),
+                      PopupMenuButton<_JobAction>(
+                        tooltip: 'More job actions',
+                        onSelected: (action) => onActionSelected(job, action),
+                        itemBuilder: (context) {
+                          return const [
+                            PopupMenuItem<_JobAction>(
+                              value: _JobAction.details,
+                              child: Text('View details'),
+                            ),
+                            PopupMenuItem<_JobAction>(
+                              value: _JobAction.addNote,
+                              child: Text('Add note'),
+                            ),
+                            PopupMenuItem<_JobAction>(
+                              value: _JobAction.tailor,
+                              child: Text('Tailor linked resume'),
+                            ),
+                            PopupMenuItem<_JobAction>(
+                              value: _JobAction.preview,
+                              child: Text('Open preview'),
+                            ),
+                          ];
+                        },
+                        icon: const Icon(Iconsax.more),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1223,312 +851,6 @@ class _TableView extends StatelessWidget {
   }
 }
 
-class _KanbanBoard extends StatelessWidget {
-  const _KanbanBoard({
-    required this.jobs,
-    required this.resumesById,
-    required this.dateFormat,
-    required this.service,
-    required this.onMove,
-    required this.onOpenDetails,
-    required this.onAddNote,
-    required this.onTailor,
-  });
-
-  final List<JobApplicationRecord> jobs;
-  final Map<String, ResumeModel> resumesById;
-  final DateFormat dateFormat;
-  final JobTrackerService service;
-  final Future<void> Function(
-      JobApplicationRecord job, JobApplicationStatus nextStatus) onMove;
-  final void Function(JobApplicationRecord job) onOpenDetails;
-  final Future<void> Function(JobApplicationRecord job) onAddNote;
-  final void Function(JobApplicationRecord job) onTailor;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 560,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: JobApplicationStatus.values.map((status) {
-            final statusJobs = jobs
-                .where((job) => job.status == status)
-                .toList(growable: false);
-            return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: SizedBox(
-                width: 320,
-                child: DragTarget<JobApplicationRecord>(
-                  onWillAcceptWithDetails: (details) {
-                    final job = details.data;
-                    return service.canTransition(job.status, status);
-                  },
-                  onAcceptWithDetails: (details) =>
-                      onMove(details.data, status),
-                  builder: (context, candidateData, rejectedData) {
-                    final isActive = candidateData.isNotEmpty;
-                    return Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? _statusColor(status).withValues(alpha: 0.1)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isActive
-                              ? _statusColor(status)
-                              : AppColors.border,
-                          width: isActive ? 1.4 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              _StatusBadge(status: status),
-                              const SizedBox(width: 10),
-                              Text(
-                                statusJobs.length.toString(),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Expanded(
-                            child: statusJobs.isEmpty
-                                ? Center(
-                                    child: Text(
-                                      'Drag jobs here',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            color: AppColors.textTertiary,
-                                          ),
-                                    ),
-                                  )
-                                : ListView.separated(
-                                    itemCount: statusJobs.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(height: 10),
-                                    itemBuilder: (context, index) {
-                                      final job = statusJobs[index];
-                                      final linkedResume = job.resumeId == null
-                                          ? null
-                                          : resumesById[job.resumeId!];
-                                      final card = _KanbanJobCard(
-                                        job: job,
-                                        linkedResume: linkedResume,
-                                        dateFormat: dateFormat,
-                                        onTap: () => onOpenDetails(job),
-                                        onAddNote: () => onAddNote(job),
-                                        onTailor: () => onTailor(job),
-                                      );
-                                      return LongPressDraggable<
-                                          JobApplicationRecord>(
-                                        data: job,
-                                        axis: Axis.horizontal,
-                                        delay:
-                                            const Duration(milliseconds: 140),
-                                        maxSimultaneousDrags: 1,
-                                        feedback: Material(
-                                          color: Colors.transparent,
-                                          child:
-                                              SizedBox(width: 300, child: card),
-                                        ),
-                                        childWhenDragging:
-                                            Opacity(opacity: 0.32, child: card),
-                                        child: card,
-                                      );
-                                    },
-                                  ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            );
-          }).toList(growable: false),
-        ),
-      ),
-    ).animate().fadeIn(duration: 250.ms).slideX(begin: 0.04, end: 0);
-  }
-}
-
-class _KanbanJobCard extends StatelessWidget {
-  const _KanbanJobCard({
-    required this.job,
-    required this.linkedResume,
-    required this.dateFormat,
-    required this.onTap,
-    required this.onAddNote,
-    required this.onTailor,
-  });
-
-  final JobApplicationRecord job;
-  final ResumeModel? linkedResume;
-  final DateFormat dateFormat;
-  final VoidCallback onTap;
-  final VoidCallback onAddNote;
-  final VoidCallback onTailor;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        job.company,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        job.role,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 36,
-                  height: 36,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Icon(
-                    Icons.drag_indicator,
-                    size: 18,
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ],
-            ),
-            if (job.location.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Iconsax.location,
-                      size: 14, color: AppColors.textTertiary),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      job.location,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (linkedResume != null)
-                  _InlineTag(
-                      icon: Iconsax.document_text, label: linkedResume!.title),
-                if (job.followUpDate != null)
-                  _InlineTag(
-                    icon: Iconsax.calendar_1,
-                    label: 'Follow-up ${dateFormat.format(job.followUpDate!)}',
-                  ),
-                if (job.interviewDate != null)
-                  _InlineTag(
-                    icon: Iconsax.clock,
-                    label: 'Interview ${dateFormat.format(job.interviewDate!)}',
-                  ),
-              ],
-            ),
-            if (job.parsedSkills.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: job.parsedSkills
-                    .take(4)
-                    .map((skill) => Chip(
-                        label: Text(skill),
-                        visualDensity: VisualDensity.compact))
-                    .toList(growable: false),
-              ),
-            ],
-            if (job.notes.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                job.notes.split('\n').last,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                TextButton.icon(
-                  onPressed: onAddNote,
-                  icon: const Icon(Iconsax.note_1, size: 16),
-                  label: const Text('Note'),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onTailor,
-                    icon: const Icon(Iconsax.magicpen, size: 16),
-                    label: const Text('Tailor'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _InlineTag extends StatelessWidget {
   const _InlineTag({required this.icon, required this.label});

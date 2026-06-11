@@ -10,17 +10,13 @@ String _readPaymentConfig(String key) {
   return AppConfigService.read(key);
 }
 
-final String _razorpayKeyId = _readPaymentConfig('RAZORPAY_KEY_ID');
+String get _razorpayKeyId => _readPaymentConfig('RAZORPAY_KEY_ID');
 
 class RazorpayService {
   Razorpay? _razorpay;
 
   static bool get supportsNativeCheckout => !kIsWeb;
   static bool get isConfigured => _razorpayKeyId.isNotEmpty;
-
-  static bool get isTestMode => _razorpayKeyId.startsWith('rzp_test_');
-
-  static bool get canUseTestActivationFallback => !kReleaseMode && isTestMode;
 
   // Callbacks set by the screen
   void Function(PaymentSuccessResponse)? onSuccess;

@@ -36,8 +36,9 @@ class SubscriptionPricingService {
     'Complete pro toolkit',
   ];
 
-  static const Map<PricingRegion, Map<SubscriptionPlan, SubscriptionPricingOption>>
-      _pricingByRegion = <PricingRegion, Map<SubscriptionPlan, SubscriptionPricingOption>>{
+  static const Map<PricingRegion,
+          Map<SubscriptionPlan, SubscriptionPricingOption>> _pricingByRegion =
+      <PricingRegion, Map<SubscriptionPlan, SubscriptionPricingOption>>{
     PricingRegion.india: <SubscriptionPlan, SubscriptionPricingOption>{
       SubscriptionPlan.weekly: SubscriptionPricingOption(
         plan: SubscriptionPlan.weekly,
@@ -46,7 +47,7 @@ class SubscriptionPricingService {
         checkoutDescription: '7 days of full premium access',
         price: SubscriptionPrice(
           currencyCode: 'INR',
-          amountInMinorUnits: 14900,
+          amountInMinorUnits: 19900,
           originalAmountInMinorUnits: 19900,
         ),
         savingsLabel: 'Intro pricing',
@@ -59,7 +60,7 @@ class SubscriptionPricingService {
         checkoutDescription: '30 days of full premium access',
         price: SubscriptionPrice(
           currencyCode: 'INR',
-          amountInMinorUnits: 39900,
+          amountInMinorUnits: 59900,
           originalAmountInMinorUnits: 59900,
         ),
         highlight: PricingHighlight.mostPopular,
@@ -74,8 +75,8 @@ class SubscriptionPricingService {
         checkoutDescription: '90 days of full premium access',
         price: SubscriptionPrice(
           currencyCode: 'INR',
-          amountInMinorUnits: 99900,
-          originalAmountInMinorUnits: 149900,
+          amountInMinorUnits: 79900,
+          originalAmountInMinorUnits: 79900,
         ),
         savingsLabel: 'Save ~35%',
         features: _quarterlyFeatures,
@@ -87,8 +88,8 @@ class SubscriptionPricingService {
         checkoutDescription: '365 days of full premium access',
         price: SubscriptionPrice(
           currencyCode: 'INR',
-          amountInMinorUnits: 199900,
-          originalAmountInMinorUnits: 399900,
+          amountInMinorUnits: 249900,
+          originalAmountInMinorUnits: 249900,
         ),
         highlight: PricingHighlight.bestValue,
         highlightLabel: 'Best Value',
@@ -157,7 +158,8 @@ class SubscriptionPricingService {
   };
 
   static List<SubscriptionPricingOption> plansForRegion(PricingRegion region) {
-    final pricing = _pricingByRegion[region] ?? _pricingByRegion[PricingRegion.global]!;
+    final pricing =
+        _pricingByRegion[region] ?? _pricingByRegion[PricingRegion.global]!;
     return SubscriptionPlan.values
         .where((plan) => plan != SubscriptionPlan.free)
         .map((plan) => pricing[plan]!)
@@ -168,7 +170,8 @@ class SubscriptionPricingService {
     PricingRegion region,
     SubscriptionPlan plan,
   ) {
-    final pricing = _pricingByRegion[region] ?? _pricingByRegion[PricingRegion.global]!;
+    final pricing =
+        _pricingByRegion[region] ?? _pricingByRegion[PricingRegion.global]!;
     return pricing[plan] ?? pricing[SubscriptionPlan.monthly]!;
   }
 

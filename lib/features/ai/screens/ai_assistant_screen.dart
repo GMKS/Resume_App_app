@@ -31,6 +31,7 @@ class AIAssistantScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Service status header removed (redundant UI)
             if (!FreePlanService.isPremium)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),

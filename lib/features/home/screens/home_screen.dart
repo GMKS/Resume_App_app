@@ -31,6 +31,25 @@ class ResumesNotifier extends StateNotifier<List<ResumeModel>> {
     loadResumes();
   }
 
+  String _nextUntitledResumeName() {
+    var index = 1;
+    while (StorageService.hasResumeTitle('My Resume $index')) {
+      index++;
+    }
+    return 'My Resume $index';
+  }
+
+  String _nextDuplicateTitle(String baseTitle) {
+    final trimmedBase = baseTitle.trim();
+    var candidate = '$trimmedBase (Copy)';
+    var copyIndex = 2;
+    while (StorageService.hasResumeTitle(candidate)) {
+      candidate = '$trimmedBase (Copy $copyIndex)';
+      copyIndex++;
+    }
+    return candidate;
+  }
+
   void loadResumes() {
     state = StorageService.getAllResumes()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -59,7 +78,7 @@ class ResumesNotifier extends StateNotifier<List<ResumeModel>> {
   Future<ResumeModel> createResume() async {
     final resume = ResumeModel(
       id: const Uuid().v4(),
-      title: 'My Resume ${state.length + 1}',
+      title: _nextUntitledResumeName(),
       personalInfo: PersonalInfo(),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -77,7 +96,7 @@ class ResumesNotifier extends StateNotifier<List<ResumeModel>> {
   Future<void> duplicateResume(ResumeModel resume) async {
     final newResume = ResumeModel(
       id: const Uuid().v4(),
-      title: '${resume.title} (Copy)',
+      title: _nextDuplicateTitle(resume.title),
       personalInfo: resume.personalInfo,
       objective: resume.objective,
       education: List.from(resume.education),
@@ -191,6 +210,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         context,
         const ['Resume Name'],
         prefix: 'Add the missing field before creating a resume:',
+      );
+      return;
+    }
+
+    if (StorageService.hasResumeTitle(trimmedName)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A resume with this name already exists.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }

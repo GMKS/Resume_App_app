@@ -1,5 +1,3 @@
-import 'package:shared_preferences/shared_preferences.dart';
-
 class UserSessionService {
   const UserSessionService._();
 
@@ -7,7 +5,7 @@ class UserSessionService {
   static const String _countryCodeKey = 'user_country_code';
   static const String _legacySavedPhoneKey = 'saved_phone';
 
-  static String readStoredContact(SharedPreferences prefs) {
+  static String readStoredContact(dynamic prefs) {
     final contact = prefs.getString(_contactKey)?.trim() ?? '';
     if (contact.isNotEmpty) {
       return contact;
@@ -16,7 +14,7 @@ class UserSessionService {
   }
 
   static Future<void> persistPhoneSession(
-    SharedPreferences prefs,
+    dynamic prefs,
     String phone,
   ) async {
     await prefs.setBool('is_logged_in', true);
@@ -31,7 +29,7 @@ class UserSessionService {
   }
 
   static Future<void> persistSocialContact(
-    SharedPreferences prefs,
+    dynamic prefs,
     String contact,
   ) async {
     final trimmed = contact.trim();
@@ -44,13 +42,13 @@ class UserSessionService {
     await prefs.remove(_legacySavedPhoneKey);
   }
 
-  static Future<void> clearStoredContact(SharedPreferences prefs) async {
+  static Future<void> clearStoredContact(dynamic prefs) async {
     await prefs.remove(_contactKey);
     await prefs.remove(_countryCodeKey);
     await prefs.remove(_legacySavedPhoneKey);
   }
 
-  static String? readStoredCountryCode(SharedPreferences prefs) {
+  static String? readStoredCountryCode(dynamic prefs) {
     final stored = prefs.getString(_countryCodeKey)?.trim().toUpperCase();
     if (stored != null && stored.isNotEmpty) {
       return stored;

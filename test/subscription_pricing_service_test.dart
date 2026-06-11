@@ -21,11 +21,11 @@ void main() {
         SubscriptionPlan.yearly,
       );
 
-      expect(monthly.price.formatCurrent(), '₹399');
+      expect(monthly.price.formatCurrent(), '₹599');
       expect(monthly.price.formatOriginal(), '₹599');
       expect(monthly.highlightLabel, 'Most Popular');
 
-      expect(yearly.price.formatCurrent(), '₹1,999');
+      expect(yearly.price.formatCurrent(), '₹2,499');
       expect(yearly.highlightLabel, 'Best Value');
     });
 

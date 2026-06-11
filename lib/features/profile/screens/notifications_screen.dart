@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_theme.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -27,7 +27,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     setState(() {
       _pushNotifications = prefs.getBool('notif_push') ?? true;
       _emailNotifications = prefs.getBool('notif_email') ?? false;
@@ -39,7 +39,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _savePref(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = StorageService.prefs;
     await prefs.setBool(key, value);
   }
 

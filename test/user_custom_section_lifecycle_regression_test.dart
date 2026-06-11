@@ -24,7 +24,7 @@ void main() {
     );
   });
 
-  Future<void> _pumpTestApp(
+  Future<void> pumpTestApp(
     WidgetTester tester, {
     required String initialLocation,
   }) async {
@@ -37,13 +37,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
   }
 
-  Future<void> _settleUi(WidgetTester tester) async {
+  Future<void> settleUi(WidgetTester tester) async {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(const Duration(milliseconds: 350));
   }
 
-  Future<String> _createUserSection(
+  Future<String> createUserSection(
     WidgetTester tester, {
     required String title,
     required String content,
@@ -76,7 +76,7 @@ void main() {
   testWidgets('user custom section back, cancel, and save stay stable', (
     tester,
   ) async {
-    final sectionId = await _createUserSection(
+    final sectionId = await createUserSection(
       tester,
       title: 'Personal Details',
       content: 'Current role highlights',
@@ -85,22 +85,22 @@ void main() {
     final route =
         '/editor/$resumeEditorCustomSectionResumeId/user-custom/$sectionId';
 
-    await _pumpTestApp(tester, initialLocation: route);
+    await pumpTestApp(tester, initialLocation: route);
 
     await tester.tap(find.byIcon(Iconsax.arrow_left).first);
-    await _settleUi(tester);
+    await settleUi(tester);
 
     expect(find.text('Editor Test Resume'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await _pumpTestApp(tester, initialLocation: route);
+    await pumpTestApp(tester, initialLocation: route);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Add Entry'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
     await tester.tap(find.byIcon(Iconsax.close_circle).last);
-    await _settleUi(tester);
+    await settleUi(tester);
 
     expect(find.text('Description / Content'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -109,9 +109,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
 
-    await tester.enterText(find.byType(TextFormField).first, 'Led hiring panel');
+    await tester.enterText(
+        find.byType(TextFormField).first, 'Led hiring panel');
     await tester.tap(find.widgetWithText(ElevatedButton, 'Add Entry'));
-    await _settleUi(tester);
+    await settleUi(tester);
 
     final savedResume = StorageService.getResume(
       resumeEditorCustomSectionResumeId,
