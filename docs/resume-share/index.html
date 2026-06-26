@@ -268,7 +268,9 @@
       const contactButton = document.getElementById('contact-button');
 
       const query = new URLSearchParams(window.location.search);
-      const shareId = (query.get('id') || '').trim();
+      const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+      const shareId = (query.get('id') || hash.get('id') || '').trim();
+      const resumePayload = (query.get('r') || hash.get('r') || '').trim();
 
       printButton.addEventListener('click', () => window.print());
 
@@ -312,6 +314,19 @@
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return value;
         return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+      }
+
+      function decodeResumePayload(payload) {
+        if (!payload) return null;
+        try {
+          const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+          const json = atob(padded);
+          return JSON.parse(json);
+        } catch (error) {
+          console.error(error);
+          return null;
+        }
       }
 
       function appendEntry(container, titleValue, metaValue, copyValue, extras = []) {
@@ -443,6 +458,13 @@
       }
 
       async function loadShare() {
+        const payloadResume = decodeResumePayload(resumePayload);
+        if (payloadResume) {
+          populateResume(payloadResume);
+          setResumeVisible();
+          return;
+        }
+
         if (!shareId) {
           setEmpty('This shared resume link is missing its identifier.');
           return;
@@ -457,6 +479,13 @@
 
           const data = snapshot.data();
           if (!data || data.active !== true || !data.resume) {
+            const storedPayload = typeof data?.resumePayload === 'string' ? decodeResumePayload(data.resumePayload) : null;
+            if (storedPayload) {
+              populateResume(storedPayload);
+              setResumeVisible();
+              return;
+            }
+
             setEmpty('This shared resume link has been disabled.');
             return;
           }
