@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/storage_service.dart';
 
@@ -25,7 +23,11 @@ class _ResumeStyleConverterScreenState
     {'name': 'UK', 'flag': '🇬🇧', 'subtitle': 'CV format, 2 pages OK'},
     {'name': 'Germany', 'flag': '🇩🇪', 'subtitle': 'Lebenslauf, photo common'},
     {'name': 'Canada', 'flag': '🇨🇦', 'subtitle': 'Similar to USA, bilingual'},
-    {'name': 'Australia', 'flag': '🇦🇺', 'subtitle': '2-3 pages, referee list'},
+    {
+      'name': 'Australia',
+      'flag': '🇦🇺',
+      'subtitle': '2-3 pages, referee list'
+    },
     {'name': 'France', 'flag': '🇫🇷', 'subtitle': 'CV, photo recommended'},
     {'name': 'Japan', 'flag': '🇯🇵', 'subtitle': 'Rirekisho, strict format'},
     {'name': 'India', 'flag': '🇮🇳', 'subtitle': 'Detailed, 2-3 pages'},
@@ -77,11 +79,8 @@ class _ResumeStyleConverterScreenState
         return;
       }
 
-      final apiKey = await AiApiKeyStorageService.read();
-
       final resumeJson = _buildResumeMap(resume);
       final result = await AiResumeService.convertResumeStyle(
-        apiKey: apiKey,
         resumeJson: resumeJson,
         targetCountry: _selectedCountry!,
       );
@@ -93,7 +92,7 @@ class _ResumeStyleConverterScreenState
       setState(() => _errorMessage = e.message);
     } catch (e) {
       setState(
-          () => _errorMessage = 'Something went wrong. Please try again.');
+          () => _errorMessage = AiResumeService.describeUnexpectedError(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -158,10 +157,10 @@ class _ResumeStyleConverterScreenState
             const SizedBox(height: 24),
 
             Text('Select Target Country',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600))
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600))
                 .animate()
                 .fadeIn(delay: 100.ms),
             const SizedBox(height: 12),
@@ -181,8 +180,7 @@ class _ResumeStyleConverterScreenState
                 final c = _countries[i];
                 final selected = _selectedCountry == c['name'];
                 return GestureDetector(
-                  onTap: () =>
-                      setState(() => _selectedCountry = c['name']),
+                  onTap: () => setState(() => _selectedCountry = c['name']),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.all(10),
@@ -192,16 +190,13 @@ class _ResumeStyleConverterScreenState
                           : Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: selected
-                            ? AppColors.primary
-                            : AppColors.border,
+                        color: selected ? AppColors.primary : AppColors.border,
                         width: selected ? 2 : 1,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Text(c['flag']!,
-                            style: const TextStyle(fontSize: 22)),
+                        Text(c['flag']!, style: const TextStyle(fontSize: 22)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -213,9 +208,7 @@ class _ResumeStyleConverterScreenState
                                 style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13,
-                                    color: selected
-                                        ? AppColors.primary
-                                        : null),
+                                    color: selected ? AppColors.primary : null),
                               ),
                               Text(
                                 c['subtitle']!,
@@ -234,8 +227,10 @@ class _ResumeStyleConverterScreenState
                       ],
                     ),
                   ),
-                ).animate().fadeIn(delay: ((i * 40) + 120).ms).scale(
-                    begin: const Offset(0.95, 0.95));
+                )
+                    .animate()
+                    .fadeIn(delay: ((i * 40) + 120).ms)
+                    .scale(begin: const Offset(0.95, 0.95));
               },
             ),
 
@@ -246,8 +241,7 @@ class _ResumeStyleConverterScreenState
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,23 +257,15 @@ class _ResumeStyleConverterScreenState
                                     color: Colors.red, fontSize: 13))),
                       ],
                     ),
-                    if (_errorMessage!.contains('API key'))
+                    if (!_isLoading)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => context.push('/settings'),
-                            icon: const Icon(Iconsax.key, size: 16,
-                                color: Colors.red),
-                            label: const Text('Configure API Key in Settings',
-                                style: TextStyle(
-                                    color: Colors.red, fontSize: 13)),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Colors.red),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                            ),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: _convert,
+                            icon: const Icon(Iconsax.refresh_2, size: 16),
+                            label: const Text('Retry'),
                           ),
                         ),
                       ),
@@ -321,19 +307,15 @@ class _ResumeStyleConverterScreenState
   }
 
   List<Widget> _buildResults(Map<String, dynamic> r) {
-    final keyDifferences = (r['keyDifferences'] as List?)
-        ?.map((e) => e.toString())
-        .toList() ?? [];
+    final keyDifferences =
+        (r['keyDifferences'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final adaptedSummary = r['adaptedSummary'] as String? ?? '';
-    final formatTips = (r['formatTips'] as List?)
-        ?.map((e) => e.toString())
-        .toList() ?? [];
-    final doList = (r['doList'] as List?)
-        ?.map((e) => e.toString())
-        .toList() ?? [];
-    final dontList = (r['dontList'] as List?)
-        ?.map((e) => e.toString())
-        .toList() ?? [];
+    final formatTips =
+        (r['formatTips'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final doList =
+        (r['doList'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final dontList =
+        (r['dontList'] as List?)?.map((e) => e.toString()).toList() ?? [];
 
     return [
       // Summary
@@ -363,13 +345,12 @@ class _ResumeStyleConverterScreenState
                         const Padding(
                           padding: EdgeInsets.only(top: 5),
                           child: CircleAvatar(
-                              radius: 4,
-                              backgroundColor: AppColors.info),
+                              radius: 4, backgroundColor: AppColors.info),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                            child: Text(d,
-                                style: const TextStyle(fontSize: 13))),
+                            child:
+                                Text(d, style: const TextStyle(fontSize: 13))),
                       ],
                     ),
                   ))
@@ -398,8 +379,8 @@ class _ResumeStyleConverterScreenState
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                            child: Text(t,
-                                style: const TextStyle(fontSize: 13))),
+                            child:
+                                Text(t, style: const TextStyle(fontSize: 13))),
                       ],
                     ),
                   ))
@@ -430,8 +411,7 @@ class _ResumeStyleConverterScreenState
                               const SizedBox(width: 6),
                               Expanded(
                                   child: Text(d,
-                                      style: const TextStyle(
-                                          fontSize: 12))),
+                                      style: const TextStyle(fontSize: 12))),
                             ],
                           ),
                         ))
@@ -458,8 +438,7 @@ class _ResumeStyleConverterScreenState
                               const SizedBox(width: 6),
                               Expanded(
                                   child: Text(d,
-                                      style: const TextStyle(
-                                          fontSize: 12))),
+                                      style: const TextStyle(fontSize: 12))),
                             ],
                           ),
                         ))

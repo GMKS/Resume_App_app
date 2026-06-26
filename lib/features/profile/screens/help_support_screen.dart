@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_info.dart';
+import '../../../core/services/bug_report_service.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/feature_gate.dart';
@@ -142,11 +144,11 @@ class HelpSupportScreen extends ConsumerWidget {
           ),
           _buildLinkTile(
             context,
-            icon: Iconsax.video_play,
-            title: 'Video Tutorials',
-            subtitle: 'Watch step-by-step tutorials',
+            icon: Iconsax.book_1,
+            title: 'App Guide',
+            subtitle: 'Open step-by-step app walkthroughs',
             delay: 300,
-            onTap: () => _launchUrl('https://youtube.com'),
+            onTap: () => context.push('/app-guide'),
           ),
           _buildLinkTile(
             context,
@@ -237,63 +239,160 @@ class HelpSupportScreen extends ConsumerWidget {
   }
 
   void _showFeedbackSheet(BuildContext context, {bool isReport = false}) {
-    final controller = TextEditingController();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isReport ? 'Report a Bug' : 'Send Feedback',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              maxLines: 5,
-              decoration: InputDecoration(
-                hintText: isReport
-                    ? 'Describe the bug you encountered...'
-                    : 'Share your thoughts...',
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (ctx) => _FeedbackSheet(
+        isReport: isReport,
+        supportContext: context,
+      ),
+    );
+  }
+}
+
+class _FeedbackSheet extends StatefulWidget {
+  const _FeedbackSheet({
+    required this.isReport,
+    required this.supportContext,
+  });
+
+  final bool isReport;
+  final BuildContext supportContext;
+
+  @override
+  State<_FeedbackSheet> createState() => _FeedbackSheetState();
+}
+
+class _FeedbackSheetState extends State<_FeedbackSheet> {
+  final TextEditingController _controller = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.isReport ? 'Report a Bug' : 'Send Feedback',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            maxLines: 5,
+            enabled: !_submitting,
+            decoration: InputDecoration(
+              hintText: widget.isReport
+                  ? 'Describe the bug you encountered...'
+                  : 'Share your thoughts...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(isReport
-                          ? 'Bug report submitted. Thank you!'
-                          : 'Feedback submitted. Thank you!'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                child: const Text('Submit'),
-              ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _submitting ? null : _submit,
+              child: _submitting
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Submit'),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      _showSnackBar('Please describe the issue before submitting.');
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.maybeOf(widget.supportContext) ??
+        ScaffoldMessenger.of(context);
+
+    setState(() => _submitting = true);
+
+    final mediaQuery = MediaQuery.of(context);
+    final result = widget.isReport
+        ? await BugReportService.submit(
+            BugReportSubmission(
+              category: 'bug_report',
+              screenName: 'Help & Support / Report a Bug',
+              issueDescription: text,
+              viewport: <String, dynamic>{
+                'width': mediaQuery.size.width,
+                'height': mediaQuery.size.height,
+                'pixelRatio': mediaQuery.devicePixelRatio,
+                'textScaleFactor': mediaQuery.textScaler.scale(1),
+              },
+            ),
+          )
+        : const BugReportResult(
+            success: true,
+            message: 'Feedback submitted. Thank you!',
+          );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _submitting = false);
+
+    if (!result.success) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          behavior: SnackBarBehavior.floating,
         ),
+      );
+      return;
+    }
+
+    Navigator.pop(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(result.message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSnackBar(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(widget.supportContext) ??
+        ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

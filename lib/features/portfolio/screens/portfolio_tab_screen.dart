@@ -12,33 +12,14 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/models/resume_model.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/shareable_export_file.dart';
+import '../../home/screens/home_screen.dart' show resumesProvider;
+import '../services/portfolio_profile_service.dart';
+import '../services/resume_share_service.dart';
 import '../../../shared/widgets/feature_gate.dart';
-
-const List<_PortfolioProject> _defaultProjects = <_PortfolioProject>[
-  _PortfolioProject(
-    id: 'project-1',
-    title: 'E-Commerce Platform',
-    description: 'Built with Flutter & Firebase',
-  ),
-  _PortfolioProject(
-    id: 'project-2',
-    title: 'AI-Powered Chat App',
-    description: 'Real-time messaging application',
-  ),
-];
-
-const List<_PortfolioCertificate> _defaultCertificates =
-    <_PortfolioCertificate>[
-      _PortfolioCertificate(
-        id: 'certificate-1',
-        title: 'Flutter Developer Certification',
-        issuer: 'Google',
-        date: 'Jan 2026',
-      ),
-    ];
 
 const XTypeGroup _certificateFileGroup = XTypeGroup(
   label: 'Certificate Files',
@@ -49,20 +30,25 @@ class PortfolioTabScreen extends ConsumerStatefulWidget {
   const PortfolioTabScreen({super.key});
 
   @override
-  ConsumerState<PortfolioTabScreen> createState() =>
-      _PortfolioTabScreenState();
+  ConsumerState<PortfolioTabScreen> createState() => _PortfolioTabScreenState();
 }
 
 class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
   static const String _projectsKey = 'portfolio_projects';
   static const String _certificatesKey = 'portfolio_certificates';
-  static const String _portfolioUrl =
-      'https://myportfolio.resumebuilder.app/johndoe';
+  static const String _selectedResumeIdKey = 'portfolio_selected_resume_id';
 
   final GlobalKey _qrBoundaryKey = GlobalKey();
 
   late List<_PortfolioProject> _projects;
   late List<_PortfolioCertificate> _certificates;
+  String? _selectedResumeId;
+  String? _shareUrl;
+  String? _shareResumeId;
+  String? _shareResumeVersion;
+  bool _isGeneratingShareLink = false;
+  bool _isCopyingLink = false;
+  bool _isSharingPortfolio = false;
   bool _isExportingQr = false;
 
   @override
@@ -70,18 +56,24 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
     super.initState();
     _projects = _readProjects();
     _certificates = _readCertificates();
+    _selectedResumeId = _readSelectedResumeId();
+  }
+
+  String? _readSelectedResumeId() {
+    final raw = StorageService.prefs.getString(_selectedResumeIdKey)?.trim();
+    return raw == null || raw.isEmpty ? null : raw;
   }
 
   List<_PortfolioProject> _readProjects() {
     final raw = StorageService.prefs.getString(_projectsKey);
     if (raw == null || raw.trim().isEmpty) {
-      return List<_PortfolioProject>.from(_defaultProjects);
+      return <_PortfolioProject>[];
     }
 
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List) {
-        return List<_PortfolioProject>.from(_defaultProjects);
+        return <_PortfolioProject>[];
       }
 
       final loaded = decoded
@@ -94,24 +86,22 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
           .map(_PortfolioProject.fromMap)
           .toList(growable: false);
 
-      return loaded.isEmpty
-          ? List<_PortfolioProject>.from(_defaultProjects)
-          : loaded;
+      return loaded;
     } catch (_) {
-      return List<_PortfolioProject>.from(_defaultProjects);
+      return <_PortfolioProject>[];
     }
   }
 
   List<_PortfolioCertificate> _readCertificates() {
     final raw = StorageService.prefs.getString(_certificatesKey);
     if (raw == null || raw.trim().isEmpty) {
-      return List<_PortfolioCertificate>.from(_defaultCertificates);
+      return <_PortfolioCertificate>[];
     }
 
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! List) {
-        return List<_PortfolioCertificate>.from(_defaultCertificates);
+        return <_PortfolioCertificate>[];
       }
 
       final loaded = decoded
@@ -124,11 +114,9 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
           .map(_PortfolioCertificate.fromMap)
           .toList(growable: false);
 
-      return loaded.isEmpty
-          ? List<_PortfolioCertificate>.from(_defaultCertificates)
-          : loaded;
+      return loaded;
     } catch (_) {
-      return List<_PortfolioCertificate>.from(_defaultCertificates);
+      return <_PortfolioCertificate>[];
     }
   }
 
@@ -139,11 +127,106 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
         .map((certificate) => certificate.toMap())
         .toList(growable: false);
 
-    await StorageService.prefs.setString(_projectsKey, jsonEncode(projectPayload));
+    await StorageService.prefs
+        .setString(_projectsKey, jsonEncode(projectPayload));
     await StorageService.prefs.setString(
       _certificatesKey,
       jsonEncode(certificatePayload),
     );
+  }
+
+  Future<void> _persistSelectedResumeId(String? resumeId) async {
+    final normalized = resumeId?.trim() ?? '';
+    if (normalized.isEmpty) {
+      await StorageService.prefs.remove(_selectedResumeIdKey);
+      return;
+    }
+    await StorageService.prefs.setString(_selectedResumeIdKey, normalized);
+  }
+
+  ResumeModel? _currentSourceResume() {
+    final resumes = ref.read(resumesProvider);
+    return PortfolioProfileService.selectSourceResume(
+      resumes,
+      preferredResumeId: _selectedResumeId,
+    );
+  }
+
+  String _portfolioUrlUnavailableMessage({required String action}) {
+    return 'Select a saved resume before $action.';
+  }
+
+  Future<void> _handleSourceResumeChanged(String? resumeId) async {
+    setState(() {
+      _selectedResumeId = resumeId;
+    });
+    await _persistSelectedResumeId(resumeId);
+    await _refreshShareLink(force: true);
+  }
+
+  Future<void> _refreshShareLink({bool force = false}) async {
+    final resume = _currentSourceResume();
+    final resumeId = resume?.id;
+    final resumeVersion = resume?.updatedAt.toIso8601String();
+
+    debugPrint('Resume ID: ${resumeId ?? ''}');
+    debugPrint('Selected Resume ID: ${_selectedResumeId ?? ''}');
+
+    if (resume == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _shareUrl = null;
+        _shareResumeId = null;
+        _shareResumeVersion = null;
+        _isGeneratingShareLink = false;
+      });
+      return;
+    }
+
+    if (!force &&
+        !_isGeneratingShareLink &&
+        _shareUrl != null &&
+        _shareResumeId == resumeId &&
+        _shareResumeVersion == resumeVersion) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isGeneratingShareLink = true);
+    }
+
+    try {
+      final record = await ResumeShareService.ensureShareRecord(resume);
+      final portfolioUrl = record?.publicUrl.trim() ?? '';
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _shareUrl = portfolioUrl.isEmpty ? null : portfolioUrl;
+        _shareResumeId = resumeId;
+        _shareResumeVersion = resumeVersion;
+        _isGeneratingShareLink = false;
+      });
+      debugPrint('Portfolio URL: ${_shareUrl ?? ''}');
+      debugPrint('Portfolio URL length: ${(_shareUrl ?? '').length}');
+      if ((_shareUrl ?? '').isNotEmpty) {
+        debugPrint('QR Generated');
+        debugPrint('Copy Enabled');
+        debugPrint('Share Enabled');
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _shareUrl = null;
+        _shareResumeId = resumeId;
+        _shareResumeVersion = resumeVersion;
+        _isGeneratingShareLink = false;
+      });
+    }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -161,23 +244,88 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
   }
 
   Future<void> _sharePortfolio() async {
+    if (_isSharingPortfolio) {
+      return;
+    }
+
+    await _refreshShareLink(force: true);
+    final shareUrl = _shareUrl;
+    if (shareUrl == null || shareUrl.isEmpty) {
+      _showSnackBar(
+        _portfolioUrlUnavailableMessage(action: 'sharing'),
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _isSharingPortfolio = true);
+    debugPrint('Share Enabled');
+    debugPrint('Portfolio URL: $shareUrl');
+    debugPrint('Share URL length: ${shareUrl.length}');
     try {
-      await Share.share(
-        _portfolioUrl,
-        subject: 'My Portfolio',
+      await SharePlus.instance.share(
+        ShareParams(
+          text: shareUrl,
+          subject: 'My Resume',
+        ),
       );
     } catch (error) {
-      _showSnackBar('Unable to share portfolio link: $error', isError: true);
+      _showSnackBar('Unable to share resume link: $error', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isSharingPortfolio = false);
+      }
     }
   }
 
   Future<void> _copyPortfolioLink() async {
-    await Clipboard.setData(const ClipboardData(text: _portfolioUrl));
-    _showSnackBar('Link copied to clipboard');
+    if (_isCopyingLink) {
+      return;
+    }
+
+    await _refreshShareLink(force: true);
+    final shareUrl = _shareUrl;
+    if (shareUrl == null || shareUrl.isEmpty) {
+      _showSnackBar(
+        _portfolioUrlUnavailableMessage(action: 'copying'),
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _isCopyingLink = true);
+    debugPrint('Copy Enabled');
+    debugPrint('Portfolio URL: $shareUrl');
+    debugPrint('Copy URL length: ${shareUrl.length}');
+    try {
+      await Clipboard.setData(ClipboardData(text: shareUrl));
+      _showSnackBar('Link copied to clipboard');
+    } catch (error) {
+      _showSnackBar('Unable to copy resume link: $error', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isCopyingLink = false);
+      }
+    }
   }
 
   Future<void> _openPortfolioLink() async {
-    final uri = Uri.parse(_portfolioUrl);
+    await _refreshShareLink(force: true);
+    final shareUrl = _shareUrl;
+    if (shareUrl == null || shareUrl.isEmpty) {
+      _showSnackBar(
+        _portfolioUrlUnavailableMessage(action: 'opening it'),
+        isError: true,
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(shareUrl);
+    if (uri == null) {
+      _showSnackBar('Resume share link is invalid.', isError: true);
+      return;
+    }
+
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.platformDefault);
       return;
@@ -191,8 +339,20 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
       return;
     }
 
+    await _refreshShareLink(force: true);
+    final shareUrl = _shareUrl;
+    if (shareUrl == null || shareUrl.isEmpty) {
+      _showSnackBar(
+        _portfolioUrlUnavailableMessage(action: 'exporting a QR code'),
+        isError: true,
+      );
+      return;
+    }
+
     setState(() => _isExportingQr = true);
     try {
+      debugPrint('QR URL: $shareUrl');
+      debugPrint('QR URL length: ${shareUrl.length}');
       final bytes = await _captureQrCodeBytes();
       final file = await buildShareableExportFile(
         bytes: bytes,
@@ -200,10 +360,12 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
         mimeType: 'image/png',
       );
 
-      await Share.shareXFiles(
-        <XFile>[file],
-        subject: 'Portfolio QR Code',
-        text: 'Save or share this QR code for $_portfolioUrl',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: <XFile>[file],
+          subject: 'Resume QR Code',
+          text: 'Save or share this QR code for $shareUrl',
+        ),
       );
 
       if (!mounted) {
@@ -305,15 +467,17 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
     }
 
     try {
-      await Share.shareXFiles(
-        <XFile>[
-          XFile(
-            certificate.filePath!,
-            name: certificate.fileName,
-          ),
-        ],
-        subject: certificate.title,
-        text: '${certificate.title} by ${certificate.issuer}',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: <XFile>[
+            XFile(
+              certificate.filePath!,
+              name: certificate.fileName,
+            ),
+          ],
+          subject: certificate.title,
+          text: '${certificate.title} by ${certificate.issuer}',
+        ),
       );
     } catch (error) {
       _showSnackBar('Unable to open certificate file: $error', isError: true);
@@ -322,6 +486,52 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final resumes = ref.watch(resumesProvider);
+    final sourceResume = _currentSourceResume();
+    final shareUrl = _shareUrl ?? '';
+    final hasPortfolioUrl = shareUrl.isNotEmpty;
+    final emptyPortfolioMessage = resumes.isEmpty
+        ? 'Create a resume to enable sharing.'
+        : _isGeneratingShareLink
+            ? 'Generating a shareable resume link...'
+            : 'Resume sharing is temporarily unavailable. Try again.';
+    final sourceResumeVersion = sourceResume?.updatedAt.toIso8601String();
+    if (sourceResume != null &&
+        !_isGeneratingShareLink &&
+        (_shareResumeId != sourceResume.id ||
+            _shareResumeVersion != sourceResumeVersion)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refreshShareLink();
+      });
+    }
+    final fullName = sourceResume?.personalInfo.fullName.trim() ?? '';
+    final jobTitle = sourceResume?.personalInfo.jobTitle?.trim() ?? '';
+    final summary = sourceResume?.objective?.trim() ?? '';
+    final contactItems = <String>[
+      sourceResume?.personalInfo.email.trim() ?? '',
+      sourceResume?.personalInfo.phone.trim() ?? '',
+      sourceResume?.personalInfo.address.trim() ?? '',
+      sourceResume?.personalInfo.linkedIn?.trim() ?? '',
+      sourceResume?.personalInfo.github?.trim() ?? '',
+    ].where((item) => item.isNotEmpty).toList(growable: false);
+    final resumeProjects = sourceResume?.projects ?? const <Project>[];
+    final resumeCertifications =
+        sourceResume?.certifications ?? const <Certification>[];
+    final experienceItems = sourceResume?.experience ?? const <Experience>[];
+    final educationItems = sourceResume?.education ?? const <Education>[];
+    final customSections =
+        sourceResume?.customSections ?? const <CustomSection>[];
+    final achievementItems = experienceItems
+        .expand((experience) => experience.achievements)
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    final skills = sourceResume?.skills
+            .map((skill) => skill.name.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false) ??
+        const <String>[];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Portfolio'),
@@ -335,6 +545,91 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (resumes.isEmpty)
+                const _PortfolioEmptyState(
+                  title: 'No resume selected yet',
+                  message:
+                      'Create or update a resume first. Your portfolio will automatically sync the latest resume details here.',
+                )
+              else ...[
+                if (resumes.length > 1)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Portfolio Source',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: sourceResume?.id,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                        ),
+                        items: resumes
+                            .map(
+                              (resume) => DropdownMenuItem<String>(
+                                value: resume.id,
+                                child: Text(
+                                  resume.title,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: _handleSourceResumeChanged,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          fullName.isNotEmpty
+                              ? fullName
+                              : sourceResume?.title ?? 'Portfolio',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        if (jobTitle.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            jobTitle,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(color: AppColors.primary),
+                          ),
+                        ],
+                        if (contactItems.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: contactItems
+                                .map((item) => _InfoChip(label: item))
+                                .toList(growable: false),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 50.ms).slideY(begin: 0.06, end: 0),
+                const SizedBox(height: 16),
+              ],
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -368,16 +663,24 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 SelectableText(
-                                  _portfolioUrl,
-                                  onTap: _openPortfolioLink,
+                                  hasPortfolioUrl
+                                    ? shareUrl
+                                      : emptyPortfolioMessage,
+                                  onTap: hasPortfolioUrl
+                                      ? _openPortfolioLink
+                                      : null,
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
                                       ?.copyWith(
-                                        color: AppColors.primary,
-                                        decoration: TextDecoration.underline,
+                                        color: hasPortfolioUrl
+                                            ? AppColors.primary
+                                            : AppColors.textSecondary,
+                                        decoration: hasPortfolioUrl
+                                            ? TextDecoration.underline
+                                            : TextDecoration.none,
                                       ),
-                                  maxLines: 1,
+                                  maxLines: hasPortfolioUrl ? 1 : 3,
                                 ),
                               ],
                             ),
@@ -389,16 +692,37 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: _copyPortfolioLink,
-                              icon: const Icon(Iconsax.copy, size: 18),
+                              onPressed: hasPortfolioUrl && !_isCopyingLink
+                                  ? _copyPortfolioLink
+                                  : null,
+                              icon: _isCopyingLink
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Iconsax.copy, size: 18),
                               label: const Text('Copy Link'),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: _sharePortfolio,
-                              icon: const Icon(Iconsax.share, size: 18),
+                              onPressed: hasPortfolioUrl && !_isSharingPortfolio
+                                  ? _sharePortfolio
+                                  : null,
+                              icon: _isSharingPortfolio
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(Iconsax.share, size: 18),
                               label: const Text('Share'),
                             ),
                           ),
@@ -431,17 +755,46 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: QrImageView(
-                              data: _portfolioUrl,
-                              version: QrVersions.auto,
-                              size: 200,
-                              backgroundColor: Colors.white,
-                            ),
+                            child: hasPortfolioUrl
+                                ? QrImageView(
+                                    data: shareUrl,
+                                    version: QrVersions.auto,
+                                    size: 200,
+                                    backgroundColor: Colors.white,
+                                  )
+                                : SizedBox(
+                                    width: 200,
+                                    height: 200,
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Iconsax.scan_barcode,
+                                          size: 36,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          emptyPortfolioMessage,
+                                          textAlign: TextAlign.center,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: AppColors.textSecondary,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 16),
                         TextButton.icon(
-                          onPressed: _isExportingQr ? null : _downloadQrCode,
+                          onPressed: _isExportingQr || !hasPortfolioUrl
+                              ? null
+                              : _downloadQrCode,
                           icon: _isExportingQr
                               ? const SizedBox(
                                   width: 18,
@@ -462,12 +815,130 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
                   ),
                 ).animate().fadeIn(delay: 200.ms).scale(),
               ),
+              if (summary.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                _PortfolioSectionCard(
+                  title: 'Professional Summary',
+                  child: Text(
+                    summary,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+              if (skills.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                _PortfolioSectionCard(
+                  title: 'Skills',
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: skills
+                        .map((skill) => _InfoChip(label: skill))
+                        .toList(growable: false),
+                  ),
+                ),
+              ],
+              if (experienceItems.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Text(
+                  'Work Experience',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                ...experienceItems.asMap().entries.map(
+                      (entry) => Padding(
+                        padding: EdgeInsets.only(
+                          bottom:
+                              entry.key == experienceItems.length - 1 ? 0 : 12,
+                        ),
+                        child: _ExperienceCard(experience: entry.value),
+                      ),
+                    ),
+              ],
+              if (achievementItems.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                _PortfolioSectionCard(
+                  title: 'Key Achievements',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: achievementItems
+                        .map(
+                          (achievement) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text('• $achievement'),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ),
+              ],
+              if (educationItems.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Text(
+                  'Education',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                ...educationItems.asMap().entries.map(
+                      (entry) => Padding(
+                        padding: EdgeInsets.only(
+                          bottom:
+                              entry.key == educationItems.length - 1 ? 0 : 12,
+                        ),
+                        child: _EducationCard(education: entry.value),
+                      ),
+                    ),
+              ],
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Projects',
+                    'Projects from Resume',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (resumeProjects.isEmpty)
+                const _PortfolioEmptyState(
+                  title: 'No resume projects yet',
+                  message:
+                      'Add projects to the selected resume and they will appear here automatically.',
+                )
+              else
+                ...resumeProjects.asMap().entries.map(
+                  (entry) {
+                    final index = entry.key;
+                    final project = entry.value;
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index == resumeProjects.length - 1 ? 0 : 12,
+                      ),
+                      child: _ResumeProjectCard(
+                        project: project,
+                      )
+                          .animate()
+                          .fadeIn(delay: (300 + index * 80).ms)
+                          .slideX(begin: -0.1, end: 0),
+                    );
+                  },
+                ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Portfolio Highlights',
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
@@ -483,8 +954,9 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
               const SizedBox(height: 12),
               if (_projects.isEmpty)
                 const _PortfolioEmptyState(
-                  title: 'No projects yet',
-                  message: 'Add a project so your portfolio shows recent work.',
+                  title: 'No extra highlights yet',
+                  message:
+                      'Add optional showcase items if you want more portfolio-specific project highlights beyond the resume.',
                 )
               else
                 ..._projects.asMap().entries.map(
@@ -501,7 +973,7 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
                         onEdit: () => _saveProject(existing: project),
                       )
                           .animate()
-                          .fadeIn(delay: (300 + index * 80).ms)
+                          .fadeIn(delay: (360 + index * 80).ms)
                           .slideX(begin: -0.1, end: 0),
                     );
                   },
@@ -511,7 +983,46 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Certificates',
+                    'Certifications from Resume',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (resumeCertifications.isEmpty)
+                const _PortfolioEmptyState(
+                  title: 'No resume certifications yet',
+                  message:
+                      'Add certifications to the selected resume and they will appear here automatically.',
+                )
+              else
+                ...resumeCertifications.asMap().entries.map(
+                  (entry) {
+                    final index = entry.key;
+                    final certificate = entry.value;
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom:
+                            index == resumeCertifications.length - 1 ? 0 : 12,
+                      ),
+                      child: _ResumeCertificationCard(
+                        certification: certificate,
+                      )
+                          .animate()
+                          .fadeIn(delay: (450 + index * 80).ms)
+                          .slideX(begin: -0.1, end: 0),
+                    );
+                  },
+                ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Uploaded Certificates',
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
@@ -527,8 +1038,9 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
               const SizedBox(height: 12),
               if (_certificates.isEmpty)
                 const _PortfolioEmptyState(
-                  title: 'No certificates yet',
-                  message: 'Upload a certificate to add proof of your skills.',
+                  title: 'No uploaded certificates yet',
+                  message:
+                      'Upload an attachment here if you want a portfolio-specific certificate file to share.',
                 )
               else
                 ..._certificates.asMap().entries.map(
@@ -546,15 +1058,356 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
                         onView: () => _viewCertificate(certificate),
                       )
                           .animate()
-                          .fadeIn(delay: (450 + index * 80).ms)
+                          .fadeIn(delay: (520 + index * 80).ms)
                           .slideX(begin: -0.1, end: 0),
                     );
                   },
                 ),
+              if (customSections.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Text(
+                  'Additional Sections',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                ...customSections.asMap().entries.map(
+                      (entry) => Padding(
+                        padding: EdgeInsets.only(
+                          bottom:
+                              entry.key == customSections.length - 1 ? 0 : 12,
+                        ),
+                        child: _CustomSectionCard(section: entry.value),
+                      ),
+                    ),
+              ],
               const SizedBox(height: 100),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textPrimary,
+            ),
+      ),
+    );
+  }
+}
+
+class _PortfolioSectionCard extends StatelessWidget {
+  const _PortfolioSectionCard({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExperienceCard extends StatelessWidget {
+  const _ExperienceCard({required this.experience});
+
+  final Experience experience;
+
+  @override
+  Widget build(BuildContext context) {
+    final achievements = experience.achievements
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              experience.position.trim().isNotEmpty
+                  ? experience.position.trim()
+                  : 'Role',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              experience.company.trim().isNotEmpty
+                  ? experience.company.trim()
+                  : 'Company',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColors.primary),
+            ),
+            if (experience.description.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(experience.description.trim()),
+            ],
+            if (achievements.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ...achievements.map(
+                (achievement) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text('• $achievement'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EducationCard extends StatelessWidget {
+  const _EducationCard({required this.education});
+
+  final Education education;
+
+  @override
+  Widget build(BuildContext context) {
+    final degree =
+        '${education.degree.trim()} ${education.fieldOfStudy.trim()}'.trim();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (degree.isNotEmpty)
+              Text(
+                degree,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            if (education.institution.trim().isNotEmpty) ...[
+              if (degree.isNotEmpty) const SizedBox(height: 4),
+              Text(
+                education.institution.trim(),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: AppColors.primary),
+              ),
+            ],
+            if ((education.description ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text((education.description ?? '').trim()),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResumeProjectCard extends StatelessWidget {
+  const _ResumeProjectCard({required this.project});
+
+  final Project project;
+
+  @override
+  Widget build(BuildContext context) {
+    final technologies = project.technologies
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .join(', ');
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              project.title.trim().isNotEmpty
+                  ? project.title.trim()
+                  : 'Project',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            if (project.description.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(project.description.trim()),
+            ],
+            if (technologies.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Technologies: $technologies',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
+            ],
+            if ((project.url ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                (project.url ?? '').trim(),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.primary,
+                    ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ResumeCertificationCard extends StatelessWidget {
+  const _ResumeCertificationCard({required this.certification});
+
+  final Certification certification;
+
+  @override
+  Widget build(BuildContext context) {
+    final credentialParts = <String>[
+      certification.issuer.trim(),
+      (certification.credentialId ?? '').trim(),
+      (certification.credentialUrl ?? '').trim(),
+    ].where((item) => item.isNotEmpty).toList(growable: false);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              certification.name.trim().isNotEmpty
+                  ? certification.name.trim()
+                  : 'Certification',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            if (credentialParts.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...credentialParts.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    item,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomSectionCard extends StatelessWidget {
+  const _CustomSectionCard({required this.section});
+
+  final CustomSection section;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = section.items.where((item) {
+      return item.title.trim().isNotEmpty ||
+          (item.subtitle ?? '').trim().isNotEmpty ||
+          (item.description ?? '').trim().isNotEmpty;
+    }).toList(growable: false);
+
+    return _PortfolioSectionCard(
+      title: section.title.trim().isNotEmpty
+          ? section.title.trim()
+          : 'Additional Section',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: items
+            .map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item.title.trim().isNotEmpty)
+                      Text(
+                        item.title.trim(),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    if ((item.subtitle ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        (item.subtitle ?? '').trim(),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppColors.primary),
+                      ),
+                    ],
+                    if ((item.description ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text((item.description ?? '').trim()),
+                    ],
+                  ],
+                ),
+              ),
+            )
+            .toList(growable: false),
       ),
     );
   }
@@ -749,7 +1602,8 @@ class _ProjectEditorDialogState extends State<_ProjectEditorDialog> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.existing?.title ?? '');
+    _titleController =
+        TextEditingController(text: widget.existing?.title ?? '');
     _descriptionController = TextEditingController(
       text: widget.existing?.description ?? '',
     );
@@ -778,7 +1632,8 @@ class _ProjectEditorDialogState extends State<_ProjectEditorDialog> {
 
     Navigator.of(context).pop(
       _PortfolioProject(
-        id: widget.existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+        id: widget.existing?.id ??
+            DateTime.now().microsecondsSinceEpoch.toString(),
         title: title,
         description: description,
       ),
@@ -821,7 +1676,8 @@ class _ProjectEditorDialogState extends State<_ProjectEditorDialog> {
         ),
         FilledButton(
           onPressed: _submit,
-          child: Text(widget.existing == null ? 'Save Project' : 'Update Project'),
+          child:
+              Text(widget.existing == null ? 'Save Project' : 'Update Project'),
         ),
       ],
     );

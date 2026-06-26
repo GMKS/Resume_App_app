@@ -33,6 +33,7 @@ enum SubscriptionPlan {
 enum BillingProvider {
   local,
   googlePlay,
+  razorpay,
 }
 
 class SubscriptionModel {
@@ -89,7 +90,7 @@ class SubscriptionModel {
     return plan != SubscriptionPlan.free;
   }
 
-  bool get isStoreManaged => billingProvider != BillingProvider.local;
+  bool get isStoreManaged => billingProvider == BillingProvider.googlePlay;
 
   static SubscriptionModel forPlan(
     SubscriptionPlan plan, {

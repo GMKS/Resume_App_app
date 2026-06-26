@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:resume_builder/core/services/storage_service.dart';
 import 'package:resume_builder/core/services/twilio_service.dart';
 import 'package:resume_builder/core/services/user_session_service.dart';
 import '../widgets/otp_verification_widget.dart';
@@ -157,6 +159,10 @@ class _TwilioLoginScreenState extends State<TwilioLoginScreen>
         // Save login session for flash login
         final prefs = await SharedPreferences.getInstance();
         await UserSessionService.persistPhoneSession(prefs, _phone);
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          await StorageService.ensureWorkspaceOwner(currentUser.uid);
+        }
 
         // Navigate to dashboard after success
         await Future.delayed(const Duration(seconds: 1));

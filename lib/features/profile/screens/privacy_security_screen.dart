@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/services/analytics_service.dart';
+import '../../../core/services/auth_service.dart';
+import '../../../core/services/biometric_service.dart';
 import '../../../core/services/data_deletion_service.dart';
+import '../../../core/services/data_export_service.dart';
 import '../../../core/theme/app_theme.dart';
 
 class PrivacySecurityScreen extends StatefulWidget {
@@ -19,18 +24,28 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   bool _biometricLogin = false;
   bool _dataCollection = true;
   bool _analyticsSharing = false;
+  bool _isBiometricAvailable = false;
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+    _checkBiometricAvailability();
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    final isAvailable = await BiometricService.isBiometricAvailable();
+    if (mounted) {
+      setState(() => _isBiometricAvailable = isAvailable);
+    }
   }
 
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _twoFactor = prefs.getBool('sec_2fa') ?? false;
-      _biometricLogin = prefs.getBool('sec_biometric') ?? false;
+      _biometricLogin =
+          _isBiometricAvailable && (prefs.getBool('sec_biometric') ?? false);
       _dataCollection = prefs.getBool('sec_data_collection') ?? true;
       _analyticsSharing = prefs.getBool('sec_analytics') ?? false;
     });
@@ -54,7 +69,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
           ],
         ),
         content: const Text(
-          'Users can delete their data anytime. Delete the app data stored on this device and remove any synced backups tied to your current sync code or device? This also signs you out.'),
+            'Users can delete their data anytime. Delete the app data stored on this device and remove any synced backups tied to your current authenticated workspace? This also signs you out.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -80,8 +95,8 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
-            child:
-                const Text('Delete Data', style: TextStyle(color: Colors.white)),
+            child: const Text('Delete Data',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -98,31 +113,42 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          const _SectionHeader(title: 'Security').animate().fadeIn(delay: 50.ms),
+          const _SectionHeader(title: 'Security')
+              .animate()
+              .fadeIn(delay: 50.ms),
           _buildToggle(
             icon: Iconsax.shield_tick,
             title: 'Two-Factor Authentication',
             subtitle: 'Require OTP on every login',
             value: _twoFactor,
             delay: 100,
-            onChanged: (v) {
+            onChanged: (v) async {
+              await AuthService.enableTwoFactorAuth(v);
               setState(() => _twoFactor = v);
               _savePref('sec_2fa', v);
             },
           ),
-          _buildToggle(
-            icon: Iconsax.finger_scan,
-            title: 'Biometric Login',
-            subtitle: 'Use fingerprint or Face ID',
-            value: _biometricLogin,
-            delay: 150,
-            onChanged: (v) {
-              setState(() => _biometricLogin = v);
-              _savePref('sec_biometric', v);
-            },
-          ),
+          if (_isBiometricAvailable)
+            _buildToggle(
+              icon: Iconsax.finger_scan,
+              title: 'Biometric Login',
+              subtitle: 'Use fingerprint or Face ID',
+              value: _biometricLogin,
+              delay: 150,
+              onChanged: (v) async {
+                if (v) {
+                  final didAuth = await BiometricService.authenticate(
+                      'Enable biometric login');
+                  if (!didAuth) return;
+                }
+                setState(() => _biometricLogin = v);
+                _savePref('sec_biometric', v);
+              },
+            ),
           const SizedBox(height: 20),
-          const _SectionHeader(title: 'Privacy').animate().fadeIn(delay: 200.ms),
+          const _SectionHeader(title: 'Privacy')
+              .animate()
+              .fadeIn(delay: 200.ms),
           _buildToggle(
             icon: Iconsax.data,
             title: 'Data Collection',
@@ -130,6 +156,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             value: _dataCollection,
             delay: 250,
             onChanged: (v) {
+              AnalyticsService.setCollectionEnabled(v);
               setState(() => _dataCollection = v);
               _savePref('sec_data_collection', v);
             },
@@ -141,6 +168,7 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             value: _analyticsSharing,
             delay: 300,
             onChanged: (v) {
+              AnalyticsService.setSharingEnabled(v);
               setState(() => _analyticsSharing = v);
               _savePref('sec_analytics', v);
             },
@@ -153,13 +181,10 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
             subtitle: 'Download a copy of all your data',
             iconColor: AppColors.primary,
             delay: 400,
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Data export feature coming soon.'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+            onTap: () async {
+              final filePath = await DataExportService.exportData();
+              await Share.shareXFiles(
+                  [XFile(filePath, mimeType: 'application/json')]);
             },
           ),
           _buildActionTile(
@@ -261,11 +286,8 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(
-                                fontWeight: FontWeight.w600, color: iconColor)),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600, color: iconColor)),
                     const SizedBox(height: 2),
                     Text(subtitle,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(

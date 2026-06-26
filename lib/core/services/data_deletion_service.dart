@@ -11,6 +11,12 @@ class DataDeletionService {
   const DataDeletionService._();
 
   static Future<void> deleteUserData({bool deleteCloudData = true}) async {
+    final wasPremium = StorageService.isPremiumUser();
+    debugPrint(
+      'DataDeletionService.deleteUserData: deleteCloudData=$deleteCloudData '
+      'premiumBefore=$wasPremium',
+    );
+
     if (deleteCloudData) {
       await Future.wait([
         SupabaseSyncService.deleteAllCloudData(),
@@ -18,8 +24,12 @@ class DataDeletionService {
       ]);
     }
 
-    await StorageService.resumeBox.clear();
-    await StorageService.prefs.clear();
+    await StorageService.clearLocalWorkspaceData();
+
+    debugPrint(
+      'DataDeletionService.deleteUserData: premiumAfter=${StorageService.isPremiumUser()} '
+      'premiumCachePreserved=${StorageService.isPremiumUser() == wasPremium}',
+    );
 
     try {
       await FirebaseAuth.instance.signOut();

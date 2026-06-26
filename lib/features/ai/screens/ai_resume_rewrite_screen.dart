@@ -7,7 +7,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
-import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -42,7 +41,6 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
   String? _errorMessage;
 
   String? _selectedResumeId;
-  String _apiKey = '';
   List<ResumeModel> _allResumes = [];
 
   /// Available writing tones
@@ -58,7 +56,6 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
   @override
   void initState() {
     super.initState();
-    _loadApiKey();
     _loadResumes();
     _selectedResumeId = widget.resumeId;
   }
@@ -94,11 +91,6 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
     super.dispose();
   }
 
-  Future<void> _loadApiKey() async {
-    final apiKey = await AiApiKeyStorageService.read();
-    setState(() => _apiKey = apiKey);
-  }
-
   Future<void> _rewriteResume(List<ResumeModel> allResumes) async {
     if (!FreePlanService.isPremium) {
       showUpgradePromptSheet(
@@ -119,11 +111,6 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
       setState(() => _errorMessage = 'Please select a resume first.');
       return;
     }
-    if (_apiKey.isEmpty) {
-      _showApiKeyDialog();
-      return;
-    }
-
     setState(() {
       _isRewriting = true;
       _errorMessage = null;
@@ -143,7 +130,6 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
       final targetTitle = _targetJobTitleController.text.trim();
 
       final result = await AiResumeService.rewriteFullResume(
-        apiKey: _apiKey,
         resumeJson: resumeMap,
         tone: tone,
         targetJobTitle: targetTitle.isNotEmpty ? targetTitle : null,
@@ -167,11 +153,10 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
         _isRewriting = false;
         _errorMessage = e.message;
       });
-      _showApiKeyDialog();
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = AiResumeService.describeUnexpectedError(e);
         _isRewriting = false;
       });
     }
@@ -263,44 +248,6 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
     });
   }
 
-  void _showApiKeyDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Iconsax.cpu, color: _kRewriteColor),
-            SizedBox(width: 10),
-            Text('AI Service'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'AI access is managed by the app. You do not need to create or paste a personal API key.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'If AI is unavailable right now, the app configuration is missing or temporarily unavailable. Please try again later.',
-              style: TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12, height: 1.5),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -314,22 +261,6 @@ class _AiResumeRewriteScreenState extends ConsumerState<AiResumeRewriteScreen> {
           ),
         ),
         title: const Text('AI Resume Rewrite'),
-        actions: [
-          AdaptiveTooltip(
-            message: _apiKey.isNotEmpty
-                ? 'AI service ready'
-                : 'AI service unavailable',
-            button: true,
-            child: IconButton(
-              onPressed: _showApiKeyDialog,
-              icon: Icon(
-                Iconsax.key,
-                color:
-                    _apiKey.isNotEmpty ? AppColors.success : AppColors.warning,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

@@ -90,4 +90,17 @@ void main() {
     );
     expect(updated.skills.map((skill) => skill.name), contains('Leadership'));
   });
+
+  test('keyword analyzer ignores generic posting words but keeps role terms', () {
+    final missing = RAOE2KeywordAnalyzer.findMissingKeywords(
+      resumeText: 'Flutter developer building mobile apps with Dart',
+      jobDescription:
+          'Application Developer with Flutter, Dart, strong team collaboration and 5 years of experience required',
+    );
+
+    expect(missing, contains('application'));
+    expect(missing, isNot(contains('experience')));
+    expect(missing, isNot(contains('years')));
+    expect(missing, isNot(contains('team')));
+  });
 }

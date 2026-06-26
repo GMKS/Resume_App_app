@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUser(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read, write: if ownsUser(userId);
+
+      match /resumes/{resumeId} {
+        allow read, write: if ownsUser(userId);
+      }
+
+      match /settings/{settingId} {
+        allow read, write: if ownsUser(userId);
+      }
+
+      match /backups/{backupId} {
+        allow read, write: if ownsUser(userId);
+      }
+
+      match /resume_versions/{resumeId} {
+        allow read, write: if ownsUser(userId);
+
+        match /versions/{versionId} {
+          allow read, write: if ownsUser(userId);
+        }
+      }
+    }
+
+    match /support_bug_reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.user.uid == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
+    match /public_resume_shares/{shareId} {
+      allow read: if resource.data.active == true;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn()
+        && resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /resumes/{docId} {
+      allow read, write: if false;
+    }
+
+    match /job_tracker/{docId} {
+      allow read, write: if false;
+    }
+
+    match /resume_versions/{docId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

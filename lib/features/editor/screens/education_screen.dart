@@ -6,14 +6,12 @@ import 'package:iconsax/iconsax.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/services/resume_quality_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/utils/validation_feedback.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/app_empty_state_card.dart';
 import '../../../shared/widgets/app_loading_state.dart';
-import '../../../shared/widgets/resume_quality_panel.dart';
 import '../utils/date_range_utils.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/editor_intro_card.dart';
@@ -405,54 +403,6 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
     }
   }
 
-  ResumeModel _buildDraftResume(ResumeModel resume) {
-    final hasDraftInput = _institutionController.text.trim().isNotEmpty ||
-        _degreeController.text.trim().isNotEmpty ||
-        _fieldController.text.trim().isNotEmpty ||
-        _gradeController.text.trim().isNotEmpty ||
-        _startDate != null ||
-        _endDate != null;
-
-    if (!hasDraftInput) {
-      return resume;
-    }
-
-    final draftEducation = Education(
-      id: widget.existing?.id ?? 'draft-education',
-      institution: _institutionController.text.trim(),
-      degree: _degreeController.text.trim(),
-      fieldOfStudy: _fieldController.text.trim(),
-      grade: _gradeController.text.trim(),
-      startDate: _startDate ?? DateTime.now(),
-      endDate: _isCurrently ? null : _endDate,
-      isCurrentlyStudying: _isCurrently,
-    );
-
-    final updatedEducation = widget.existing != null
-        ? resume.education
-            .map((item) => item.id == draftEducation.id ? draftEducation : item)
-            .toList()
-        : [...resume.education, draftEducation];
-
-    return resume.copyWith(education: updatedEducation);
-  }
-
-  String? _liveGuidanceMessage() {
-    if (_institutionController.text.trim().isEmpty) {
-      return 'Add the institution name so this credential is recognizable in preview output.';
-    }
-    if (_degreeController.text.trim().isEmpty) {
-      return 'Add the degree or program name to explain what this education entry represents.';
-    }
-    if (_startDate == null) {
-      return 'Select a start date to keep your education timeline consistent.';
-    }
-    if (_endDate == null && !_isCurrently) {
-      return 'Add an end date or mark this entry as current so exported timelines stay complete.';
-    }
-    return null;
-  }
-
   void _saveEducation() {
     setState(() {
       _validationMessage = null;
@@ -580,12 +530,6 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
 
   @override
   Widget build(BuildContext context) {
-    final resume = ref.watch(currentResumeProvider(widget.resumeId));
-    final qualityReport = resume == null
-        ? null
-        : ResumeQualityService.analyzeResume(_buildDraftResume(resume));
-    final liveGuidanceMessage = _liveGuidanceMessage();
-
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(
@@ -630,74 +574,6 @@ class _EducationFormState extends ConsumerState<_EducationForm> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  EditorIntroCard(
-                    title: widget.existing != null
-                        ? 'Refine this credential'
-                        : 'Add academic proof',
-                    subtitle:
-                        'Keep the institution, program, and dates complete so the resume preview presents a trustworthy academic path.',
-                    icon: Iconsax.teacher,
-                    accentColor: const Color(0xFF0EA5E9),
-                    stats: [
-                      EditorIntroStat(
-                        label: _isCurrently ? 'current study' : 'dated entry',
-                        icon: Iconsax.clock,
-                      ),
-                      EditorIntroStat(
-                        label: _gradeController.text.trim().isNotEmpty
-                            ? 'grade included'
-                            : 'grade optional',
-                        icon: Iconsax.medal_star,
-                      ),
-                    ],
-                  ),
-                  if (qualityReport != null) ...[
-                    const SizedBox(height: 16),
-                    ResumeQualityPanel(
-                      report: qualityReport,
-                      title: 'Draft Education Guidance',
-                      subtitle:
-                          'This score uses your in-progress education details before save.',
-                      accentColor: const Color(0xFF0EA5E9),
-                      maxSuggestions: 2,
-                    ),
-                  ],
-                  if (liveGuidanceMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.warning.withValues(alpha: 0.16),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Iconsax.info_circle,
-                            color: AppColors.warning,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              liveGuidanceMessage,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    height: 1.4,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _institutionController,

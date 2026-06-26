@@ -7,6 +7,7 @@ class SubscriptionService extends StateNotifier<SubscriptionModel> {
       'subscription_cancel_at_period_end';
   static const String _providerKey = 'subscription_provider';
   static const String _activeKey = 'subscription_active';
+  static const String _verifiedKey = 'subscription_verified';
 
   SubscriptionService() : super(SubscriptionModel.free()) {
     _loadSavedSubscription();
@@ -17,13 +18,13 @@ class SubscriptionService extends StateNotifier<SubscriptionModel> {
     final prefs = await SharedPreferences.getInstance();
     final planName = prefs.getString('subscription_plan');
     final expiryStr = prefs.getString('subscription_expiry');
-    final cancelAtPeriodEnd =
-        prefs.getBool(_cancelAtPeriodEndKey) ?? false;
+    final cancelAtPeriodEnd = prefs.getBool(_cancelAtPeriodEndKey) ?? false;
     final providerName = prefs.getString(_providerKey);
     final billingProvider = BillingProvider.values.firstWhere(
       (provider) => provider.name == providerName,
       orElse: () => BillingProvider.local,
     );
+    final verified = prefs.getBool(_verifiedKey) ?? false;
 
     if (planName == null) return;
 
@@ -34,12 +35,24 @@ class SubscriptionService extends StateNotifier<SubscriptionModel> {
 
     if (billingProvider == BillingProvider.googlePlay) {
       final isActive = prefs.getBool(_activeKey) ?? true;
+      final expiry = expiryStr == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(int.parse(expiryStr));
       if (isActive && plan != SubscriptionPlan.free) {
         upgradeToPlan(
           plan,
+          expiryDate: expiry,
+          cancelAtPeriodEnd: cancelAtPeriodEnd,
           billingProvider: billingProvider,
         );
+      } else if (plan != SubscriptionPlan.free) {
+        await clearPersistedSubscriptionStorage(prefs);
       }
+      return;
+    }
+
+    if (!verified) {
+      await _clearPersistedSubscription(prefs);
       return;
     }
 
@@ -48,11 +61,7 @@ class SubscriptionService extends StateNotifier<SubscriptionModel> {
     final expiry = DateTime.fromMillisecondsSinceEpoch(int.parse(expiryStr));
     if (expiry.isBefore(DateTime.now())) {
       // Subscription expired — clear storage and stay free
-      await prefs.remove('subscription_plan');
-      await prefs.remove('subscription_expiry');
-      await prefs.remove(_cancelAtPeriodEndKey);
-      await prefs.remove(_providerKey);
-      await prefs.remove(_activeKey);
+      await _clearPersistedSubscription(prefs);
       return;
     }
 
@@ -83,11 +92,7 @@ class SubscriptionService extends StateNotifier<SubscriptionModel> {
   Future<void> cancelSubscription() async {
     state = SubscriptionModel.free();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('subscription_plan');
-    await prefs.remove('subscription_expiry');
-    await prefs.remove(_cancelAtPeriodEndKey);
-    await prefs.remove(_providerKey);
-    await prefs.remove(_activeKey);
+    await _clearPersistedSubscription(prefs);
   }
 
   Future<void> scheduleCancellation() async {
@@ -128,6 +133,32 @@ class SubscriptionService extends StateNotifier<SubscriptionModel> {
 
   bool hasFeatureAccess(String featureName) {
     return state.hasFeature(featureName);
+  }
+
+  Future<void> _clearPersistedSubscription(SharedPreferences prefs) async {
+    await clearPersistedSubscriptionStorage(prefs);
+  }
+
+  static Future<void> clearPersistedSubscriptionStorage(
+    SharedPreferences prefs,
+  ) async {
+    await prefs.remove('subscription_plan');
+    await prefs.remove('subscription_expiry');
+    await prefs.remove('subscription_purchase_date');
+    await prefs.remove('subscription_purchase_token');
+    await prefs.remove('subscription_renewal_date');
+    await prefs.remove('subscription_provider');
+    await prefs.remove('subscription_status');
+    await prefs.remove('subscription_store_order_id');
+    await prefs.remove('subscription_payment_id');
+    await prefs.remove('subscription_order_id');
+    await prefs.remove('subscription_signature');
+    await prefs.remove('subscription_verification_status');
+    await prefs.remove('subscription_auto_renewing');
+    await prefs.remove(_cancelAtPeriodEndKey);
+    await prefs.remove(_providerKey);
+    await prefs.remove(_activeKey);
+    await prefs.remove(_verifiedKey);
   }
 }
 

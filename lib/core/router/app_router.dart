@@ -22,6 +22,7 @@ import '../../features/editor/screens/languages_screen.dart';
 import '../../features/editor/screens/summary_screen.dart';
 import '../../features/templates/screens/template_selection_screen.dart';
 import '../../features/preview/screens/preview_screen.dart';
+import '../../features/portfolio/screens/public_resume_share_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/ai/screens/ai_assistant_screen.dart';
 import '../../features/ai/screens/ai_resume_generator_screen.dart';
@@ -40,11 +41,13 @@ import '../../features/career_tools/screens/career_articles_screen.dart';
 import '../../features/ai/screens/ai_bullet_generator_screen.dart';
 import '../../features/ai/screens/roast_resume_screen.dart';
 import '../../features/tools/screens/resume_style_converter_screen.dart';
+import '../../features/resume/screens/resumes_tab_screen.dart';
 import '../../features/subscription/screens/subscription_screen.dart';
 import '../../features/auth/screens/twilio_login_screen.dart';
 import '../../features/profile/screens/notifications_screen.dart';
 import '../../features/profile/screens/privacy_security_screen.dart';
 import '../../features/profile/screens/help_support_screen.dart';
+import '../../features/profile/screens/video_tutorials_screen.dart';
 import '../../features/profile/screens/terms_conditions_screen.dart';
 import '../../features/profile/screens/about_screen.dart';
 
@@ -55,9 +58,21 @@ final onboardingCompleteProvider = FutureProvider<bool>((ref) async {
 });
 
 // Router provider
+String _resolveInitialLocation() {
+  final shareTarget = Uri.base.queryParameters['p'];
+  if (shareTarget != null && shareTarget.trim().isNotEmpty) {
+    final decoded = Uri.decodeComponent(shareTarget.trim());
+    if (decoded.startsWith('/')) {
+      return decoded;
+    }
+  }
+
+  return '/';
+}
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: kStoreScreenshotMode ? '/dashboard' : '/',
+    initialLocation: kStoreScreenshotMode ? '/dashboard' : _resolveInitialLocation(),
     routes: [
       GoRoute(
         path: '/raoe2',
@@ -65,7 +80,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           final resumeId = state.uri.queryParameters['resumeId'];
           final resumeText = state.uri.queryParameters['resumeText'] ?? '';
-          final jobDescription = state.uri.queryParameters['jobDescription'] ?? '';
+          final jobDescription =
+              state.uri.queryParameters['jobDescription'] ?? '';
           return CustomTransitionPage(
             key: state.pageKey,
             child: RAOE2Screen(
@@ -73,11 +89,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               resumeText: resumeText,
               jobDescription: jobDescription,
             ),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
               const begin = Offset(1.0, 0.0);
               const end = Offset.zero;
               const curve = Curves.easeInOutCubic;
-              var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+              var tween =
+                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
               return SlideTransition(
                 position: animation.drive(tween),
                 child: child,
@@ -262,6 +280,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
+      GoRoute(
+        path: '/resume-share',
+        name: 'resume-share',
+        pageBuilder: (context, state) => _slideTransition(
+          state,
+          PublicResumeShareScreen(
+            shareId: state.uri.queryParameters['id'] ?? '',
+            resumePayload: state.uri.queryParameters['r'],
+          ),
+        ),
+      ),
+
       // AI Features
       GoRoute(
         path: '/ai-assistant',
@@ -304,7 +334,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'ai-content-enhancer',
         pageBuilder: (context, state) => _slideTransition(
           state,
-          AiContentEnhancerScreen(resumeId: state.uri.queryParameters['resumeId']),
+          AiContentEnhancerScreen(
+              resumeId: state.uri.queryParameters['resumeId']),
         ),
       ),
 
@@ -313,7 +344,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'ai-resume-rewrite',
         pageBuilder: (context, state) => _slideTransition(
           state,
-          AiResumeRewriteScreen(resumeId: state.uri.queryParameters['resumeId']),
+          AiResumeRewriteScreen(
+              resumeId: state.uri.queryParameters['resumeId']),
         ),
       ),
 
@@ -396,7 +428,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'ai-bullet-generator',
         pageBuilder: (context, state) => _slideTransition(
           state,
-          const AIBulletGeneratorScreen(),
+          AIBulletGeneratorScreen(
+            resumeId: state.uri.queryParameters['resumeId'],
+          ),
         ),
       ),
 
@@ -417,6 +451,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ResumeStyleConverterScreen(
             resumeId: state.uri.queryParameters['resumeId'],
           ),
+        ),
+      ),
+
+      GoRoute(
+        path: '/my-resumes',
+        name: 'my-resumes',
+        pageBuilder: (context, state) => _slideTransition(
+          state,
+          const ResumesTabScreen(),
         ),
       ),
 
@@ -476,6 +519,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _slideTransition(
           state,
           const HelpSupportScreen(),
+        ),
+      ),
+
+      GoRoute(
+        path: '/app-guide',
+        name: 'app-guide',
+        pageBuilder: (context, state) => _slideTransition(
+          state,
+          const AppGuideScreen(),
+        ),
+      ),
+
+      GoRoute(
+        path: '/video-tutorials',
+        name: 'video-tutorials-legacy',
+        pageBuilder: (context, state) => _slideTransition(
+          state,
+          const AppGuideScreen(),
         ),
       ),
 

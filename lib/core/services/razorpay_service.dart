@@ -10,17 +10,19 @@ String _readPaymentConfig(String key) {
   return AppConfigService.read(key);
 }
 
-final String _razorpayKeyId = _readPaymentConfig('RAZORPAY_KEY_ID');
+String get _razorpayKeyId => _readPaymentConfig('RAZORPAY_KEY_ID');
 
 class RazorpayService {
+  static const int checkoutTimeoutSeconds = 15;
+
   Razorpay? _razorpay;
 
   static bool get supportsNativeCheckout => !kIsWeb;
   static bool get isConfigured => _razorpayKeyId.isNotEmpty;
+  static String get diagnosticsSummary =>
+      'configured=$isConfigured native=$supportsNativeCheckout testMode=$isTestMode';
 
   static bool get isTestMode => _razorpayKeyId.startsWith('rzp_test_');
-
-  static bool get canUseTestActivationFallback => !kReleaseMode && isTestMode;
 
   // Callbacks set by the screen
   void Function(PaymentSuccessResponse)? onSuccess;
@@ -29,6 +31,10 @@ class RazorpayService {
 
   void initialize() {
     final razorpayKey = _razorpayKeyId;
+    debugPrint(
+      'RazorpayService.initialize: configured=${razorpayKey.isNotEmpty} '
+      'native=$supportsNativeCheckout testMode=$isTestMode',
+    );
     if (razorpayKey.isEmpty) {
       throw Exception('Razorpay Key ID is not configured.');
     }
@@ -52,6 +58,7 @@ class RazorpayService {
   bool openCheckout({
     required SubscriptionPlan plan,
     required SubscriptionPricingOption pricing,
+    required String orderId,
     String? userPhone,
     String? userEmail,
     String? userName,
@@ -66,11 +73,12 @@ class RazorpayService {
 
     final options = {
       'key': _razorpayKeyId,
+      'order_id': orderId,
       'amount': pricing.price.amountInMinorUnits,
       'currency': pricing.price.currencyCode,
       'name': AppInfo.appName,
       'description': pricing.checkoutDescription,
-      'timeout': 300, // 5 minutes
+      'timeout': checkoutTimeoutSeconds,
       'prefill': {
         'contact': userPhone ?? '',
         'email': userEmail ?? '',
@@ -93,9 +101,17 @@ class RazorpayService {
     };
 
     try {
+      debugPrint(
+        'RazorpayService.openCheckout: plan=${plan.name} '
+        'orderId=$orderId '
+        'amount=${pricing.price.amountInMinorUnits} '
+        'currency=${pricing.price.currencyCode} '
+        'timeout=${checkoutTimeoutSeconds}s',
+      );
       _razorpay?.open(options);
       return true;
-    } catch (_) {
+    } catch (error) {
+      debugPrint('RazorpayService.openCheckout: failed with $error');
       return false;
     }
   }
@@ -127,6 +143,23 @@ class RazorpayService {
         return 'App update required for payments.';
       default:
         return 'Payment failed. Please try again.';
+    }
+  }
+
+  static String errorStatus(int? code) {
+    switch (code) {
+      case Razorpay.PAYMENT_CANCELLED:
+        return 'cancelled';
+      case Razorpay.NETWORK_ERROR:
+        return 'network_error';
+      case Razorpay.INVALID_OPTIONS:
+        return 'invalid_options';
+      case Razorpay.TLS_ERROR:
+        return 'tls_error';
+      case Razorpay.INCOMPATIBLE_PLUGIN:
+        return 'incompatible_plugin';
+      default:
+        return 'failed';
     }
   }
 }

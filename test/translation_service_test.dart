@@ -399,4 +399,50 @@ void main() {
     expect(translated.education.first.degree, original.education.first.degree);
     expect(translated.languages.first.proficiency, original.languages.first.proficiency);
   });
+
+  test('translateResume uses supported backend code for Norwegian', () async {
+    late String capturedTarget;
+    TranslationService.debugBackendOverride = (text, backendLangCode) async {
+      capturedTarget = backendLangCode;
+      return text.replaceAll('Senior QA Engineer', 'Senior QA-ingenior');
+    };
+
+    final translated = await TranslationService.translateResume(
+      _buildResume(),
+      'Norwegian',
+    );
+
+    expect(capturedTarget, 'nb');
+    expect(translated.personalInfo.jobTitle, 'Senior QA-ingenior');
+  });
+
+  test('translateBatch falls back to per-item translation when chunk request fails', () async {
+    TranslationService.clearCache();
+    var batchAttempted = false;
+    TranslationService.debugBackendOverride = (text, _) async {
+      if (text.contains('¶¶¶')) {
+        batchAttempted = true;
+        throw Exception('chunk failed');
+      }
+
+      return text
+          .replaceAll('Senior QA Engineer', 'Ingeniera QA Senior')
+          .replaceAll(
+            'Build reliable mobile releases for global users.',
+            'Creo lanzamientos moviles confiables para usuarios globales.',
+          );
+    };
+
+    final translated = await TranslationService.translateResume(
+      _buildResume(),
+      'Spanish',
+    );
+
+    expect(batchAttempted, isTrue);
+    expect(translated.personalInfo.jobTitle, 'Ingeniera QA Senior');
+    expect(
+      translated.objective,
+      'Creo lanzamientos moviles confiables para usuarios globales.',
+    );
+  });
 }

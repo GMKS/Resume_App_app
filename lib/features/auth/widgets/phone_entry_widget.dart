@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+
+import '../../../core/utils/phone_number_utils.dart';
 
 class _Country {
   final String name;
@@ -22,11 +25,11 @@ const List<_Country> _countries = [
   _Country(name: 'United States', flag: '🇺🇸', dialCode: '+1', hint: '(555) 123-4567', maxLength: 10),
   _Country(name: 'United Kingdom', flag: '🇬🇧', dialCode: '+44', hint: '7911 123456', maxLength: 10),
   _Country(name: 'Canada', flag: '🇨🇦', dialCode: '+1', hint: '(604) 123-4567', maxLength: 10),
-  _Country(name: 'Australia', flag: '🇦🇺', dialCode: '+61', hint: '412 345 678', maxLength: 9),
-  _Country(name: 'Germany', flag: '🇩🇪', dialCode: '+49', hint: '1512 3456789', maxLength: 11),
-  _Country(name: 'France', flag: '🇫🇷', dialCode: '+33', hint: '6 12 34 56 78', maxLength: 9),
-  _Country(name: 'UAE', flag: '🇦🇪', dialCode: '+971', hint: '50 123 4567', maxLength: 9),
-  _Country(name: 'Singapore', flag: '🇸🇬', dialCode: '+65', hint: '8123 4567', maxLength: 8),
+  _Country(name: 'Australia', flag: '🇦🇺', dialCode: '+61', hint: '4123 45678', maxLength: 10),
+  _Country(name: 'Germany', flag: '🇩🇪', dialCode: '+49', hint: '1512 345678', maxLength: 10),
+  _Country(name: 'France', flag: '🇫🇷', dialCode: '+33', hint: '6123 45678', maxLength: 10),
+  _Country(name: 'UAE', flag: '🇦🇪', dialCode: '+971', hint: '5012 34567', maxLength: 10),
+  _Country(name: 'Singapore', flag: '🇸🇬', dialCode: '+65', hint: '8123 45678', maxLength: 10),
   _Country(name: 'Japan', flag: '🇯🇵', dialCode: '+81', hint: '90-1234-5678', maxLength: 10),
 ];
 
@@ -65,18 +68,19 @@ class _PhoneEntryWidgetState extends State<PhoneEntryWidget> {
   }
 
   void _handleSubmit() {
-    final phone = _phoneController.text.trim().replaceAll(RegExp(r'[\s\-()]'), '');
-    if (phone.isEmpty) {
-      setState(() => _errorText = 'Please enter a phone number');
-      return;
-    }
-    if (phone.length < _selectedCountry.maxLength - 1) {
-      setState(() => _errorText = 'Phone number too short for ${_selectedCountry.name}');
+    final phone = PhoneNumberUtils.normalizeLocalNumber(_phoneController.text);
+    final validation = PhoneNumberUtils.validateLocalNumber(
+      phone,
+      required: true,
+    );
+    if (validation != null) {
+      setState(() => _errorText = validation);
       return;
     }
     setState(() => _errorText = '');
-    // Pass full E.164 number: dialCode + digits
-    widget.onSubmit('${_selectedCountry.dialCode}$phone');
+    widget.onSubmit(
+      PhoneNumberUtils.formatInternational(_selectedCountry.dialCode, phone),
+    );
   }
 
   void _showCountryPicker() {
@@ -208,7 +212,15 @@ class _PhoneEntryWidgetState extends State<PhoneEntryWidget> {
               child: TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                maxLength: _selectedCountry.maxLength + 2,
+                inputFormatters: <TextInputFormatter>[
+                  ...PhoneNumberUtils.localNumberInputFormatters,
+                ],
+                maxLength: PhoneNumberUtils.localNumberLength,
+                onChanged: (_) {
+                  if (_errorText.isNotEmpty) {
+                    setState(() => _errorText = '');
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: _selectedCountry.hint,
                   labelText: 'Phone Number',
@@ -242,13 +254,6 @@ class _PhoneEntryWidgetState extends State<PhoneEntryWidget> {
                       : Colors.grey.shade50,
                   errorText: _errorText.isEmpty ? null : _errorText,
                 ),
-                onChanged: (_) {
-                  if (_errorText.isNotEmpty) {
-                    setState(() {
-                      _errorText = '';
-                    });
-                  }
-                },
               ),
             ).animate().slideX(begin: 0.1, duration: const Duration(milliseconds: 600)),
 

@@ -112,7 +112,6 @@ class RAOE2Service {
   static const String engineVersion = '2026-04-23-raoe2-ai-v1';
 
   static Future<RAOE2OptimizationResult> optimize({
-    required String apiKey,
     required String resumeText,
     required String jobDescription,
     ResumeModel? resume,
@@ -128,7 +127,6 @@ class RAOE2Service {
 
     if (resume != null) {
       final response = await AiResumeService.optimizeStructuredResumeForJob(
-        apiKey: apiKey,
         resumeJson: ResumeJson.toMap(resume),
         jobDescription: normalizedJobDescription,
         missingKeywords: missingKeywords,
@@ -143,7 +141,6 @@ class RAOE2Service {
     }
 
     final response = await AiResumeService.optimizeResumeTextForJob(
-      apiKey: apiKey,
       resumeText: normalizedResumeText,
       jobDescription: normalizedJobDescription,
       missingKeywords: missingKeywords,
@@ -167,7 +164,8 @@ class RAOE2Service {
       updatedAt: DateTime.now(),
     );
 
-    if (result.rewrittenExperience.isNotEmpty && updated.experience.isNotEmpty) {
+    if (result.rewrittenExperience.isNotEmpty &&
+        updated.experience.isNotEmpty) {
       final updatedExperience = updated.experience.asMap().entries.map((entry) {
         final index = entry.key;
         final experience = entry.value;
@@ -176,7 +174,9 @@ class RAOE2Service {
         }
         final rewrite = result.rewrittenExperience[index];
         return experience.copyWith(
-          position: rewrite.position.isNotEmpty ? rewrite.position : experience.position,
+          position: rewrite.position.isNotEmpty
+              ? rewrite.position
+              : experience.position,
           description: rewrite.description.isNotEmpty
               ? rewrite.description
               : experience.description,
@@ -302,7 +302,8 @@ class RAOE2Service {
 
     if (resume.languages.isNotEmpty) {
       final languagesText = resume.languages
-          .map((language) => '${language.name.trim()} (${language.proficiency.trim()})')
+          .map((language) =>
+              '${language.name.trim()} (${language.proficiency.trim()})')
           .where((item) => item.isNotEmpty)
           .join(', ');
       _writeSection(buffer, title: 'Languages', body: languagesText);
@@ -337,13 +338,16 @@ class RAOE2Service {
     required Map<String, dynamic> response,
     required List<String> missingKeywords,
   }) {
-    final rewrittenSummary = response['rewrittenSummary']?.toString().trim() ?? '';
-    final rewrittenExperience = _experienceRewrites(response['rewrittenExperience']);
+    final rewrittenSummary =
+        response['rewrittenSummary']?.toString().trim() ?? '';
+    final rewrittenExperience =
+        _experienceRewrites(response['rewrittenExperience']);
     final rewrittenSkills = stringList(response['rewrittenSkills']);
     final keywordsAdded = stringList(response['keywordsAdded']);
     final addressedKeywords = stringList(response['missingKeywordsAddressed']);
     final suggestions = stringList(response['actionableSuggestions']);
-    final overallRationale = response['overallRationale']?.toString().trim() ?? '';
+    final overallRationale =
+        response['overallRationale']?.toString().trim() ?? '';
 
     final sectionRewrites = <RAOE2SectionRewrite>[];
     final originalSummary = resume.objective?.trim() ?? '';
@@ -355,7 +359,9 @@ class RAOE2Service {
           originalText: originalSummary,
           optimizedText: rewrittenSummary,
           keywordsAdded: keywordsAdded
-              .where((keyword) => rewrittenSummary.toLowerCase().contains(keyword.toLowerCase()))
+              .where((keyword) => rewrittenSummary
+                  .toLowerCase()
+                  .contains(keyword.toLowerCase()))
               .toList(growable: false),
           rationale: overallRationale.isNotEmpty
               ? overallRationale
@@ -372,7 +378,8 @@ class RAOE2Service {
       }
       final rewrite = rewrittenExperience[index];
       final originalText = _buildExperienceText(experience);
-      final optimizedText = _buildExperienceTextFromRewrite(experience, rewrite);
+      final optimizedText =
+          _buildExperienceTextFromRewrite(experience, rewrite);
       if (optimizedText.trim() == originalText.trim()) {
         continue;
       }
@@ -405,9 +412,11 @@ class RAOE2Service {
           originalText: originalSkills,
           optimizedText: optimizedSkills,
           keywordsAdded: keywordsAdded
-              .where((keyword) => optimizedSkills.toLowerCase().contains(keyword.toLowerCase()))
+              .where((keyword) =>
+                  optimizedSkills.toLowerCase().contains(keyword.toLowerCase()))
               .toList(growable: false),
-          rationale: 'Reordered and sharpened the skills section around the target job.',
+          rationale:
+              'Reordered and sharpened the skills section around the target job.',
         ),
       );
     }
@@ -452,12 +461,15 @@ class RAOE2Service {
     required Map<String, dynamic> response,
     required List<String> missingKeywords,
   }) {
-    final optimizedResumeText = response['optimizedResumeText']?.toString().trim().isNotEmpty == true
-        ? response['optimizedResumeText'].toString().trim()
-        : originalResumeText;
-    final sectionRewrites = (response['sectionRewrites'] as List? ?? const <dynamic>[])
+    final optimizedResumeText =
+        response['optimizedResumeText']?.toString().trim().isNotEmpty == true
+            ? response['optimizedResumeText'].toString().trim()
+            : originalResumeText;
+    final sectionRewrites = (response['sectionRewrites'] as List? ??
+            const <dynamic>[])
         .whereType<Map>()
-        .map((item) => item.map((key, value) => MapEntry(key.toString(), value)))
+        .map(
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)))
         .map(RAOE2SectionRewrite.fromMap)
         .where((section) => section.hasVisibleChange)
         .toList(growable: false);
@@ -467,7 +479,8 @@ class RAOE2Service {
       optimizedResumeText: optimizedResumeText,
       missingKeywords: missingKeywords,
       keywordsAdded: stringList(response['keywordsAdded']),
-      missingKeywordsAddressed: stringList(response['missingKeywordsAddressed']),
+      missingKeywordsAddressed:
+          stringList(response['missingKeywordsAddressed']),
       actionableSuggestions: stringList(response['actionableSuggestions']),
       sectionRewrites: sectionRewrites,
       rewrittenSummary: '',
@@ -530,12 +543,16 @@ class RAOE2Service {
             .map((item) => '- $item')
             .join('\n');
 
-    final header = '${rewrite.position.isNotEmpty ? rewrite.position : original.position} '
-        'at ${rewrite.company.isNotEmpty ? rewrite.company : original.company}'.trim();
+    final header =
+        '${rewrite.position.isNotEmpty ? rewrite.position : original.position} '
+                'at ${rewrite.company.isNotEmpty ? rewrite.company : original.company}'
+            .trim();
 
     final bodyParts = <String>[
       header,
-      rewrite.description.isNotEmpty ? rewrite.description : original.description,
+      rewrite.description.isNotEmpty
+          ? rewrite.description
+          : original.description,
       achievements,
     ].where((item) => item.isNotEmpty).toList(growable: false);
 
@@ -620,6 +637,36 @@ class RAOE2KeywordAnalyzer {
     'etc',
     'job',
     'role',
+    'years',
+    'year',
+    'experience',
+    'experienced',
+    'skills',
+    'skill',
+    'ability',
+    'abilities',
+    'candidate',
+    'candidates',
+    'position',
+    'positions',
+    'requirement',
+    'requirements',
+    'required',
+    'preferred',
+    'responsible',
+    'responsibilities',
+    'including',
+    'knowledge',
+    'strong',
+    'excellent',
+    'proven',
+    'team',
+    'teams',
+    'work',
+    'working',
+    'environment',
+    'plus',
+    'using',
     'must',
     'should',
     'could',

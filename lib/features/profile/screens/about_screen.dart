@@ -11,7 +11,8 @@ class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
   static const String _developer = 'Seenai GMK';
-  static const String _linkedinUrl = 'https://www.linkedin.com/in/seenai';
+  static const String _linkedinUrl =
+      'https://www.linkedin.com/in/seenai-gmk-74a04519/';
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);

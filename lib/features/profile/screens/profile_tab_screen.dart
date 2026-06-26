@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/app_version_service.dart';
+import '../../../core/models/subscription_model.dart';
+import '../../../core/services/storage_service.dart';
 import '../../../core/services/user_session_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/subscription_service.dart';
@@ -49,6 +54,7 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
   @override
   Widget build(BuildContext context) {
     final subscription = ref.watch(subscriptionProvider);
+    final subscriptionSubtitle = _buildSubscriptionSubtitle(subscription);
 
     return Scaffold(
       appBar: AppBar(
@@ -158,11 +164,7 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            subscription.isPremium()
-                                ? subscription.cancelAtPeriodEnd
-                                    ? 'Cancels ${_formatDate(subscription.expiryDate!)}'
-                                    : 'Expires ${_formatDate(subscription.expiryDate!)}'
-                                : 'Upgrade to unlock premium features',
+                            subscriptionSubtitle,
                             style:
                                 Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: AppColors.textSecondary,
@@ -288,6 +290,23 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  String _buildSubscriptionSubtitle(SubscriptionModel subscription) {
+    if (!subscription.isPremium()) {
+      return 'Upgrade to unlock premium features';
+    }
+
+    final expiryDate = subscription.expiryDate;
+    if (expiryDate == null) {
+      return subscription.isStoreManaged
+          ? 'Managed by Google Play'
+          : 'Premium plan active';
+    }
+
+    return subscription.cancelAtPeriodEnd
+        ? 'Cancels ${_formatDate(expiryDate)}'
+        : 'Expires ${_formatDate(expiryDate)}';
+  }
+
   Future<_ProfileIdentity> _loadProfileIdentity() async {
     final prefs = await SharedPreferences.getInstance();
     final rawDisplayName = prefs.getString('display_name')?.trim() ?? '';
@@ -406,13 +425,23 @@ class _ProfileTabScreenState extends ConsumerState<ProfileTabScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogCtx);
-              // Clear saved session
               final prefs = await SharedPreferences.getInstance();
               await prefs.setBool('is_logged_in', false);
               await UserSessionService.clearStoredContact(prefs);
               await prefs.remove('display_name');
               await prefs.remove('photo_url');
               await prefs.remove('auth_provider');
+              await StorageService.clearLocalWorkspaceData();
+              await StorageService.clearWorkspaceOwner();
+              try {
+                await FirebaseAuth.instance.signOut();
+              } catch (_) {}
+              try {
+                await GoogleSignIn().signOut();
+              } catch (_) {}
+              try {
+                await FacebookAuth.instance.logOut();
+              } catch (_) {}
               if (outerContext.mounted) {
                 outerContext.go('/login');
               }

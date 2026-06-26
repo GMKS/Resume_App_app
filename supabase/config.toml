@@ -254,6 +254,12 @@ max_frequency = "5s"
 # Force log out if the user has been inactive longer than the specified duration.
 # inactivity_timeout = "8h"
 
+[functions.ai-gateway]
+verify_jwt = false
+
+[functions.ai-health]
+verify_jwt = false
+
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]
 # enabled = true

@@ -11,9 +11,11 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/services/free_plan_service.dart';
+import '../../../core/utils/phone_number_utils.dart';
 import '../../../core/utils/resume_translations.dart';
 import '../../../core/utils/validation_feedback.dart';
 import '../../../shared/widgets/feature_gate.dart';
+import '../../portfolio/services/portfolio_profile_service.dart';
 import '../widgets/custom_text_field.dart';
 import 'resume_editor_screen.dart';
 
@@ -97,11 +99,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
   }
 
   String _normalizedPhoneDigits(String value) {
-    final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
-    if (digitsOnly.length <= 10) {
-      return digitsOnly;
-    }
-    return digitsOnly.substring(0, 10);
+    return PhoneNumberUtils.normalizeLocalNumber(value);
   }
 
   void _initializeControllers(ResumeModel resume) {
@@ -307,7 +305,11 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
             email: _emailController.text.trim(),
             phone: normalizedPhone.isEmpty
                 ? ''
-                : '${_countryCode.trim()} $normalizedPhone'.trim(),
+              : PhoneNumberUtils.formatInternational(
+                _countryCode.trim(),
+                normalizedPhone,
+                includeSpace: true,
+                ),
             address: _addressController.text.trim(),
             jobTitle: _jobTitleController.text.trim(),
             linkedIn: _linkedInController.text.trim(),
@@ -668,23 +670,12 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                               child: TextFormField(
                                 controller: _phoneController,
                                 keyboardType: TextInputType.phone,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(10),
-                                ],
+                                inputFormatters:
+                                    PhoneNumberUtils.localNumberInputFormatters,
                                 onChanged: (_) => setState(() {}),
                                 style: Theme.of(context).textTheme.bodyLarge,
-                                validator: (value) {
-                                  final digits =
-                                      _normalizedPhoneDigits(value ?? '');
-                                  if (digits.isEmpty) {
-                                    return null;
-                                  }
-                                  if (digits.length < 10) {
-                                    return 'Please enter a valid 10-digit phone number';
-                                  }
-                                  return null;
-                                },
+                                validator: (value) =>
+                                    PhoneNumberUtils.validateLocalNumber(value),
                                 decoration: InputDecoration(
                                   hintText: '9916750642',
                                   prefixIcon: const Icon(
@@ -835,6 +826,16 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                     hint: 'www.johndoe.com',
                     prefixIcon: Iconsax.global,
                     keyboardType: TextInputType.url,
+                    validator: (value) {
+                      final trimmed = value?.trim() ?? '';
+                      if (trimmed.isEmpty) {
+                        return null;
+                      }
+                      if (!PortfolioProfileService.isValidPortfolioUrl(trimmed)) {
+                        return 'Enter a valid public website URL';
+                      }
+                      return null;
+                    },
                     onChanged: (_) => setState(() {}),
                   ).animate().fadeIn(delay: 550.ms).slideX(begin: 0.1, end: 0),
                 ],

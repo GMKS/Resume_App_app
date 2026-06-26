@@ -7,6 +7,7 @@ import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:resume_builder/core/models/resume_model.dart';
+import 'package:resume_builder/core/providers/navigation_providers.dart';
 import 'package:resume_builder/core/services/storage_service.dart';
 import 'package:resume_builder/features/resume/screens/resumes_tab_screen.dart';
 
@@ -81,6 +82,58 @@ void main() {
     expect((titleRect.top - buttonRect.top).abs(), lessThan(16));
     expect(buttonRect.left, greaterThan(titleRect.left));
     expect(tester.takeException(), isNull);
+
+    await _disposeTestWidgetTree(tester);
+  });
+
+  testWidgets('shows only completed resumes when completed filter is active',
+      (tester) async {
+    final now = DateTime(2026, 5, 1);
+    await StorageService.deleteAllResumes();
+    await StorageService.saveResume(
+      ResumeModel(
+        id: 'resume-complete',
+        title: 'Completed Resume',
+        personalInfo: PersonalInfo(fullName: 'GMK Seenai'),
+        createdAt: now,
+        updatedAt: now,
+        completionPercentage: 100,
+      ),
+    );
+    await StorageService.saveResume(
+      ResumeModel(
+        id: 'resume-progress',
+        title: 'Draft Resume',
+        personalInfo: PersonalInfo(fullName: 'GMK Seenai'),
+        createdAt: now,
+        updatedAt: now,
+        completionPercentage: 60,
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          resumeListFilterProvider.overrideWith(
+            (ref) => StateController(ResumeListFilter.completed),
+          ),
+        ],
+        child: const MaterialApp(
+          home: ResumesTabScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('Completed Resume'), findsOneWidget);
+    expect(find.text('Draft Resume'), findsNothing);
+    expect(find.text('Completed resumes'), findsOneWidget);
+
+    await tester.tap(find.byType(ActionChip));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Draft Resume'), findsOneWidget);
 
     await _disposeTestWidgetTree(tester);
   });

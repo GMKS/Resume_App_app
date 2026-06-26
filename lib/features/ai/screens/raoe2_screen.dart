@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/models/resume_model.dart';
-import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/resume_version_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -51,7 +50,6 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
   ResumeModel? _selectedResume;
   Set<String> _missingKeywords = <String>{};
   RAOE2OptimizationResult? _result;
-  String _apiKey = '';
   String _selectedTone = _tones.first;
   String _manualResumeDraft = '';
   String? _errorMessage;
@@ -66,7 +64,6 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
     _manualResumeDraft = widget.resumeText;
     _resumeController.addListener(_handleInputChanged);
     _jobDescController.addListener(_handleInputChanged);
-    _loadApiKey();
     _loadResumes();
     _refreshKeywordAnalysis();
   }
@@ -76,16 +73,6 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
     _resumeController.dispose();
     _jobDescController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadApiKey() async {
-    final apiKey = await AiApiKeyStorageService.read();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _apiKey = apiKey;
-    });
   }
 
   void _loadResumes({String? preferredResumeId}) {
@@ -193,17 +180,13 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
       });
       return;
     }
-    if (jobDescription.length < 50) {
+    if (jobDescription.length < 10) {
       setState(() {
-        _errorMessage = 'Paste a fuller job description before optimizing.';
+        _errorMessage =
+            'Add at least a target role or a short job description before optimizing.';
       });
       return;
     }
-    if (_apiKey.isEmpty) {
-      _showApiKeyDialog();
-      return;
-    }
-
     setState(() {
       _isOptimizing = true;
       _errorMessage = null;
@@ -212,7 +195,6 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
 
     try {
       final result = await RAOE2Service.optimize(
-        apiKey: _apiKey,
         resumeText: resumeText,
         jobDescription: jobDescription,
         resume: _selectedResume,
@@ -235,13 +217,12 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
         _errorMessage = error.message;
         _isOptimizing = false;
       });
-      _showApiKeyDialog();
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _errorMessage = error.toString();
+        _errorMessage = AiResumeService.describeUnexpectedError(error);
         _isOptimizing = false;
       });
     }
@@ -339,44 +320,6 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
     }
   }
 
-  void _showApiKeyDialog() {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Iconsax.cpu, color: AppColors.primary),
-            SizedBox(width: 10),
-            Text('AI Service'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'AI access is managed by the app. You do not need to create or paste a personal API key.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'If AI is unavailable right now, the app configuration is missing or temporarily unavailable. Please try again later.',
-              style: TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12, height: 1.5),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -389,18 +332,6 @@ class _RAOE2ScreenState extends ConsumerState<RAOE2Screen> {
           icon: const Icon(Iconsax.arrow_left),
         ),
         title: const Text('Resume Auto-Optimization (RAOE 2)'),
-        actions: [
-          IconButton(
-            onPressed: _showApiKeyDialog,
-            icon: Icon(
-              Iconsax.key,
-              color: _apiKey.isNotEmpty ? AppColors.success : AppColors.warning,
-            ),
-            tooltip: _apiKey.isNotEmpty
-                ? 'AI service ready'
-                : 'AI service unavailable',
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

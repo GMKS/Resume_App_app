@@ -7,7 +7,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
-import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -40,7 +39,6 @@ class _AiContentEnhancerScreenState
   bool _showResult = false;
   Map<String, dynamic>? _result;
   String? _errorMessage;
-  String _apiKey = '';
 
   // Form state
   String _selectedJobTitle = 'Software Engineer';
@@ -55,7 +53,6 @@ class _AiContentEnhancerScreenState
   @override
   void initState() {
     super.initState();
-    _loadApiKey();
     _loadResumes();
   }
 
@@ -64,11 +61,6 @@ class _AiContentEnhancerScreenState
     _industryController.dispose();
     _existingDescController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadApiKey() async {
-    final apiKey = await AiApiKeyStorageService.read();
-    setState(() => _apiKey = apiKey);
   }
 
   void _loadResumes() {
@@ -148,11 +140,6 @@ class _AiContentEnhancerScreenState
       );
       return;
     }
-    if (_apiKey.isEmpty) {
-      _showApiKeyDialog();
-      return;
-    }
-
     setState(() {
       _isGenerating = true;
       _errorMessage = null;
@@ -161,7 +148,6 @@ class _AiContentEnhancerScreenState
 
     try {
       final result = await AiResumeService.generateResumeContent(
-        apiKey: _apiKey,
         jobTitle: _selectedJobTitle,
         experienceYears: _experienceYears,
         industry: _industryController.text.trim().isNotEmpty
@@ -193,10 +179,9 @@ class _AiContentEnhancerScreenState
         _isGenerating = false;
         _errorMessage = e.message;
       });
-      _showApiKeyDialog();
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = AiResumeService.describeUnexpectedError(e);
         _isGenerating = false;
       });
     }
@@ -605,42 +590,6 @@ class _AiContentEnhancerScreenState
     );
   }
 
-  void _showApiKeyDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Iconsax.cpu, color: AppColors.primary),
-            SizedBox(width: 10),
-            Text('AI Service'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'AI access is managed by the app. You do not need to create, paste, or manage a personal API key.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'If AI is unavailable right now, the app has not been configured yet. Please try again later.',
-              style: TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12, height: 1.5),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -654,22 +603,6 @@ class _AiContentEnhancerScreenState
           ),
         ),
         title: const Text('AI Content Enhancer'),
-        actions: [
-          AdaptiveTooltip(
-            message: _apiKey.isNotEmpty
-                ? 'AI service ready'
-                : 'AI service unavailable',
-            button: true,
-            child: IconButton(
-              onPressed: _showApiKeyDialog,
-              icon: Icon(
-                Iconsax.key,
-                color:
-                    _apiKey.isNotEmpty ? AppColors.success : AppColors.warning,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

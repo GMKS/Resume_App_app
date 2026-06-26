@@ -8,7 +8,6 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
-import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/resume_import_service.dart';
 import '../../../core/services/resume_import_mapper.dart';
@@ -41,7 +40,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
   String? _errorMessage;
   ResumeModel? _selectedResume;
   List<ResumeModel> _allResumes = [];
-  String _apiKey = '';
 
   // Import Resume mode
   bool _importMode = false;
@@ -58,7 +56,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
   void initState() {
     super.initState();
     _loadResumes();
-    _loadApiKey();
   }
 
   @override
@@ -160,11 +157,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
     }
   }
 
-  Future<void> _loadApiKey() async {
-    final apiKey = await AiApiKeyStorageService.read();
-    setState(() => _apiKey = apiKey);
-  }
-
   void _loadResumes() {
     final resumes = StorageService.getAllResumes();
     setState(() {
@@ -237,9 +229,8 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
         ..putIfAbsent('tailoredSummary', () => '')
         ..putIfAbsent('tailoredExperience', () => const <dynamic>[]);
 
-      if (_apiKey.isEmpty) {
-        result['analysisNotice'] =
-            'Match analysis is ready. AI tailoring is unavailable right now because the app AI service is not configured.';
+      if (!AiResumeService.isBackendConfigured) {
+        result['analysisNotice'] = AiResumeService.missingConfigurationMessage;
       } else {
         try {
           await ResumeVersionService.saveVersion(
@@ -250,7 +241,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
 
           final resumeMap = ResumeJson.toMap(resume);
           final aiResult = await AiResumeService.tailorResumeForJob(
-            apiKey: _apiKey,
             resumeJson: resumeMap,
             jobDescription: jobDescription,
           );
@@ -267,11 +257,9 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           result['analysisNotice'] =
               'Match analysis completed, but AI tailoring is currently unavailable. ${e.message}';
         } on AiConfigException catch (e) {
-          result['analysisNotice'] =
-              'Match analysis completed, but AI tailoring is not configured. ${e.message}';
+          result['analysisNotice'] = e.message;
         } catch (e) {
-          result['analysisNotice'] =
-              'Match analysis completed, but AI tailoring could not be generated. ${e.toString()}';
+          result['analysisNotice'] = AiResumeService.describeUnexpectedError(e);
         }
       }
 
@@ -294,8 +282,10 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           'Please paste more resume content (at least 50 characters).');
       return;
     }
-    if (_apiKey.isEmpty) {
-      _showApiKeyDialog();
+    if (!AiResumeService.isBackendConfigured) {
+      setState(() {
+        _errorMessage = AiResumeService.missingConfigurationMessage;
+      });
       return;
     }
 
@@ -309,7 +299,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
 
     try {
       final result = await AiResumeService.parseResumeFromText(
-        apiKey: _apiKey,
         resumeText: _jobDescController.text.trim(),
       );
       setState(() {
@@ -322,10 +311,9 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
         _isParsing = false;
         _errorMessage = e.message;
       });
-      _showApiKeyDialog();
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = AiResumeService.describeUnexpectedError(e);
         _isParsing = false;
       });
     }
@@ -487,42 +475,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
     });
   }
 
-  void _showApiKeyDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Iconsax.cpu, color: AppColors.primary),
-            SizedBox(width: 10),
-            Text('AI Service'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'AI access is managed by the app. You do not need to create or paste a personal API key.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'If AI is unavailable right now, the app configuration is missing or temporarily unavailable. Please try again later.',
-              style: TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12, height: 1.5),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -536,22 +488,6 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
           ),
         ),
         title: Text(_importMode ? 'Import Resume' : 'Resume Match & Tailor'),
-        actions: [
-          AdaptiveTooltip(
-            message: _apiKey.isNotEmpty
-                ? 'AI service ready'
-                : 'AI service unavailable',
-            button: true,
-            child: IconButton(
-              onPressed: _showApiKeyDialog,
-              icon: Icon(
-                Iconsax.key,
-                color:
-                    _apiKey.isNotEmpty ? AppColors.success : AppColors.warning,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -951,9 +887,7 @@ class _AiJobTailorScreenState extends ConsumerState<AiJobTailorScreen> {
                               ? 'Analyzing resume match...'
                               : (_importMode
                                   ? 'Analyze & Import Resume'
-                                  : (_apiKey.isEmpty
-                                      ? 'Analyze Resume Match'
-                                      : 'Analyze Match & Tailor with AI')),
+                                  : 'Analyze Match & Tailor with AI'),
                   style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 15,

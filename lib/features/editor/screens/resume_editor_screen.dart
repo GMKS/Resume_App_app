@@ -1317,7 +1317,9 @@ class _ResumeEditorScreenState extends ConsumerState<ResumeEditorScreen> {
                       color: const Color(0xFF10B981),
                       onTap: () {
                         Navigator.pop(ctx);
-                        context.push('/ai-bullet-generator');
+                        context.push(
+                          '/ai-bullet-generator?resumeId=${widget.resumeId}',
+                        );
                       },
                     ),
                     const SizedBox(height: 24),

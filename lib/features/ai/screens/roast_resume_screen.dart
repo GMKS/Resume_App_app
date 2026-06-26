@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
-import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -40,7 +38,8 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
   void _loadResumes() {
     final resumes = StorageService.getAllResumes()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    final defaultResumeId = widget.resumeId ?? (resumes.isNotEmpty ? resumes.first.id : null);
+    final defaultResumeId =
+        widget.resumeId ?? (resumes.isNotEmpty ? resumes.first.id : null);
 
     setState(() {
       _allResumes = resumes;
@@ -111,11 +110,8 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
         return;
       }
 
-      final apiKey = await AiApiKeyStorageService.read();
-
       final resumeJson = _buildResumeMap(targetResume);
       final result = await AiResumeService.roastResume(
-        apiKey: apiKey,
         resumeJson: resumeJson,
       );
 
@@ -126,7 +122,7 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
       setState(() => _errorMessage = e.message);
     } catch (e) {
       setState(
-          () => _errorMessage = 'Something went wrong. Please try again.');
+          () => _errorMessage = AiResumeService.describeUnexpectedError(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -161,9 +157,7 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
             Text('$score',
                 style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: color)),
+                    fontSize: 13, fontWeight: FontWeight.bold, color: color)),
           ],
         ),
         const SizedBox(height: 4),
@@ -281,7 +275,8 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
                 initialValue: _selectedResumeId,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 ),
                 isExpanded: true,
                 items: _allResumes
@@ -342,19 +337,6 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 20),
-            if (_errorMessage!.contains('API key'))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push('/settings'),
-                  icon: const Icon(Iconsax.key, size: 16, color: Colors.red),
-                  label: const Text('Configure API Key in Settings',
-                      style: TextStyle(color: Colors.red)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                  ),
-                ),
-              ),
             ElevatedButton.icon(
               onPressed: _roast,
               icon: const Icon(Iconsax.refresh_2, size: 18),
@@ -386,7 +368,8 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: gradeColor.withValues(alpha: 0.4), width: 2),
+              side: BorderSide(
+                  color: gradeColor.withValues(alpha: 0.4), width: 2),
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -428,8 +411,7 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
                           child: LinearProgressIndicator(
                             value: overall / 100,
                             minHeight: 8,
-                            backgroundColor:
-                                gradeColor.withValues(alpha: 0.15),
+                            backgroundColor: gradeColor.withValues(alpha: 0.15),
                             valueColor:
                                 AlwaysStoppedAnimation<Color>(gradeColor),
                           ),
@@ -440,7 +422,10 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
                 ],
               ),
             ),
-          ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.95, 0.95)),
+          )
+              .animate()
+              .fadeIn(duration: 400.ms)
+              .scale(begin: const Offset(0.95, 0.95)),
 
           const SizedBox(height: 16),
 
@@ -450,8 +435,7 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
             decoration: BoxDecoration(
               color: Colors.orange.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: Colors.orange.withValues(alpha: 0.3)),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,9 +446,7 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
                   child: Text(
                     roast,
                     style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.5,
-                        fontStyle: FontStyle.italic),
+                        fontSize: 14, height: 1.5, fontStyle: FontStyle.italic),
                   ),
                 ),
               ],
@@ -475,10 +457,12 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
 
           // Score Breakdown
           Text('Score Breakdown',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600)).animate().fadeIn(delay: 200.ms),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600))
+              .animate()
+              .fadeIn(delay: 200.ms),
           const SizedBox(height: 12),
           Card(
             elevation: 0,
@@ -490,11 +474,22 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _scoreBar('Impact', (scores['impact'] as num?)?.toInt() ?? 50, const Color(0xFF10B981)),
-                  _scoreBar('Clarity', (scores['clarity'] as num?)?.toInt() ?? 50, const Color(0xFF3B82F6)),
-                  _scoreBar('Skills', (scores['skills'] as num?)?.toInt() ?? 50, const Color(0xFFF59E0B)),
-                  _scoreBar('Formatting', (scores['formatting'] as num?)?.toInt() ?? 50, const Color(0xFF8B5CF6)),
-                  _scoreBar('ATS Compatibility', (scores['atsCompatibility'] as num?)?.toInt() ?? 50, const Color(0xFFEC4899)),
+                  _scoreBar('Impact', (scores['impact'] as num?)?.toInt() ?? 50,
+                      const Color(0xFF10B981)),
+                  _scoreBar(
+                      'Clarity',
+                      (scores['clarity'] as num?)?.toInt() ?? 50,
+                      const Color(0xFF3B82F6)),
+                  _scoreBar('Skills', (scores['skills'] as num?)?.toInt() ?? 50,
+                      const Color(0xFFF59E0B)),
+                  _scoreBar(
+                      'Formatting',
+                      (scores['formatting'] as num?)?.toInt() ?? 50,
+                      const Color(0xFF8B5CF6)),
+                  _scoreBar(
+                      'ATS Compatibility',
+                      (scores['atsCompatibility'] as num?)?.toInt() ?? 50,
+                      const Color(0xFFEC4899)),
                 ],
               ),
             ),
@@ -504,10 +499,12 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
 
           // Improvements
           Text('Fix These First',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600)).animate().fadeIn(delay: 400.ms),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600))
+              .animate()
+              .fadeIn(delay: 400.ms),
           const SizedBox(height: 12),
           ...improvements.asMap().entries.map((entry) {
             final i = entry.key;
@@ -538,7 +535,10 @@ class _RoastResumeScreenState extends ConsumerState<RoastResumeScreen> {
                 title: Text(item,
                     style: const TextStyle(fontSize: 14, height: 1.4)),
               ),
-            ).animate().fadeIn(delay: ((4 + i) * 80).ms).slideX(begin: 0.05, end: 0);
+            )
+                .animate()
+                .fadeIn(delay: ((4 + i) * 80).ms)
+                .slideX(begin: 0.05, end: 0);
           }),
 
           const SizedBox(height: 80),

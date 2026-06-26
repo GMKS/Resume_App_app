@@ -28,8 +28,9 @@ import '../services/preview_pdf_service.dart';
 
 class PreviewScreen extends ConsumerStatefulWidget {
   final String resumeId;
+  final ResumeModel? initialResume;
 
-  const PreviewScreen({super.key, required this.resumeId});
+  const PreviewScreen({super.key, required this.resumeId, this.initialResume});
 
   @override
   ConsumerState<PreviewScreen> createState() => _PreviewScreenState();
@@ -39,6 +40,9 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   static const String _previewRendererVersion =
       '2026-05-31-business-management-curved-header-v196';
   static const double _gifExportDpi = 170;
+  static const double _readingMinZoom = 1.0;
+  static const double _readingMaxZoom = 2.5;
+  static const double _readingZoomStep = 0.2;
   ResumeModel? _resume;
   bool _isLoading = false;
   String? _activeExportLabel;
@@ -46,6 +50,9 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   Uint8List? _previewBytes;
   List<Uint8List> _previewPageImages = const [];
   String? _previewSignature;
+  bool _isReadingMode = false;
+  double _readingZoom = _readingMinZoom;
+  double _readingZoomStart = _readingMinZoom;
 
   bool get _usesRasterizedPreview =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -79,6 +86,40 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
     });
   }
 
+  void _toggleReadingMode() {
+    if (!mounted) return;
+    setState(() {
+      _isReadingMode = !_isReadingMode;
+      if (!_isReadingMode) {
+        _readingZoom = _readingMinZoom;
+      }
+    });
+  }
+
+  void _setReadingZoom(double value) {
+    final clamped = value.clamp(_readingMinZoom, _readingMaxZoom);
+    if ((_readingZoom - clamped).abs() < 0.01 || !mounted) {
+      return;
+    }
+    setState(() {
+      _readingZoom = clamped;
+    });
+  }
+
+  void _handleReadingScaleStart(ScaleStartDetails details) {
+    if (!_isReadingMode) {
+      return;
+    }
+    _readingZoomStart = _readingZoom;
+  }
+
+  void _handleReadingScaleUpdate(ScaleUpdateDetails details) {
+    if (!_isReadingMode || details.pointerCount < 2) {
+      return;
+    }
+    _setReadingZoom(_readingZoomStart * details.scale);
+  }
+
   @override
   void reassemble() {
     super.reassemble();
@@ -95,7 +136,9 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   }
 
   ResumeModel? _currentResume() {
-    return _resume ?? StorageService.getResume(widget.resumeId);
+    return _resume ??
+        widget.initialResume ??
+        StorageService.getResume(widget.resumeId);
   }
 
   @override
@@ -112,7 +155,8 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   }
 
   void _loadResume() {
-    final resume = StorageService.getResume(widget.resumeId);
+    final resume =
+        widget.initialResume ?? StorageService.getResume(widget.resumeId);
     _logLifecycle('loadResume:start', resume: resume);
     if (!mounted) {
       return;
@@ -637,9 +681,14 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
 
   Widget _buildRasterPreview() {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      padding: EdgeInsets.fromLTRB(
+        _isReadingMode ? 4 : 16,
+        0,
+        _isReadingMode ? 4 : 16,
+        _isReadingMode ? 8 : 24,
+      ),
       itemCount: _previewPageImages.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 18),
+      separatorBuilder: (_, __) => SizedBox(height: _isReadingMode ? 8 : 18),
       itemBuilder: (context, index) {
         return Container(
           decoration: BoxDecoration(
@@ -658,6 +707,160 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _wrapPreviewWithReadingZoom(Widget child) {
+    if (!_isReadingMode) {
+      return child;
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const ClampingScrollPhysics(),
+          child: SizedBox(
+            width: constraints.maxWidth * _readingZoom,
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReadingModeControls() {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 16,
+      child: SafeArea(
+        top: false,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: _readingZoom <= _readingMinZoom
+                      ? null
+                      : () => _setReadingZoom(_readingZoom - _readingZoomStep),
+                  tooltip: 'Zoom out',
+                  icon: const Icon(Icons.remove),
+                  color: Colors.white,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '${(_readingZoom * 100).round()}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: (_readingZoom - _readingMinZoom).abs() < 0.01
+                      ? null
+                      : () => _setReadingZoom(_readingMinZoom),
+                  tooltip: 'Reset zoom',
+                  icon: const Icon(Icons.center_focus_strong),
+                  color: Colors.white,
+                ),
+                IconButton(
+                  onPressed: _readingZoom >= _readingMaxZoom
+                      ? null
+                      : () => _setReadingZoom(_readingZoom + _readingZoomStep),
+                  tooltip: 'Zoom in',
+                  icon: const Icon(Icons.add),
+                  color: Colors.white,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewContent() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onDoubleTap: _toggleReadingMode,
+      onScaleStart: _handleReadingScaleStart,
+      onScaleUpdate: _handleReadingScaleUpdate,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        color: _isReadingMode ? Colors.black : Colors.transparent,
+        padding: EdgeInsets.only(
+          top: _isReadingMode ? MediaQuery.paddingOf(context).top + 18 : 18,
+        ),
+        child: Stack(
+          children: [
+            if (_previewBytes == null)
+              const Center(child: CircularProgressIndicator())
+            else
+              _wrapPreviewWithReadingZoom(
+                _usesRasterizedPreview
+                    ? Stack(
+                        children: [
+                          _buildRasterPreview(),
+                          if (FreePlanService.shouldShowWatermark)
+                            _buildPreviewWatermarkOverlay(),
+                        ],
+                      )
+                    : Stack(
+                        children: [
+                          PdfPreview(
+                            build: (format) async => _previewBytes!,
+                            actions: const [],
+                            canChangeOrientation: false,
+                            canChangePageFormat: false,
+                            canDebug: false,
+                            allowPrinting: false,
+                            allowSharing: false,
+                            pdfPreviewPageDecoration: BoxDecoration(
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 10,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (FreePlanService.shouldShowWatermark)
+                            _buildPreviewWatermarkOverlay(),
+                        ],
+                      ),
+              ),
+            if (_isReadingMode)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: SafeArea(
+                  bottom: false,
+                  child: IconButton(
+                    onPressed: _toggleReadingMode,
+                    icon: const Icon(Iconsax.close_circle),
+                    color: Colors.white,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ),
+              ),
+            if (_isReadingMode) _buildReadingModeControls(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -725,107 +928,73 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: AdaptiveTooltip(
-          message: 'Back',
-          button: true,
-          child: IconButton(
-            onPressed: () => context.pop(),
-            icon: const Icon(Iconsax.arrow_left),
-          ),
-        ),
-        title: const Text('Preview'),
-        actions: [
-          if (!FreePlanService.isPremium)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Center(
-                child: Text(
-                  FreePlanService.trialStatusMessage,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: AppColors.warning,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
+    final appBar = _isReadingMode
+        ? null
+        : AppBar(
+            leading: AdaptiveTooltip(
+              message: 'Back',
+              button: true,
+              child: IconButton(
+                onPressed: () => context.pop(),
+                icon: const Icon(Iconsax.arrow_left),
               ),
             ),
-          AdaptiveTooltip(
-            message: 'Refresh preview',
-            button: true,
-            child: IconButton(
-              onPressed: () {
-                final resume = _currentResume();
-                if (resume == null) return;
-                setState(() {
-                  _previewBytes = null;
-                  _previewSignature = null;
-                  _isPreviewLoading = false;
-                });
-                _refreshPreview(resume);
-              },
-              icon: const Icon(Iconsax.refresh),
-            ),
-          ),
-          AdaptiveTooltip(
-            message: 'Change template',
-            button: true,
-            child: IconButton(
-              onPressed: () async {
-                await context.push('/templates/${widget.resumeId}');
-                if (mounted) {
-                  _loadResume();
-                }
-              },
-              icon: const Icon(Iconsax.brush_2),
-            ),
-          ),
-        ],
-      ),
+            title: const Text('Preview'),
+            actions: [
+              if (!FreePlanService.isPremium)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Center(
+                    child: Text(
+                      FreePlanService.trialStatusMessage,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                ),
+              AdaptiveTooltip(
+                message: 'Refresh preview',
+                button: true,
+                child: IconButton(
+                  onPressed: () {
+                    final resume = _currentResume();
+                    if (resume == null) return;
+                    setState(() {
+                      _previewBytes = null;
+                      _previewSignature = null;
+                      _isPreviewLoading = false;
+                    });
+                    _refreshPreview(resume);
+                  },
+                  icon: const Icon(Iconsax.refresh),
+                ),
+              ),
+              AdaptiveTooltip(
+                message: 'Change template',
+                button: true,
+                child: IconButton(
+                  onPressed: () async {
+                    await context.push('/templates/${widget.resumeId}');
+                    if (mounted) {
+                      _loadResume();
+                    }
+                  },
+                  icon: const Icon(Iconsax.brush_2),
+                ),
+              ),
+            ],
+          );
+
+    return Scaffold(
+      backgroundColor: _isReadingMode
+          ? Colors.black
+          : Theme.of(context).scaffoldBackgroundColor,
+      appBar: appBar,
       body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 18),
-            child: Stack(
-              children: [
-                if (_previewBytes == null)
-                  const Center(child: CircularProgressIndicator())
-                else if (_usesRasterizedPreview)
-                  Stack(
-                    children: [
-                      _buildRasterPreview(),
-                      if (FreePlanService.shouldShowWatermark)
-                        _buildPreviewWatermarkOverlay(),
-                    ],
-                  )
-                else
-                  Stack(
-                    children: [
-                      PdfPreview(
-                        build: (format) async => _previewBytes!,
-                        actions: const [],
-                        canChangeOrientation: false,
-                        canChangePageFormat: false,
-                        canDebug: false,
-                        allowPrinting: false,
-                        allowSharing: false,
-                        pdfPreviewPageDecoration: BoxDecoration(
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 10,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (FreePlanService.shouldShowWatermark)
-                        _buildPreviewWatermarkOverlay(),
-                    ],
-                  ),
-              ],
-            ),
-          ),
+          _buildPreviewContent(),
           if (_isLoading)
             Container(
               color: Colors.black.withValues(alpha: 0.3),
@@ -848,75 +1017,78 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
             ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4))
-            ],
-          ),
-          child: Row(
-            children: [
-              AdaptiveTooltip(
-                message: kIsWeb
-                    ? 'Open a print-ready PDF in a new tab'
-                    : 'Print your resume',
-                button: true,
-                child: IconButton(
-                  onPressed: _printPdf,
-                  icon: const Icon(Iconsax.printer),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                  ),
+      bottomNavigationBar: _isReadingMode
+          ? null
+          : SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4))
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    AdaptiveTooltip(
+                      message: kIsWeb
+                          ? 'Open a print-ready PDF in a new tab'
+                          : 'Print your resume',
+                      button: true,
+                      child: IconButton(
+                        onPressed: _printPdf,
+                        icon: const Icon(Iconsax.printer),
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    AdaptiveTooltip(
+                      message: 'Email resume',
+                      button: true,
+                      child: IconButton(
+                        onPressed: _emailPdf,
+                        icon: const Icon(Iconsax.sms),
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              const Color(0xFFEC4899).withValues(alpha: 0.1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    AdaptiveTooltip(
+                      message: 'Share resume',
+                      button: true,
+                      child: IconButton(
+                        onPressed: _sharePdf,
+                        icon: const Icon(Iconsax.share),
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _showExportSheet,
+                        icon: const Icon(Iconsax.document_download),
+                        label: const Text('Export Resume'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF14B8A6),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              AdaptiveTooltip(
-                message: 'Email resume',
-                button: true,
-                child: IconButton(
-                  onPressed: _emailPdf,
-                  icon: const Icon(Iconsax.sms),
-                  style: IconButton.styleFrom(
-                    backgroundColor:
-                        const Color(0xFFEC4899).withValues(alpha: 0.1),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              AdaptiveTooltip(
-                message: 'Share resume',
-                button: true,
-                child: IconButton(
-                  onPressed: _sharePdf,
-                  icon: const Icon(Iconsax.share),
-                  style: IconButton.styleFrom(
-                    backgroundColor:
-                        const Color(0xFF0EA5E9).withValues(alpha: 0.1),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _showExportSheet,
-                  icon: const Icon(Iconsax.document_download),
-                  label: const Text('Export Resume'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF14B8A6),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3, end: 0),
+            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3, end: 0),
     );
   }
 

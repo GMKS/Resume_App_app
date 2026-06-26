@@ -403,7 +403,7 @@ class TranslationService {
     'Italian': 'it',
     'Dutch': 'nl',
     'Swedish': 'sv',
-    'Norwegian': 'no',
+    'Norwegian': 'nb',
     'Danish': 'da',
     'Finnish': 'fi',
     'Polish': 'pl',
@@ -830,7 +830,14 @@ class TranslationService {
           translatedJoined = await _translateWithBackend(joined, langCode);
           _cache[cacheKey] = translatedJoined;
         } catch (_) {
-          // Keep originals for this chunk — partial failure is acceptable
+          await Future.wait(idxList.map((idx) async {
+            try {
+              uniqueResults[idx] =
+                  await translate(uniqueTexts[idx], targetLanguage);
+            } catch (_) {
+              uniqueResults[idx] = uniqueTexts[idx];
+            }
+          }));
           return;
         }
       }

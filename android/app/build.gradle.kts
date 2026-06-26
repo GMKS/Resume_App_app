@@ -33,12 +33,22 @@ fun signingValue(propertyKey: String, envKey: String): String? {
     return value?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-fun configValue(propertyKey: String, envKey: String = propertyKey): String? {
+fun configValue(
+    propertyKey: String,
+    envKey: String = propertyKey,
+    preferLocal: Boolean = false,
+    includeDotEnv: Boolean = true,
+): String? {
     val gradleValue = project.findProperty(propertyKey)?.toString()
     val localValue = localProperties.getProperty(propertyKey)
     val envValue = System.getenv(envKey)
-    val dotEnvValue = dotEnvProperties.getProperty(propertyKey)
-    return listOf(gradleValue, localValue, envValue, dotEnvValue)
+    val dotEnvValue = if (includeDotEnv) dotEnvProperties.getProperty(propertyKey) else null
+    val candidates = if (preferLocal) {
+        listOf(localValue, gradleValue, envValue, dotEnvValue)
+    } else {
+        listOf(gradleValue, localValue, envValue, dotEnvValue)
+    }
+    return candidates
         .firstOrNull { !it.isNullOrBlank() }
         ?.trim()
 }
@@ -122,20 +132,28 @@ val androidApplicationId = "com.seenaigmk.resumebuilderai"
 val facebookAppId = configValue("FACEBOOK_APP_ID") ?: "YOUR_FACEBOOK_APP_ID"
 val facebookClientToken = configValue("FACEBOOK_CLIENT_TOKEN") ?: "YOUR_FACEBOOK_CLIENT_TOKEN"
 val linkedInProviderId = configValue("LINKEDIN_PROVIDER_ID") ?: "oidc.linkedin"
-val defaultOtpBaseUrl = "https://bnxdoumofrzfzubsivgs.supabase.co/functions/v1"
 val configuredOtpBaseUrl = configValue("OTP_BASE_URL")
 val configuredOtpSendUrl = configValue("OTP_SEND_URL")
 val configuredOtpVerifyUrl = configValue("OTP_VERIFY_URL")
-val playWeeklyProductId = configValue("PLAY_WEEKLY_PRODUCT_ID") ?: "weekly_pro"
-val playMonthlyProductId = configValue("PLAY_MONTHLY_PRODUCT_ID") ?: "monthly_pro"
-val playQuarterlyProductId = configValue("PLAY_QUARTERLY_PRODUCT_ID") ?: "quarterly_pro"
-val playYearlyProductId = configValue("PLAY_YEARLY_PRODUCT_ID") ?: "yearly_pro"
-val groqApiKey = configValue("GROQ_API_KEY") ?: ""
-val dummyPaymentsEnabled = configValue("ENABLE_DUMMY_PAYMENTS") ?: ""
-val googlePlayBillingDisabled = configValue("DISABLE_GOOGLE_PLAY_BILLING") ?: ""
+val playWeeklyProductId = configValue("PLAY_WEEKLY_PRODUCT_ID", preferLocal = true, includeDotEnv = true) ?: "weekly_pro"
+val playMonthlyProductId = configValue("PLAY_MONTHLY_PRODUCT_ID", preferLocal = true, includeDotEnv = true) ?: "monthly_pro"
+val playQuarterlyProductId = configValue("PLAY_QUARTERLY_PRODUCT_ID", preferLocal = true, includeDotEnv = true) ?: "quarterly_pro"
+val playYearlyProductId = configValue("PLAY_YEARLY_PRODUCT_ID", preferLocal = true, includeDotEnv = true) ?: "yearly_pro"
+val aiBaseUrl = configValue("AI_BASE_URL", preferLocal = true, includeDotEnv = true) ?: ""
+val aiEnvironment = configValue("AI_ENV", preferLocal = true, includeDotEnv = true) ?: "production"
+val razorpayKeyId = configValue("RAZORPAY_KEY_ID") ?: ""
+val dummyPaymentsEnabled = localProperties
+    .getProperty("ENABLE_DUMMY_PAYMENTS")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: "false"
+val googlePlayBillingDisabled = localProperties
+    .getProperty("DISABLE_GOOGLE_PLAY_BILLING")
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: "false"
 val otpBaseUrl = when {
     !configuredOtpBaseUrl.isNullOrBlank() -> configuredOtpBaseUrl.trim()
-    configuredOtpSendUrl.isNullOrBlank() && configuredOtpVerifyUrl.isNullOrBlank() -> defaultOtpBaseUrl
     else -> ""
 }
 val otpSendUrl = deriveOtpUrl(configuredOtpSendUrl, otpBaseUrl, "send-otp")
@@ -202,7 +220,9 @@ android {
         resValue("string", "play_monthly_product_id", playMonthlyProductId)
         resValue("string", "play_quarterly_product_id", playQuarterlyProductId)
         resValue("string", "play_yearly_product_id", playYearlyProductId)
-        resValue("string", "groq_api_key", groqApiKey)
+        resValue("string", "ai_base_url", aiBaseUrl)
+        resValue("string", "ai_environment", aiEnvironment)
+        resValue("string", "razorpay_key_id", razorpayKeyId)
         resValue("string", "enable_dummy_payments", dummyPaymentsEnabled)
         resValue("string", "disable_google_play_billing", googlePlayBillingDisabled)
 

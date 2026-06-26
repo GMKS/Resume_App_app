@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -265,7 +267,8 @@ class InterviewPrepScreen extends ConsumerStatefulWidget {
   const InterviewPrepScreen({super.key});
 
   @override
-  ConsumerState<InterviewPrepScreen> createState() => _InterviewPrepScreenState();
+  ConsumerState<InterviewPrepScreen> createState() =>
+      _InterviewPrepScreenState();
 }
 
 class _InterviewPrepScreenState extends ConsumerState<InterviewPrepScreen> {
@@ -337,7 +340,8 @@ class _InterviewPrepScreenState extends ConsumerState<InterviewPrepScreen> {
                     backgroundColor: Colors.grey[100],
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.white : AppColors.textPrimary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
                     ),
                   );
                 },
@@ -410,16 +414,41 @@ class _InterviewPrepScreenState extends ConsumerState<InterviewPrepScreen> {
                         _expandedIndex = isExpanded ? null : index;
                       });
                     },
-                  ).animate().fadeIn(delay: (300 + index * 50).ms).slideX(begin: -0.05, end: 0);
+                  )
+                      .animate()
+                      .fadeIn(delay: (300 + index * 50).ms)
+                      .slideX(begin: -0.05, end: 0);
                 },
               ),
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _startPracticeSession,
-          icon: const Icon(Iconsax.video_play),
-          label: const Text('Start Practice'),
+        floatingActionButton: SafeArea(
+          minimum: const EdgeInsets.symmetric(horizontal: 16),
+          child: Align(
+            alignment: Alignment.bottomRight,
+            child: SizedBox(
+              width: math.min(MediaQuery.sizeOf(context).width - 32, 220),
+              child: FloatingActionButton.extended(
+                onPressed: _startPracticeSession,
+                icon: const Icon(Iconsax.video_play),
+                extendedPadding: const EdgeInsets.symmetric(horizontal: 22),
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'Start Practice',
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ).animate().fadeIn(delay: 400.ms).scale(),
       ),
     );
@@ -556,7 +585,8 @@ class _QuestionCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Iconsax.message_question, color: AppColors.primary),
+                  const Icon(Iconsax.message_question,
+                      color: AppColors.primary),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -581,14 +611,16 @@ class _QuestionCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
+                      border: Border.all(
+                          color: AppColors.success.withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const Icon(Iconsax.microphone, size: 16, color: AppColors.success),
+                            const Icon(Iconsax.microphone,
+                                size: 16, color: AppColors.success),
                             const SizedBox(width: 8),
                             Text(
                               'Sample Answer',
@@ -620,27 +652,26 @@ class _QuestionCard extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 8),
-                ...question.tips
-                    .map((tip) => Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Iconsax.tick_circle,
-                                size: 16,
-                                color: AppColors.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  tip,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                            ],
+                ...question.tips.map((tip) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Iconsax.tick_circle,
+                            size: 16,
+                            color: AppColors.primary,
                           ),
-                        )),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              tip,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: () {},

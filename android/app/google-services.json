@@ -7,6 +7,42 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:884039901207:android:a54f86ccd7ef7790f67c52",
+        "android_client_info": {
+          "package_name": "com.example.hirepilot_ai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "884039901207-ar7oaa8i511u7tqqh3is7h3pbstu82r1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkVCab7a8ILrPHX2V6Ku914iq5i3q4gOU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "884039901207-ar7oaa8i511u7tqqh3is7h3pbstu82r1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "884039901207-v2bh7k5sl9ebt3vioi29ibpb348s1hfp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hirepilotAi"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:884039901207:android:c96820fb0582f5a1f67c52",
         "android_client_info": {
           "package_name": "com.example.resume_builder"
@@ -37,6 +73,13 @@
             {
               "client_id": "884039901207-ar7oaa8i511u7tqqh3is7h3pbstu82r1.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "884039901207-v2bh7k5sl9ebt3vioi29ibpb348s1hfp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hirepilotAi"
+              }
             }
           ]
         }
@@ -74,6 +117,13 @@
             {
               "client_id": "884039901207-ar7oaa8i511u7tqqh3is7h3pbstu82r1.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "884039901207-v2bh7k5sl9ebt3vioi29ibpb348s1hfp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hirepilotAi"
+              }
             }
           ]
         }
@@ -93,6 +143,14 @@
           "android_info": {
             "package_name": "com.seenaigmk.resumebuilderai",
             "certificate_hash": "e6e3e326ad1439c2304e1f7827f294ee5b9ef557"
+          }
+        },
+        {
+          "client_id": "884039901207-c8e041uk1ncvu3o75e15m1nh83a6j557.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.seenaigmk.resumebuilderai",
+            "certificate_hash": "69af4d27b5fdf632f5b99a28d90723f412fa762f"
           }
         },
         {
@@ -119,6 +177,13 @@
             {
               "client_id": "884039901207-ar7oaa8i511u7tqqh3is7h3pbstu82r1.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "884039901207-v2bh7k5sl9ebt3vioi29ibpb348s1hfp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hirepilotAi"
+              }
             }
           ]
         }

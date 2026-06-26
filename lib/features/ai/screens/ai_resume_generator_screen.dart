@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/skill_suggestions_service.dart';
+import '../../../core/utils/phone_number_utils.dart';
 
 class AIResumeGeneratorScreen extends ConsumerStatefulWidget {
   const AIResumeGeneratorScreen({super.key});
@@ -336,6 +337,8 @@ class _AIResumeGeneratorScreenState
           controller: _phoneController,
           decoration: _inputDecoration('Phone Number', Iconsax.call),
           keyboardType: TextInputType.phone,
+          inputFormatters: PhoneNumberUtils.localNumberInputFormatters,
+          validator: (value) => PhoneNumberUtils.validateLocalNumber(value),
         ),
       ],
     );

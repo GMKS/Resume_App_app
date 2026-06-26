@@ -11,17 +11,32 @@ Future<void> ensureStoreScreenshotSeedData() async {
     return;
   }
 
+  final now = DateTime(2026, 5, 1);
+  final expiry = now.add(const Duration(days: 30));
+
   await StorageService.setOnboardingComplete(true);
   await StorageService.setThemeMode('light');
-  await StorageService.prefs.setString('subscription_provider', 'googlePlay');
+  await StorageService.prefs.setString('subscription_provider', 'local');
   await StorageService.prefs.setString('subscription_plan', 'monthly');
   await StorageService.prefs.setBool('subscription_active', true);
+  await StorageService.prefs.setBool('subscription_verified', true);
+  await StorageService.prefs.setString(
+    'subscription_purchase_date',
+    now.millisecondsSinceEpoch.toString(),
+  );
+  await StorageService.prefs.setString(
+    'subscription_expiry',
+    expiry.millisecondsSinceEpoch.toString(),
+  );
+  await StorageService.prefs.setString(
+    'subscription_verification_status',
+    'screenshot_seed',
+  );
 
   if (StorageService.getResume(kStoreScreenshotResumeId) != null) {
     return;
   }
 
-  final now = DateTime(2026, 5, 1);
   final sampleResume = ResumeModel(
     id: kStoreScreenshotResumeId,
     title: 'Senior Product Designer',

@@ -1,15 +1,204 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'ai_api_key_storage_service.dart';
+import 'app_config_service.dart';
+
+class AiBackendHealthStatus {
+  const AiBackendHealthStatus({
+    required this.configured,
+    required this.reachable,
+    required this.environment,
+    required this.message,
+    required this.checkedAt,
+  });
+
+  final bool configured;
+  final bool reachable;
+  final String environment;
+  final String message;
+  final DateTime checkedAt;
+
+  bool get available => configured && reachable;
+}
 
 /// AI Resume Service for resume content generation and job tailoring.
 class AiResumeService {
-  // Configured AI endpoint for chat completions.
-  static const _groqEndpoint =
-      'https://api.groq.com/openai/v1/chat/completions';
+  static const _gatewayFunctionName = 'ai-gateway';
+  static const _healthFunctionName = 'ai-health';
+  static const Duration _requestTimeout = Duration(seconds: 45);
+  static const Duration _healthTimeout = Duration(seconds: 8);
+  static const Duration _initialRetryDelay = Duration(milliseconds: 800);
+  static const int _maxTransientRetries = 2;
+  static const String providerName = 'Supabase AI Gateway';
+  static const String missingConfigurationMessage =
+      'AI Assistant is temporarily unavailable because the AI service endpoint is not configured.';
+  static const String invalidConfigurationMessage =
+      'AI Assistant is temporarily unavailable because the server-side AI configuration is invalid.';
+  static const String networkUnavailableMessage =
+      'Unable to reach the AI service. Check your internet connection and try again.';
+  static const String requestTimedOutMessage =
+      'The AI service took too long to respond. Please try again.';
+  static const String rateLimitedMessage =
+      'AI requests are temporarily rate-limited. Please wait a moment and try again.';
+  static const String malformedResponseMessage =
+      'The AI service returned an unexpected response. Please try again.';
+  static const String serviceUnavailableMessage =
+      'AI Assistant is temporarily unavailable. Please try again later.';
+  static const String healthCheckFailedMessage =
+      'AI Assistant is temporarily unavailable because the AI service health check failed.';
+
+  static AiBackendHealthStatus? _lastHealthStatus;
+
+  static Uri? get _gatewayUri => _buildFunctionUri(_gatewayFunctionName);
+  static Uri? get _healthUri => _buildFunctionUri(_healthFunctionName);
+  static bool get isBackendConfigured =>
+      _gatewayUri != null && _healthUri != null;
+  static String get environment {
+    final configured = AppConfigService.read('AI_ENV').trim();
+    return configured.isNotEmpty ? configured : 'production';
+  }
+
+  static String _groqUnavailableMessage() {
+    return missingConfigurationMessage;
+  }
+
+  static String _groqInvalidMessage() {
+    return invalidConfigurationMessage;
+  }
+
+  static Future<AiBackendHealthStatus> initialize({
+    bool forceRefresh = false,
+  }) async {
+    logConfigurationSnapshot(stage: 'startup');
+    return validateAvailability(forceRefresh: forceRefresh);
+  }
+
+  static Future<AiBackendHealthStatus> validateAvailability({
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _lastHealthStatus != null) {
+      return _lastHealthStatus!;
+    }
+
+    if (!isBackendConfigured) {
+      final status = AiBackendHealthStatus(
+        configured: false,
+        reachable: false,
+        environment: environment,
+        message: missingConfigurationMessage,
+        checkedAt: DateTime.now(),
+      );
+      _lastHealthStatus = status;
+      _logAiEvent(
+        'AI backend health check skipped because configuration is missing',
+        details: <String, Object?>{
+          'environment': environment,
+          'gatewayUrl': _gatewayUri?.toString() ?? 'missing',
+          'healthUrl': _healthUri?.toString() ?? 'missing',
+        },
+      );
+      return status;
+    }
+
+    try {
+      final uri = _healthUri!.replace(
+        queryParameters: <String, String>{'probe': 'provider'},
+      );
+      final response = await http.get(uri).timeout(_healthTimeout);
+      final body = _decodeJsonMap(response.body);
+      final configured = body['configured'] != false;
+      final reachable = response.statusCode >= 200 &&
+          response.statusCode < 300 &&
+          body['success'] == true &&
+          body['reachable'] != false;
+      final status = AiBackendHealthStatus(
+        configured: configured,
+        reachable: reachable,
+        environment: _readBodyString(body, 'environment') ?? environment,
+        message: _readBodyString(body, 'message') ??
+            (reachable ? 'AI service is healthy.' : healthCheckFailedMessage),
+        checkedAt: DateTime.now(),
+      );
+      _lastHealthStatus = status;
+      _logAiEvent(
+        'AI backend health check completed',
+        details: <String, Object?>{
+          'statusCode': response.statusCode,
+          'configured': status.configured,
+          'reachable': status.reachable,
+          'environment': status.environment,
+          'message': status.message,
+        },
+      );
+      return status;
+    } on TimeoutException catch (error, stackTrace) {
+      final status = AiBackendHealthStatus(
+        configured: true,
+        reachable: false,
+        environment: environment,
+        message: requestTimedOutMessage,
+        checkedAt: DateTime.now(),
+      );
+      _lastHealthStatus = status;
+      _logAiEvent(
+        'AI backend health check timed out',
+        error: error,
+        stackTrace: stackTrace,
+        details: <String, Object?>{'environment': environment},
+      );
+      return status;
+    } catch (error, stackTrace) {
+      final status = AiBackendHealthStatus(
+        configured: true,
+        reachable: false,
+        environment: environment,
+        message: describeUnexpectedError(error),
+        checkedAt: DateTime.now(),
+      );
+      _lastHealthStatus = status;
+      _logAiEvent(
+        'AI backend health check failed',
+        error: error,
+        stackTrace: stackTrace,
+        details: <String, Object?>{'environment': environment},
+      );
+      return status;
+    }
+  }
+
+  static void logConfigurationSnapshot({String stage = 'runtime'}) {
+    _logAiEvent(
+      'AI configuration snapshot',
+      details: <String, Object?>{
+        'stage': stage,
+        'provider': providerName,
+        'appConfigInitialized': AppConfigService.isInitialized,
+        'environment': environment,
+        'baseUrlSource': AppConfigService.sourceOf('AI_BASE_URL'),
+        'backendConfigured': isBackendConfigured,
+        'gatewayUrl': _gatewayUri?.toString() ?? 'missing',
+        'healthUrl': _healthUri?.toString() ?? 'missing',
+      },
+    );
+  }
+
+  static String describeUnexpectedError(Object error) {
+    if (error is AiException) {
+      return error.message;
+    }
+    if (error is TimeoutException) {
+      return requestTimedOutMessage;
+    }
+    if (_looksLikeNetworkError(error)) {
+      return networkUnavailableMessage;
+    }
+    return serviceUnavailableMessage;
+  }
 
   /// Always returns true — no usage limits, AI is free and unlimited.
   static Future<bool> hasRemainingUsage({required bool isPremium}) async =>
@@ -29,7 +218,6 @@ class AiResumeService {
   /// - `suggestedMetrics`: Quantifiable achievements to add
   /// - `atsKeywordsUsed`: Keywords optimized for ATS systems
   static Future<Map<String, dynamic>> generateResumeContent({
-    required String apiKey,
     required String jobTitle,
     required int experienceYears,
     required String industry,
@@ -76,7 +264,11 @@ Respond ONLY with valid JSON, no markdown code blocks or additional text.
 ''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.6);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.6,
+        requestType: 'generate_resume_content',
+      );
       await _incrementUsage();
       return response;
     } catch (e) {
@@ -94,7 +286,6 @@ Respond ONLY with valid JSON, no markdown code blocks or additional text.
   /// - `matchScore`: Estimated match percentage (0-100)
   /// - `suggestions`: Additional suggestions to improve the match
   static Future<Map<String, dynamic>> tailorResumeForJob({
-    required String apiKey,
     required Map<String, dynamic> resumeJson,
     required String jobDescription,
     bool isPremium = false,
@@ -187,7 +378,11 @@ RESPOND WITH ONLY THIS JSON STRUCTURE (no markdown, no extra text):
 }''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.5);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.5,
+        requestType: 'tailor_resume_for_job',
+      );
       await _incrementUsage();
       return response;
     } catch (e) {
@@ -206,7 +401,6 @@ RESPOND WITH ONLY THIS JSON STRUCTURE (no markdown, no extra text):
   /// - `actionableSuggestions`: Follow-up suggestions outside the rewrite scope
   /// - `overallRationale`: Short explanation of the rewrite strategy
   static Future<Map<String, dynamic>> optimizeStructuredResumeForJob({
-    required String apiKey,
     required Map<String, dynamic> resumeJson,
     required String jobDescription,
     List<String> missingKeywords = const <String>[],
@@ -354,7 +548,11 @@ Respond with strict JSON only in this exact structure:
 ''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.45);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.45,
+        requestType: 'optimize_structured_resume_for_job',
+      );
       await _incrementUsage();
       return response;
     } catch (e) {
@@ -372,7 +570,6 @@ Respond with strict JSON only in this exact structure:
   /// - `actionableSuggestions`: Follow-up recommendations outside the rewrite
   /// - `overallRationale`: Short explanation of the rewrite strategy
   static Future<Map<String, dynamic>> optimizeResumeTextForJob({
-    required String apiKey,
     required String resumeText,
     required String jobDescription,
     List<String> missingKeywords = const <String>[],
@@ -432,7 +629,11 @@ Respond with strict JSON only in this exact structure:
 ''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.45);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.45,
+        requestType: 'optimize_resume_text_for_job',
+      );
       await _incrementUsage();
       return response;
     } catch (e) {
@@ -448,7 +649,6 @@ Respond with strict JSON only in this exact structure:
   /// - `rewrittenSkills`: List of refined skill name strings
   /// - `improvements`: Bullet list of changes made
   static Future<Map<String, dynamic>> rewriteFullResume({
-    required String apiKey,
     required Map<String, dynamic> resumeJson,
     String tone = 'Professional',
     String? targetJobTitle,
@@ -509,7 +709,11 @@ Respond ONLY with valid JSON. No markdown, no preamble, no trailing text.
 ''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.65);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.65,
+        requestType: 'rewrite_full_resume',
+      );
       await _incrementUsage();
       return response;
     } catch (e) {
@@ -532,7 +736,6 @@ Respond ONLY with valid JSON. No markdown, no preamble, no trailing text.
   /// - `references`: list of {name, position, company, email, phone, relationship}
   /// - `customSections`: list of {title, items[]}
   static Future<Map<String, dynamic>> parseResumeFromText({
-    required String apiKey,
     required String resumeText,
   }) async {
     final prompt =
@@ -640,7 +843,11 @@ Rules:
 - Return ONLY valid JSON.''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.2);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.2,
+        requestType: 'parse_resume_from_text',
+      );
       return normalizeParsedResumePayload(response);
     } catch (e) {
       rethrow;
@@ -1314,7 +1521,6 @@ Rules:
   ///
   /// Returns a map with key `bullets` (List of strings).
   static Future<Map<String, dynamic>> generateBulletPoints({
-    required String apiKey,
     required String jobTitle,
     required String company,
     required String industry,
@@ -1326,23 +1532,30 @@ Rules:
         : '';
 
     final prompt =
-        '''You are an expert resume writer. Generate 5 powerful, ATS-optimised bullet points for the following work experience entry.
+        '''You are an expert resume writer and ATS strategist. Generate 5 polished, professional, ATS-friendly bullet points for the following work experience entry.
 
 Job Title: $jobTitle
 Company: $company
 Industry: $industry$context
 
 Rules:
-- Start each bullet with a strong action verb (not "Responsible for" or "Helped")
-- Include quantifiable metrics wherever plausible (%, \$, counts, time savings)
-- Each bullet must be ONE concise sentence (max 20 words)
-- Bullets must be distinct — no repeating the same theme
+  - Start each bullet with a strong action verb. Never start with "Responsible for", "Helped", or "Worked on".
+  - Each bullet must be one sentence between 24 and 38 words.
+  - Clearly include the responsibility, relevant tools/technologies/processes used, the accomplishment, and the business or customer impact wherever plausible.
+  - Include measurable outcomes wherever realistic, such as revenue impact, cost savings, efficiency gains, throughput, quality, accuracy, adoption, SLA improvement, or reduced manual effort.
+  - Use ATS-friendly keywords naturally for the stated role and industry.
+  - If the existing description lacks specifics, infer realistic industry-standard tools and outcomes conservatively. Do not invent unrealistic claims, confidential details, or named internal systems.
+  - Keep every bullet distinct and professionally written, with no repeated theme or filler.
 
 RESPOND ONLY with this JSON:
 {"bullets": ["<bullet 1>", "<bullet 2>", "<bullet 3>", "<bullet 4>", "<bullet 5>"]}''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.65);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.65,
+        requestType: 'generate_bullet_points',
+      );
       await _incrementUsage();
       return response;
     } catch (e) {
@@ -1355,7 +1568,6 @@ RESPOND ONLY with this JSON:
   /// Returns a map with keys: `grade`, `overallScore`, `scores` (map by category),
   /// `roast` (entertaining critique paragraph), `improvements` (list of strings).
   static Future<Map<String, dynamic>> roastResume({
-    required String apiKey,
     required Map<String, dynamic> resumeJson,
     bool isPremium = false,
   }) async {
@@ -1421,7 +1633,11 @@ RESPOND ONLY with this JSON (no markdown):
 }''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.75);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.75,
+        requestType: 'roast_resume',
+      );
       await _incrementUsage();
       return response;
     } catch (e) {
@@ -1434,7 +1650,6 @@ RESPOND ONLY with this JSON (no markdown):
   /// Returns a map with keys: `countryName`, `keyDifferences` (list),
   /// `adaptedSummary`, `formatTips` (list), `doList` (list), `dontList` (list).
   static Future<Map<String, dynamic>> convertResumeStyle({
-    required String apiKey,
     required Map<String, dynamic> resumeJson,
     required String targetCountry,
     bool isPremium = false,
@@ -1470,7 +1685,11 @@ RESPOND ONLY with this JSON (no markdown):
 }''';
 
     try {
-      final response = await _callGeminiApi(apiKey, prompt, temperature: 0.55);
+      final response = await _callGeminiApi(
+        prompt,
+        temperature: 0.55,
+        requestType: 'convert_resume_style',
+      );
       await _incrementUsage();
       return response;
     } catch (e) {
@@ -1478,64 +1697,62 @@ RESPOND ONLY with this JSON (no markdown):
     }
   }
 
-  /// Internal method to call Together AI API
+  /// Internal method to call the secure backend AI gateway.
   static Future<Map<String, dynamic>> _callGeminiApi(
-    String apiKey,
     String prompt, {
     double temperature = 0.7,
     bool preferJsonObjectMode = true,
+    int attempt = 0,
+    String requestType = 'generic',
   }) async {
-    // Strip whitespace, then remove any non-ASCII characters (code points > 127).
-    // The browser's fetch API requires HTTP header values to be ISO-8859-1 safe,
-    // so invisible Unicode chars (zero-width spaces, curly quotes, etc.) copied
-    // alongside the key will cause "String contains non ISO-8859-1 code point".
-    final trimmedKey = _normalizeApiKey(apiKey);
-    if (trimmedKey.isEmpty) {
-      throw AiConfigException(
-        'AI service is currently unavailable. Please try again later.',
-      );
-    }
-    if (!_looksLikeGroqApiKey(trimmedKey)) {
-      throw AiConfigException(
-        'AI service configuration is invalid right now. Please try again later.',
-      );
+    final gatewayUri = _gatewayUri;
+    if (gatewayUri == null) {
+      throw AiConfigException(_groqUnavailableMessage());
     }
 
-    final url = Uri.parse(_groqEndpoint);
+    _logAiEvent(
+      'Sending AI request',
+      details: <String, Object?>{
+        'attempt': attempt + 1,
+        'provider': providerName,
+        'endpoint': gatewayUri.toString(),
+        'environment': environment,
+        'requestType': requestType,
+        'jsonObjectMode': preferJsonObjectMode,
+        'temperature': temperature,
+        'promptLength': prompt.length,
+      },
+    );
 
     final requestBody = <String, dynamic>{
-      'model': 'llama-3.3-70b-versatile',
-      'messages': [
-        {
-          'role': 'system',
-          'content':
-              'You are an expert resume writer. Always respond with a single valid JSON object only, with no markdown and no extra text.',
-        },
-        {
-          'role': 'user',
-          'content': prompt,
-        }
-      ],
+      'prompt': prompt,
       'temperature': temperature,
-      'max_tokens': 2048,
+      'preferJsonObjectMode': preferJsonObjectMode,
+      'requestType': requestType,
+      'correlationId': _newCorrelationId(),
+      'maxTokens': 2048,
     };
-
-    if (preferJsonObjectMode) {
-      requestBody['response_format'] = {
-        'type': 'json_object',
-      };
-    }
 
     final body = jsonEncode(requestBody);
 
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $trimmedKey',
+      final response = await http
+          .post(
+            gatewayUri,
+            headers: const <String, String>{
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: body,
+          )
+          .timeout(_requestTimeout);
+
+      _logAiEvent(
+        'Received AI response',
+        details: <String, Object?>{
+          'attempt': attempt + 1,
+          'statusCode': response.statusCode,
+          'bodyPreview': _summarizeBody(response.body),
         },
-        body: utf8.encode(body),
       );
 
       if (response.statusCode == 200) {
@@ -1543,102 +1760,269 @@ RESPOND ONLY with this JSON (no markdown):
         final choices = data['choices'] as List?;
 
         if (choices == null || choices.isEmpty) {
-          throw AiResponseException('No response generated. Please try again.');
+          throw AiResponseException(malformedResponseMessage);
         }
 
         final message = choices[0]['message'] as Map<String, dynamic>?;
 
         if (message == null) {
-          throw AiResponseException(
-              'Invalid API response format. Please try again.');
+          throw AiResponseException(malformedResponseMessage);
         }
 
         final text = _extractMessageContent(message, choices[0]);
 
         if (text == null || text.isEmpty) {
-          throw AiResponseException(
-              'Empty response received. Please ensure your API key is valid and try again.');
+          throw AiResponseException(malformedResponseMessage);
         }
 
-        // Parse the JSON response
         try {
           final cleanText = _cleanJsonResponseText(text);
-
           return _decodeJsonObjectResponse(cleanText);
-        } catch (e) {
-          throw AiResponseException(
-              'Failed to parse AI response. Please try again.');
+        } catch (error, stackTrace) {
+          _logAiEvent(
+            'Failed to decode AI response JSON',
+            error: error,
+            stackTrace: stackTrace,
+            details: <String, Object?>{
+              'attempt': attempt + 1,
+              'bodyPreview': _summarizeBody(text),
+            },
+          );
+          throw AiResponseException(malformedResponseMessage);
         }
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
-        String errorMsg =
-            'AI service is currently unavailable. Please try again later.';
-        try {
-          final errorData = jsonDecode(response.body);
-          final detail =
-              (errorData['error']?['message'] ?? errorData['message'])
-                  ?.toString();
-          if (detail != null && detail.isNotEmpty) {
-            final lowerDetail = detail.toLowerCase();
-            if (!(lowerDetail.contains('api key') ||
-                lowerDetail.contains('authentication') ||
-                lowerDetail.contains('unauthorized'))) {
-              errorMsg = 'AI service request was rejected: $detail';
-            }
-          }
-        } catch (_) {}
-        throw AiConfigException(errorMsg);
-      } else if (response.statusCode == 429) {
-        throw AiRateLimitException(
-            'API rate limit exceeded. Please wait a few minutes and try again.');
-      } else if (response.statusCode == 400) {
-        // Parse error message from response body
-        String errorMsg = 'Bad request (400).';
-        dynamic errorData;
-        try {
-          errorData = jsonDecode(response.body);
-          final detail = errorData['error']?['message'] ??
-              errorData['message'] ??
-              errorData.toString();
-          errorMsg = 'API Error: $detail';
-        } catch (_) {
-          errorMsg = 'API Error (400): ${response.body}';
-        }
+      }
 
+      final errorData = _decodeJsonMap(response.body);
+      final errorCode = _readBodyString(errorData, 'code') ?? '';
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw AiConfigException(_groqInvalidMessage());
+      }
+
+      if (response.statusCode == 429) {
+        if (attempt < _maxTransientRetries) {
+          return _retryAfterDelay(
+            prompt,
+            temperature: temperature,
+            preferJsonObjectMode: preferJsonObjectMode,
+            attempt: attempt,
+            reason: 'rate limit',
+            requestType: requestType,
+          );
+        }
+        throw AiRateLimitException(rateLimitedMessage);
+      }
+
+      if (response.statusCode == 400) {
         if (preferJsonObjectMode &&
             _isJsonGenerationFailure(errorData, response.body)) {
           final fallbackTemperature = temperature > 0.35 ? 0.35 : temperature;
           return _callGeminiApi(
-            apiKey,
             prompt,
             temperature: fallbackTemperature,
             preferJsonObjectMode: false,
+            attempt: attempt,
+            requestType: requestType,
           );
         }
 
-        throw AiResponseException(errorMsg);
-      } else {
-        String errorMsg = 'API error (${response.statusCode}).';
-        try {
-          final errorData = jsonDecode(response.body);
-          final detail = errorData['error']?['message'] ?? errorData['message'];
-          if (detail != null) errorMsg = 'API Error: $detail';
-        } catch (_) {}
-        throw AiResponseException(errorMsg);
+        final providerMessage =
+            _extractProviderErrorMessage(errorData, response.body);
+        throw AiResponseException(providerMessage ?? malformedResponseMessage);
       }
-    } catch (e) {
-      if (e is AiException) rethrow;
-      throw AiResponseException('Network error: ${e.toString()}');
+
+      if ((errorCode == 'missing_configuration' ||
+              errorCode == 'invalid_server_key') &&
+          response.statusCode >= 500) {
+        throw AiConfigException(
+          errorCode == 'missing_configuration'
+              ? missingConfigurationMessage
+              : invalidConfigurationMessage,
+        );
+      }
+
+      if (response.statusCode >= 500 && response.statusCode < 600) {
+        if (attempt < _maxTransientRetries) {
+          return _retryAfterDelay(
+            prompt,
+            temperature: temperature,
+            preferJsonObjectMode: preferJsonObjectMode,
+            attempt: attempt,
+            reason: 'backend server error ${response.statusCode}',
+            requestType: requestType,
+          );
+        }
+
+        final providerMessage =
+            _extractProviderErrorMessage(errorData, response.body);
+        throw AiResponseException(providerMessage ?? serviceUnavailableMessage);
+      }
+
+      final providerMessage =
+          _extractProviderErrorMessage(errorData, response.body);
+      throw AiResponseException(providerMessage ?? serviceUnavailableMessage);
+    } on TimeoutException catch (error, stackTrace) {
+      _logAiEvent(
+        'AI request timed out',
+        error: error,
+        stackTrace: stackTrace,
+        details: <String, Object?>{'attempt': attempt + 1},
+      );
+      if (attempt < _maxTransientRetries) {
+        return _retryAfterDelay(
+          prompt,
+          temperature: temperature,
+          preferJsonObjectMode: preferJsonObjectMode,
+          attempt: attempt,
+          reason: 'timeout',
+          requestType: requestType,
+        );
+      }
+
+      throw AiResponseException(requestTimedOutMessage);
+    } on http.ClientException catch (error, stackTrace) {
+      _logAiEvent(
+        'AI request failed with HTTP client exception',
+        error: error,
+        stackTrace: stackTrace,
+        details: <String, Object?>{'attempt': attempt + 1},
+      );
+      if (attempt < _maxTransientRetries) {
+        return _retryAfterDelay(
+          prompt,
+          temperature: temperature,
+          preferJsonObjectMode: preferJsonObjectMode,
+          attempt: attempt,
+          reason: 'network client exception',
+          requestType: requestType,
+        );
+      }
+
+      throw AiNetworkException(networkUnavailableMessage);
+    } catch (error, stackTrace) {
+      if (error is AiException) rethrow;
+      _logAiEvent(
+        'AI request threw unexpected exception',
+        error: error,
+        stackTrace: stackTrace,
+        details: <String, Object?>{'attempt': attempt + 1},
+      );
+      if (_looksLikeNetworkError(error)) {
+        if (attempt < _maxTransientRetries) {
+          return _retryAfterDelay(
+            prompt,
+            temperature: temperature,
+            preferJsonObjectMode: preferJsonObjectMode,
+            attempt: attempt,
+            reason: 'network exception',
+            requestType: requestType,
+          );
+        }
+
+        throw AiNetworkException(networkUnavailableMessage);
+      }
+
+      if (attempt < _maxTransientRetries) {
+        return _retryAfterDelay(
+          prompt,
+          temperature: temperature,
+          preferJsonObjectMode: preferJsonObjectMode,
+          attempt: attempt,
+          reason: 'unexpected exception',
+          requestType: requestType,
+        );
+      }
+      throw AiResponseException(serviceUnavailableMessage);
     }
   }
 
-  static String _normalizeApiKey(String apiKey) {
-    return String.fromCharCodes(
-      apiKey.trim().codeUnits.where((c) => c >= 0x20 && c <= 0x7E),
+  static Future<Map<String, dynamic>> _retryAfterDelay(
+    String prompt, {
+    required double temperature,
+    required bool preferJsonObjectMode,
+    required int attempt,
+    required String reason,
+    required String requestType,
+  }) async {
+    final delay = Duration(
+      milliseconds: _initialRetryDelay.inMilliseconds * (1 << attempt),
+    );
+    _logAiEvent(
+      'Retrying AI request after transient failure',
+      details: <String, Object?>{
+        'nextAttempt': attempt + 2,
+        'reason': reason,
+        'delayMs': delay.inMilliseconds,
+      },
+    );
+    await Future<void>.delayed(delay);
+    return _callGeminiApi(
+      prompt,
+      temperature: temperature,
+      preferJsonObjectMode: preferJsonObjectMode,
+      attempt: attempt + 1,
+      requestType: requestType,
     );
   }
 
-  static bool _looksLikeGroqApiKey(String apiKey) {
-    return apiKey.startsWith('gsk_');
+  static bool _looksLikeNetworkError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('socketexception') ||
+        message.contains('failed host lookup') ||
+        message.contains('network is unreachable') ||
+        message.contains('connection refused') ||
+        message.contains('connection closed') ||
+        message.contains('network request failed');
+  }
+
+  static String _summarizeBody(String body) {
+    final normalized = body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) {
+      return '<empty>';
+    }
+    return normalized.length <= 240
+        ? normalized
+        : '${normalized.substring(0, 240)}...';
+  }
+
+  static String? _extractProviderErrorMessage(
+      dynamic errorData, String rawBody) {
+    if (errorData is Map<String, dynamic>) {
+      final error = errorData['error'];
+      if (error is Map<String, dynamic>) {
+        final message = error['message']?.toString().trim();
+        if (message != null && message.isNotEmpty) {
+          return message;
+        }
+      }
+
+      final message = errorData['message']?.toString().trim();
+      if (message != null && message.isNotEmpty) {
+        return message;
+      }
+    }
+
+    final normalized = rawBody.trim();
+    if (normalized.isNotEmpty && normalized.length <= 240) {
+      return normalized;
+    }
+
+    return null;
+  }
+
+  static void _logAiEvent(
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, Object?> details = const <String, Object?>{},
+  }) {
+    final suffix = details.isEmpty ? '' : ' | ${jsonEncode(details)}';
+    developer.log(
+      '$message$suffix',
+      name: 'AiResumeService',
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
   static String? _extractMessageContent(
@@ -1757,6 +2141,51 @@ RESPOND ONLY with this JSON (no markdown):
 
     throw const FormatException('Response is not a JSON object.');
   }
+
+  static Uri? _buildFunctionUri(String functionName) {
+    final baseUrl = AppConfigService.read('AI_BASE_URL').trim();
+    if (baseUrl.isEmpty) {
+      return null;
+    }
+
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    return Uri.tryParse('$normalizedBase/$functionName');
+  }
+
+  static String _newCorrelationId() {
+    final millis = DateTime.now().microsecondsSinceEpoch;
+    final random = math.Random().nextInt(1 << 32).toRadixString(16);
+    return 'ai-$millis-$random';
+  }
+
+  static Map<String, dynamic> _decodeJsonMap(String source) {
+    try {
+      final decoded = jsonDecode(source);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return decoded.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+    } catch (_) {
+      return const <String, dynamic>{};
+    }
+    return const <String, dynamic>{};
+  }
+
+  static String? _readBodyString(Map<String, dynamic> body, String key) {
+    final value = body[key];
+    if (value == null) {
+      return null;
+    }
+
+    final stringValue = value.toString().trim();
+    return stringValue.isEmpty ? null : stringValue;
+  }
 }
 
 // ── Custom Exceptions ──
@@ -1781,15 +2210,20 @@ class AiRateLimitException extends AiException {
   AiRateLimitException(super.message);
 }
 
+class AiNetworkException extends AiException {
+  AiNetworkException(super.message);
+}
+
 class AiResponseException extends AiException {
   AiResponseException(super.message);
 }
 
 // ── Providers ──
 
-/// Provider for AI settings (API key storage)
-final aiApiKeyProvider = FutureProvider<String>((ref) async {
-  return AiApiKeyStorageService.read();
+/// Provider for AI backend health and configuration status.
+final aiServiceHealthProvider =
+    FutureProvider<AiBackendHealthStatus>((ref) async {
+  return AiResumeService.validateAvailability();
 });
 
 /// Provider for remaining AI usage

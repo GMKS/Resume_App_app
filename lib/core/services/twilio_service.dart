@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -10,8 +11,6 @@ import 'app_config_service.dart';
 class TwilioService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String otpDebugCode = AppConfigService.read('OTP_DEBUG_CODE');
-  final String _otpSendUrl = AppConfigService.read('OTP_SEND_URL');
-  final String _otpVerifyUrl = AppConfigService.read('OTP_VERIFY_URL');
   String? _verificationId;
   int? _forceResendingToken;
   String? _pendingPhoneNumber;
@@ -19,8 +18,15 @@ class TwilioService {
 
   bool get _hasDebugOtp => !kReleaseMode && otpDebugCode.isNotEmpty;
 
-  bool get _hasBackendOtp =>
-      _otpSendUrl.isNotEmpty && _otpVerifyUrl.isNotEmpty;
+  bool get _hasBackendOtp => _otpSendUrl.isNotEmpty && _otpVerifyUrl.isNotEmpty;
+
+  String get _otpBaseUrl => AppConfigService.read('OTP_BASE_URL');
+
+  String get _otpSendUrl =>
+      _readOtpUrl(explicitKey: 'OTP_SEND_URL', fallbackPath: 'send-otp');
+
+  String get _otpVerifyUrl =>
+      _readOtpUrl(explicitKey: 'OTP_VERIFY_URL', fallbackPath: 'verify-otp');
 
   bool get supportsWebOtp => !kIsWeb || _hasDebugOtp || _hasBackendOtp;
 
@@ -40,9 +46,20 @@ class TwilioService {
 
     if (!kIsWeb) {
       final firebaseResult = await _sendOtpViaFirebase(formattedPhone);
-      if (firebaseResult['success'] == true || !_hasBackendOtp) {
+      if (firebaseResult['success'] == true ||
+          !_hasBackendOtp ||
+          !_shouldFallbackToBackend(firebaseResult)) {
         return firebaseResult;
       }
+
+      final backendResult = await _sendOtpViaBackend(formattedPhone);
+      if (backendResult['success'] == true) {
+        return backendResult;
+      }
+      return _mergeOtpFailures(
+        primary: firebaseResult,
+        fallback: backendResult,
+      );
     }
 
     if (_hasBackendOtp) {
@@ -82,7 +99,8 @@ class TwilioService {
     final formattedPhone = _formatPhoneNumber(phoneNumber);
 
     if (_activeOtpProvider == 'backend') {
-      if (_pendingPhoneNumber != null && _pendingPhoneNumber != formattedPhone) {
+      if (_pendingPhoneNumber != null &&
+          _pendingPhoneNumber != formattedPhone) {
         return {
           'success': false,
           'message': 'Please request a new OTP and try again.',
@@ -95,13 +113,16 @@ class TwilioService {
     if (!kIsWeb) {
       final hasFirebaseSession =
           _verificationId != null && _pendingPhoneNumber == formattedPhone;
-      if (_activeOtpProvider == 'firebase' || hasFirebaseSession || !_hasBackendOtp) {
+      if (_activeOtpProvider == 'firebase' ||
+          hasFirebaseSession ||
+          !_hasBackendOtp) {
         return _verifyOtpViaFirebase(formattedPhone, otpCode);
       }
     }
 
     if (_hasBackendOtp) {
-      if (_pendingPhoneNumber != null && _pendingPhoneNumber != formattedPhone) {
+      if (_pendingPhoneNumber != null &&
+          _pendingPhoneNumber != formattedPhone) {
         return {
           'success': false,
           'message': 'Please request a new OTP and try again.',
@@ -178,6 +199,8 @@ class TwilioService {
             completer.complete(<String, dynamic>{
               'success': false,
               'message': _parseFirebaseAuthError(error),
+              'errorCode': error.code,
+              'provider': 'firebase',
             });
           }
         },
@@ -190,6 +213,8 @@ class TwilioService {
           completer.complete(<String, dynamic>{
             'success': false,
             'message': _parseFirebaseAuthError(error),
+            'errorCode': error.code,
+            'provider': 'firebase',
           });
         },
         codeSent: (String verificationId, int? forceResendingToken) {
@@ -207,6 +232,7 @@ class TwilioService {
             'success': true,
             'message': 'OTP sent successfully.',
             'status': 'pending',
+            'provider': 'firebase',
           });
         },
         codeAutoRetrievalTimeout: (String verificationId) {
@@ -219,17 +245,29 @@ class TwilioService {
         onTimeout: () => <String, dynamic>{
           'success': false,
           'message': 'Timed out while sending OTP. Please try again.',
+          'errorCode': 'timeout',
+          'provider': 'firebase',
         },
       );
     } on FirebaseAuthException catch (error) {
       return {
         'success': false,
         'message': _parseFirebaseAuthError(error),
+        'errorCode': error.code,
+        'provider': 'firebase',
       };
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to start Firebase phone verification',
+        name: 'TwilioService',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return {
         'success': false,
         'message': 'Could not start phone verification. Please try again.',
+        'errorCode': 'firebase_start_failed',
+        'provider': 'firebase',
       };
     }
   }
@@ -263,25 +301,37 @@ class TwilioService {
       return {
         'success': false,
         'message': _parseFirebaseAuthError(error),
+        'errorCode': error.code,
+        'provider': 'firebase',
       };
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to verify Firebase OTP',
+        name: 'TwilioService',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return {
         'success': false,
         'message': 'Could not verify OTP. Please try again.',
+        'errorCode': 'firebase_verify_failed',
+        'provider': 'firebase',
       };
     }
   }
 
   Future<Map<String, dynamic>> _sendOtpViaBackend(String phoneNumber) async {
     try {
-      final response = await http.post(
-        Uri.parse(_otpSendUrl),
-        headers: const {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(<String, String>{'phoneNumber': phoneNumber}),
-      );
+      final response = await http
+          .post(
+            Uri.parse(_otpSendUrl),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(<String, String>{'phoneNumber': phoneNumber}),
+          )
+          .timeout(const Duration(seconds: 20));
 
       final result = _parseBackendResult(
         response,
@@ -296,10 +346,19 @@ class TwilioService {
       }
 
       return result;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to reach OTP send service',
+        name: 'TwilioService',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return {
         'success': false,
-        'message': 'Could not reach the OTP service. Please try again.',
+        'message':
+            'Could not reach the OTP service. Check your internet connection and try again in a moment.',
+        'errorCode': 'backend_unreachable',
+        'provider': 'backend',
       };
     }
   }
@@ -309,17 +368,19 @@ class TwilioService {
     String otpCode,
   ) async {
     try {
-      final response = await http.post(
-        Uri.parse(_otpVerifyUrl),
-        headers: const {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(<String, String>{
-          'phoneNumber': phoneNumber,
-          'code': otpCode.trim(),
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse(_otpVerifyUrl),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(<String, String>{
+              'phoneNumber': phoneNumber,
+              'code': otpCode.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
 
       final result = _parseBackendResult(
         response,
@@ -331,10 +392,19 @@ class TwilioService {
       }
 
       return result;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to reach OTP verify service',
+        name: 'TwilioService',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return {
         'success': false,
-        'message': 'Could not reach the OTP service. Please try again.',
+        'message':
+            'Could not reach the OTP service. Check your internet connection and try again in a moment.',
+        'errorCode': 'backend_unreachable',
+        'provider': 'backend',
       };
     }
   }
@@ -362,16 +432,83 @@ class TwilioService {
     }
 
     final success = body['success'] == true ||
-        (response.statusCode >= 200 && response.statusCode < 300 && body['success'] != false);
+        (response.statusCode >= 200 &&
+            response.statusCode < 300 &&
+            body['success'] != false);
     final message = body['message']?.toString().trim();
     final status = body['status']?.toString().trim();
 
     return {
       'success': success,
-      'message': message != null && message.isNotEmpty
-          ? message
-          : fallbackMessage,
+      'message':
+          message != null && message.isNotEmpty ? message : fallbackMessage,
+      'provider': 'backend',
       if (status != null && status.isNotEmpty) 'status': status,
+    };
+  }
+
+  String _readOtpUrl({
+    required String explicitKey,
+    required String fallbackPath,
+  }) {
+    final explicit = AppConfigService.read(explicitKey).trim();
+    if (explicit.isNotEmpty) {
+      return explicit;
+    }
+
+    final base = _otpBaseUrl.trim();
+    if (base.isEmpty) {
+      return '';
+    }
+
+    final normalizedBase =
+        base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    return '$normalizedBase/$fallbackPath';
+  }
+
+  bool _shouldFallbackToBackend(Map<String, dynamic> firebaseResult) {
+    final errorCode = (firebaseResult['errorCode']?.toString() ?? '').trim();
+    switch (errorCode) {
+      case 'operation-not-allowed':
+      case 'app-not-authorized':
+      case 'captcha-check-failed':
+      case 'internal-error':
+      case 'firebase_start_failed':
+      case 'timeout':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  Map<String, dynamic> _mergeOtpFailures({
+    required Map<String, dynamic> primary,
+    required Map<String, dynamic> fallback,
+  }) {
+    final primaryMessage = (primary['message']?.toString() ?? '').trim();
+    final fallbackMessage = (fallback['message']?.toString() ?? '').trim();
+
+    if (fallback['success'] == true) {
+      return fallback;
+    }
+
+    if (fallback['errorCode'] == 'backend_unreachable' &&
+        primaryMessage.isNotEmpty) {
+      return primary;
+    }
+
+    if (primaryMessage.isEmpty) {
+      return fallback;
+    }
+
+    if (fallbackMessage.isEmpty || fallbackMessage == primaryMessage) {
+      return primary;
+    }
+
+    return <String, dynamic>{
+      ...primary,
+      'message':
+          '$primaryMessage\n\nFallback OTP service response: $fallbackMessage',
     };
   }
 

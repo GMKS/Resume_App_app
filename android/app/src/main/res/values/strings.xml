@@ -10,6 +10,4 @@
            and add your debug/release key hash (run the keytool command shown in the
            flutter_facebook_auth docs to get your hash).
     -->
-    <string name="app_name">Resumix AI</string>
-
 </resources>

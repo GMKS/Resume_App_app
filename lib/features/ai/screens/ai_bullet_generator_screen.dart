@@ -3,15 +3,23 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../../core/models/resume_model.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/ai_api_key_storage_service.dart';
 import '../../../core/services/ai_resume_service.dart';
 import '../../../core/services/free_plan_service.dart';
+import '../../../core/services/storage_service.dart';
 import '../../../shared/widgets/feature_gate.dart';
+import '../../editor/screens/resume_editor_screen.dart'
+    show currentResumeProvider;
+import '../../home/screens/home_screen.dart' show resumesProvider;
+import '../widgets/ai_bullet_results_panel.dart';
 
 class AIBulletGeneratorScreen extends ConsumerStatefulWidget {
-  const AIBulletGeneratorScreen({super.key});
+  final String? resumeId;
+
+  const AIBulletGeneratorScreen({super.key, this.resumeId});
 
   @override
   ConsumerState<AIBulletGeneratorScreen> createState() =>
@@ -29,6 +37,15 @@ class _AIBulletGeneratorScreenState
   String? _errorMessage;
   List<String> _bullets = [];
   final Set<int> _copiedIndex = {};
+  final Set<int> _selectedBulletIndexes = {};
+  List<ResumeModel> _allResumes = [];
+  ResumeModel? _selectedResume;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadResumes();
+  }
 
   @override
   void dispose() {
@@ -37,6 +54,91 @@ class _AIBulletGeneratorScreenState
     _industryCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
+  }
+
+  void _loadResumes() {
+    final resumes = StorageService.getAllResumes();
+    ResumeModel? selectedResume;
+
+    if (widget.resumeId != null) {
+      for (final resume in resumes) {
+        if (resume.id == widget.resumeId) {
+          selectedResume = resume;
+          break;
+        }
+      }
+    }
+
+    selectedResume ??= resumes.length == 1 ? resumes.first : null;
+
+    if (mounted) {
+      setState(() {
+        _allResumes = resumes;
+        _selectedResume = selectedResume;
+      });
+    }
+  }
+
+  List<String> get _selectedBullets {
+    final indexes = _selectedBulletIndexes.toList()..sort();
+    return indexes.map((index) => _bullets[index]).toList();
+  }
+
+  void _toggleBulletSelection(int index) {
+    setState(() {
+      if (_selectedBulletIndexes.contains(index)) {
+        _selectedBulletIndexes.remove(index);
+      } else {
+        _selectedBulletIndexes.add(index);
+      }
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedBulletIndexes.length == _bullets.length) {
+        _selectedBulletIndexes.clear();
+      } else {
+        _selectedBulletIndexes
+          ..clear()
+          ..addAll(List<int>.generate(_bullets.length, (index) => index));
+      }
+    });
+  }
+
+  void _setSelectedResume(String? resumeId) {
+    if (resumeId == null) {
+      setState(() => _selectedResume = null);
+      return;
+    }
+
+    ResumeModel? selectedResume;
+    for (final resume in _allResumes) {
+      if (resume.id == resumeId) {
+        selectedResume = resume;
+        break;
+      }
+    }
+
+    setState(() => _selectedResume = selectedResume);
+  }
+
+  List<String> _dedupeBullets(List<String> bullets) {
+    final seen = <String>{};
+    final deduped = <String>[];
+
+    for (final bullet in bullets) {
+      final normalized = bullet.trim();
+      if (normalized.isEmpty) {
+        continue;
+      }
+      final key = normalized.toLowerCase();
+      if (seen.add(key)) {
+        deduped.add(normalized);
+      }
+    }
+
+    return deduped;
   }
 
   Future<void> _generate() async {
@@ -65,13 +167,12 @@ class _AIBulletGeneratorScreenState
       _isLoading = true;
       _errorMessage = null;
       _bullets = [];
+      _selectedBulletIndexes.clear();
+      _copiedIndex.clear();
     });
 
     try {
-      final apiKey = await AiApiKeyStorageService.read();
-
       final result = await AiResumeService.generateBulletPoints(
-        apiKey: apiKey,
         jobTitle: jobTitle,
         company: company.isEmpty ? 'a company' : company,
         industry: industry,
@@ -79,8 +180,12 @@ class _AIBulletGeneratorScreenState
       );
 
       final bullets = (result['bullets'] as List?)
-          ?.map((b) => b.toString())
-          .toList() ??
+              ?.map(
+                (b) =>
+                    b.toString().replaceFirst(RegExp(r'^[\-•\s]+'), '').trim(),
+              )
+              .where((bullet) => bullet.isNotEmpty)
+              .toList() ??
           [];
 
       setState(() => _bullets = bullets);
@@ -90,7 +195,8 @@ class _AIBulletGeneratorScreenState
     } on AiException catch (e) {
       setState(() => _errorMessage = e.message);
     } catch (e) {
-      setState(() => _errorMessage = 'Something went wrong. Please try again.');
+      setState(
+          () => _errorMessage = AiResumeService.describeUnexpectedError(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -110,6 +216,110 @@ class _AIBulletGeneratorScreenState
       const SnackBar(
         content: Text('All bullets copied to clipboard'),
         backgroundColor: Color(0xFF10B981),
+      ),
+    );
+  }
+
+  void _copySelected() {
+    if (_selectedBulletIndexes.isEmpty) {
+      return;
+    }
+
+    final text = _selectedBullets.map((bullet) => '• $bullet').join('\n');
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${_selectedBulletIndexes.length} selected bullet${_selectedBulletIndexes.length == 1 ? '' : 's'} copied to clipboard',
+        ),
+        backgroundColor: const Color(0xFF10B981),
+      ),
+    );
+  }
+
+  Future<void> _addSelectedToResume() async {
+    if (_selectedBulletIndexes.isEmpty) {
+      return;
+    }
+    if (_selectedResume == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Select a target resume first.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final latestResume = StorageService.getResume(_selectedResume!.id);
+    if (latestResume == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The selected resume could not be loaded.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final selectedBullets = _selectedBullets;
+    final updatedAt = DateTime.now();
+    ResumeModel updatedResume;
+
+    if (latestResume.experience.isNotEmpty) {
+      final firstExperience = latestResume.experience.first;
+      final mergedAchievements = _dedupeBullets([
+        ...firstExperience.achievements,
+        ...selectedBullets,
+      ]);
+
+      final updatedExperience = firstExperience.copyWith(
+        company: firstExperience.company.isEmpty
+            ? _companyCtrl.text.trim()
+            : firstExperience.company,
+        position: firstExperience.position.isEmpty
+            ? _jobTitleCtrl.text.trim()
+            : firstExperience.position,
+        achievements: mergedAchievements,
+      );
+
+      updatedResume = latestResume.copyWith(
+        experience: [updatedExperience, ...latestResume.experience.skip(1)],
+        updatedAt: updatedAt,
+      );
+    } else {
+      final newExperience = Experience(
+        id: const Uuid().v4(),
+        company: _companyCtrl.text.trim(),
+        position: _jobTitleCtrl.text.trim(),
+        location: '',
+        startDate: updatedAt,
+        isCurrentlyWorking: true,
+        description: _descCtrl.text.trim(),
+        achievements: selectedBullets,
+      );
+
+      updatedResume = latestResume.copyWith(
+        experience: [newExperience],
+        updatedAt: updatedAt,
+      );
+    }
+
+    await StorageService.saveResume(updatedResume);
+    ref.invalidate(resumesProvider);
+    ref.invalidate(currentResumeProvider(updatedResume.id));
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _selectedResume = updatedResume);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Added ${selectedBullets.length} bullet${selectedBullets.length == 1 ? '' : 's'} to "${updatedResume.title}".',
+        ),
+        backgroundColor: const Color(0xFF10B981),
       ),
     );
   }
@@ -182,10 +392,12 @@ class _AIBulletGeneratorScreenState
 
             // Form
             Text('Job Details',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600)).animate().fadeIn(delay: 100.ms),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600))
+                .animate()
+                .fadeIn(delay: 100.ms),
             const SizedBox(height: 12),
 
             TextField(
@@ -226,8 +438,7 @@ class _AIBulletGeneratorScreenState
               maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Existing description (optional)',
-                hintText:
-                    'Paste your current job description to improve it...',
+                hintText: 'Paste your current job description to improve it...',
                 prefixIcon: Padding(
                   padding: EdgeInsets.only(bottom: 40),
                   child: Icon(Iconsax.document_text, size: 20),
@@ -243,8 +454,7 @@ class _AIBulletGeneratorScreenState
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -253,8 +463,8 @@ class _AIBulletGeneratorScreenState
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(_errorMessage!,
-                          style: const TextStyle(
-                              color: Colors.red, fontSize: 13)),
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 13)),
                     ),
                   ],
                 ),
@@ -283,77 +493,22 @@ class _AIBulletGeneratorScreenState
             // Results
             if (_bullets.isNotEmpty) ...[
               const SizedBox(height: 28),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Generated Bullets',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600)),
-                  Text('${_bullets.length} bullets',
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
-                ],
+              AiBulletResultsPanel(
+                bullets: _bullets,
+                selectedIndexes: _selectedBulletIndexes,
+                copiedIndexes: _copiedIndex,
+                resumes: _allResumes,
+                selectedResumeId: _selectedResume?.id,
+                onResumeChanged: _setSelectedResume,
+                onToggleSelection: _toggleBulletSelection,
+                onCopyBullet: _copyBullet,
+                onToggleSelectAll: _toggleSelectAll,
+                onCopySelected:
+                    _selectedBulletIndexes.isEmpty ? null : _copySelected,
+                onAddSelectedToResume: _selectedBulletIndexes.isEmpty
+                    ? null
+                    : _addSelectedToResume,
               ).animate().fadeIn(),
-              const SizedBox(height: 12),
-              ..._bullets.asMap().entries.map((entry) {
-                final i = entry.key;
-                final bullet = entry.value;
-                return Card(
-                  elevation: 0,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: BorderSide(
-                        color: AppColors.primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.only(top: 2),
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            bullet,
-                            style: const TextStyle(
-                                fontSize: 14, height: 1.4),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => _copyBullet(i),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 250),
-                            child: _copiedIndex.contains(i)
-                                ? const Icon(Iconsax.tick_circle,
-                                    key: ValueKey('done'),
-                                    color: Color(0xFF10B981),
-                                    size: 20)
-                                : const Icon(Iconsax.copy,
-                                    key: ValueKey('copy'),
-                                    color: AppColors.textSecondary,
-                                    size: 20),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                    .animate()
-                    .fadeIn(delay: (i * 80).ms)
-                    .slideX(begin: 0.05, end: 0);
-              }),
               const SizedBox(height: 80),
             ],
           ],

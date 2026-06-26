@@ -12,7 +12,9 @@ import 'core/constants/app_info.dart';
 import 'core/debug/store_screenshot_seed.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/services/ai_resume_service.dart';
 import 'core/services/app_config_service.dart';
+import 'core/services/play_billing_service.dart';
 import 'core/services/storage_service.dart';
 import 'features/settings/screens/settings_screen.dart';
 import 'firebase_options.dart';
@@ -87,6 +89,10 @@ Future<AppStartupState> _bootstrapApp() async {
     await AppConfigService.initialize();
   });
 
+  await guardStep('AI service availability validation', () async {
+    await AiResumeService.initialize();
+  });
+
   await guardStep('Hive initialization', () async {
     await Hive.initFlutter();
   }, critical: true);
@@ -95,6 +101,7 @@ Future<AppStartupState> _bootstrapApp() async {
       'Local storage initialization',
       () async {
         await StorageService.init();
+        await StorageService.synchronizeWorkspaceOwnerWithAuthenticatedUser();
       },
       critical: true,
       onSuccess: () {
@@ -102,6 +109,12 @@ Future<AppStartupState> _bootstrapApp() async {
       });
 
   if (storageReady) {
+    await guardStep('Google Play entitlement sync', () async {
+      await PlayBillingService.syncPersistedGooglePlayEntitlement(
+        source: 'app-startup',
+      );
+    });
+
     await guardStep('Seed store screenshot data', () async {
       await ensureStoreScreenshotSeedData();
     });

@@ -24,7 +24,7 @@ void main() {
     );
   });
 
-  Future<void> _pumpTestApp(
+  Future<void> pumpTestApp(
     WidgetTester tester, {
     required String initialLocation,
   }) async {
@@ -37,7 +37,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
   }
 
-  Future<void> _settleUi(WidgetTester tester) async {
+  Future<void> settleUi(WidgetTester tester) async {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump(const Duration(milliseconds: 350));
@@ -46,18 +46,18 @@ void main() {
   testWidgets('built-in custom section back, cancel, and save stay stable', (
     tester,
   ) async {
-    final route =
+    const route =
         '/editor/$resumeEditorCustomSectionResumeId/custom/startup_achievements';
 
-    await _pumpTestApp(tester, initialLocation: route);
+    await pumpTestApp(tester, initialLocation: route);
 
     await tester.tap(find.byIcon(Iconsax.arrow_left).first);
-    await _settleUi(tester);
+    await settleUi(tester);
 
     expect(find.text('Editor Test Resume'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await _pumpTestApp(tester, initialLocation: route);
+    await pumpTestApp(tester, initialLocation: route);
 
     final addFirstItemButton = find.text('Add First Item');
     if (addFirstItemButton.evaluate().isNotEmpty) {
@@ -69,7 +69,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
 
     await tester.tap(find.byIcon(Iconsax.close_circle).last);
-    await _settleUi(tester);
+    await settleUi(tester);
 
     expect(find.text('Title'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -89,7 +89,7 @@ void main() {
     await tester.enterText(textFields.at(2), 'Reduced production regressions.');
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'Add Item'));
-    await _settleUi(tester);
+    await settleUi(tester);
 
     final savedResume = StorageService.getResume(
       resumeEditorCustomSectionResumeId,
@@ -98,7 +98,8 @@ void main() {
       (section) => section.id == 'startup_achievements',
     );
 
-    expect(savedSection.items.any((item) => item.title == 'Launch Award'), isTrue);
+    expect(
+        savedSection.items.any((item) => item.title == 'Launch Award'), isTrue);
     expect(tester.takeException(), isNull);
 
     await disposeTestWidgetTree(tester);

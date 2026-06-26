@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/resume_model.dart';
@@ -11,9 +10,8 @@ import 'resume_json.dart';
 class ResumeVersionService {
   static final _auth = FirebaseAuth.instance;
   static final _db = FirebaseFirestore.instance;
+  static const _usersCollection = 'users';
   static const _collection = 'resume_versions';
-  static const _prefKey = 'sync_device_id';
-  static const _syncCodeKey = 'sync_account_code';
   static const _maxVersionsPerResume = 10;
 
   static Future<void> _deleteDocumentsInBatches(
@@ -29,46 +27,30 @@ class ResumeVersionService {
     }
   }
 
-  // ── Key Management (reuses sync code logic) ──
-
-  static Future<String?> _getSyncCode() async {
-    final prefs = await SharedPreferences.getInstance();
-    final code = prefs.getString(_syncCodeKey);
-    return (code != null && code.trim().isNotEmpty) ? code.trim() : null;
-  }
-
-  static Future<String> _getDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? id = prefs.getString(_prefKey);
-    if (id == null || id.isEmpty) {
-      id = const Uuid().v4();
-      await prefs.setString(_prefKey, id);
-    }
-    return id;
-  }
-
-  static Future<String> _activeKey() async {
-    final code = await _getSyncCode();
-    if (code != null) return 'code_$code';
-    return _getDeviceId();
-  }
-
-  // ── Auth ──
-
   static Future<void> _ensureSignedIn() async {
     if (_auth.currentUser == null) {
       await _auth.signInAnonymously();
     }
   }
 
+  static Future<String> _cloudUserId() async {
+    await _ensureSignedIn();
+    final uid = _auth.currentUser?.uid.trim() ?? '';
+    if (uid.isEmpty) {
+      throw Exception(
+          'No authenticated user is available for resume version history.');
+    }
+    return uid;
+  }
+
   static Future<CollectionReference<Map<String, dynamic>>> _versionsRef(
     String resumeId,
   ) async {
-    final key = await _activeKey();
+    final uid = await _cloudUserId();
     return _db
+        .collection(_usersCollection)
+        .doc(uid)
         .collection(_collection)
-        .doc(key)
-        .collection('resumes')
         .doc(resumeId)
         .collection('versions');
   }
@@ -112,9 +94,7 @@ class ResumeVersionService {
   static Future<void> _cleanupOldVersions(String resumeId) async {
     try {
       final ref = await _versionsRef(resumeId);
-      final snapshot = await ref
-          .orderBy('createdAt', descending: true)
-          .get();
+      final snapshot = await ref.orderBy('createdAt', descending: true).get();
 
       if (snapshot.docs.length > _maxVersionsPerResume) {
         final toDelete = snapshot.docs.sublist(_maxVersionsPerResume);
@@ -142,10 +122,12 @@ class ResumeVersionService {
         return ResumeVersion(
           versionId: data['versionId'] as String,
           resumeId: data['resumeId'] as String,
-          resume: ResumeJson.fromMap(data['resumeData'] as Map<String, dynamic>),
+          resume:
+              ResumeJson.fromMap(data['resumeData'] as Map<String, dynamic>),
           changeType: data['changeType'] as String? ?? 'unknown',
           description: data['description'] as String?,
-          createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          createdAt:
+              (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         );
       }).toList();
     } catch (e) {
@@ -172,7 +154,8 @@ class ResumeVersionService {
         resume: ResumeJson.fromMap(data['resumeData'] as Map<String, dynamic>),
         changeType: data['changeType'] as String? ?? 'unknown',
         description: data['description'] as String?,
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        createdAt:
+            (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       );
     } catch (e) {
       return null;
@@ -198,7 +181,7 @@ class ResumeVersionService {
       await _ensureSignedIn();
       final ref = await _versionsRef(resumeId);
       final snapshot = await ref.get();
-      
+
       for (final doc in snapshot.docs) {
         await doc.reference.delete();
       }
@@ -208,17 +191,16 @@ class ResumeVersionService {
   static Future<void> deleteAllCloudData() async {
     try {
       await _ensureSignedIn();
-      final key = await _activeKey();
-      final rootDoc = _db.collection(_collection).doc(key);
-      final resumeDocs = await rootDoc.collection('resumes').get();
+      final uid = await _cloudUserId();
+      final rootDoc =
+          _db.collection(_usersCollection).doc(uid).collection(_collection);
+      final resumeDocs = await rootDoc.get();
 
       for (final resumeDoc in resumeDocs.docs) {
         final versions = await resumeDoc.reference.collection('versions').get();
         await _deleteDocumentsInBatches(versions.docs);
         await resumeDoc.reference.delete();
       }
-
-      await rootDoc.delete();
     } catch (_) {}
   }
 }
@@ -249,7 +231,7 @@ class ResumeVersion {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
-    
+
     return '${createdAt.day}/${createdAt.month}/${createdAt.year}';
   }
 

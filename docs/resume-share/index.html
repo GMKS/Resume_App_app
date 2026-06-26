@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shared Resume | Resumix AI</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fb;
+        --card: #ffffff;
+        --text: #18202a;
+        --muted: #5f6b7a;
+        --line: #dde4ef;
+        --accent: #4f46e5;
+        --accent-strong: #3730a3;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #f7f9fd 0%, #eef3fb 100%);
+        color: var(--text);
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 16px 72px;
+      }
+
+      .shell,
+      .panel {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: 0 18px 40px rgba(24, 32, 42, 0.08);
+      }
+
+      .shell {
+        padding: 28px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: rgba(79, 70, 229, 0.08);
+        color: var(--accent-strong);
+      }
+
+      h1 {
+        margin: 18px 0 8px;
+        font-size: clamp(2rem, 4.2vw, 3.2rem);
+        line-height: 1.05;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 1.05rem;
+      }
+
+      p { line-height: 1.7; }
+
+      .subtle { color: var(--muted); }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .button {
+        border: 0;
+        border-radius: 14px;
+        padding: 13px 18px;
+        font-size: 0.98rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .button.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .button.secondary {
+        background: #eef2ff;
+        color: var(--accent-strong);
+      }
+
+      .grid {
+        display: grid;
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .two-up {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .panel { padding: 20px; }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: var(--accent-strong);
+        font-size: 0.92rem;
+      }
+
+      .entry {
+        padding: 16px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .entry:first-child { border-top: 0; padding-top: 0; }
+
+      .entry-title {
+        font-weight: 700;
+        font-size: 1rem;
+      }
+
+      .entry-meta {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 0.93rem;
+      }
+
+      .entry-copy {
+        margin-top: 8px;
+        color: var(--text);
+      }
+
+      .list {
+        margin: 10px 0 0;
+        padding-left: 18px;
+      }
+
+      .empty {
+        display: none;
+        padding: 72px 20px;
+        text-align: center;
+      }
+
+      .empty.active { display: block; }
+
+      .resume.active { display: block; }
+      .resume { display: none; }
+
+      @media print {
+        body { background: #fff; }
+        .actions { display: none; }
+        .shell, .panel { box-shadow: none; border-color: #d8dfe9; }
+        main { max-width: none; padding: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section id="empty" class="shell empty active">
+        <div class="eyebrow">Resumix AI</div>
+        <h1>Shared resume unavailable</h1>
+        <p class="subtle" id="empty-message">
+          This shared resume link is invalid, expired, or no longer active.
+        </p>
+      </section>
+
+      <section id="resume" class="resume">
+        <section class="shell">
+          <div class="eyebrow">Shared Resume</div>
+          <h1 id="full-name">Resume</h1>
+          <p class="subtle" id="headline"></p>
+          <div class="actions">
+            <button class="button primary" type="button" id="print-button">
+              Print / Save PDF
+            </button>
+            <button class="button secondary" type="button" id="contact-button">
+              Contact
+            </button>
+          </div>
+        </section>
+
+        <section class="grid two-up">
+          <article class="panel">
+            <h2>About</h2>
+            <p id="summary" class="subtle"></p>
+          </article>
+          <article class="panel">
+            <h2>Contact</h2>
+            <div id="contact-items" class="chips"></div>
+          </article>
+        </section>
+
+        <section class="grid">
+          <article class="panel">
+            <h2>Skills</h2>
+            <div id="skills" class="chips"></div>
+          </article>
+          <article class="panel">
+            <h2>Work Experience</h2>
+            <div id="experience"></div>
+          </article>
+          <article class="panel">
+            <h2>Projects</h2>
+            <div id="projects"></div>
+          </article>
+          <article class="panel">
+            <h2>Education</h2>
+            <div id="education"></div>
+          </article>
+          <article class="panel">
+            <h2>Certifications</h2>
+            <div id="certifications"></div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+      import {
+        getFirestore,
+        doc,
+        getDoc,
+      } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+      const firebaseConfig = {
+        apiKey: 'AIzaSyD9OFZaE-UxSDdwXKKxypXpb8c_o5O4WaE',
+        authDomain: 'resumeapplatest.firebaseapp.com',
+        projectId: 'resumeapplatest',
+        storageBucket: 'resumeapplatest.appspot.com',
+        messagingSenderId: '884039901207',
+        appId: '1:884039901207:web:a5d265c97dcdbe63f67c52',
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      const emptySection = document.getElementById('empty');
+      const emptyMessage = document.getElementById('empty-message');
+      const resumeSection = document.getElementById('resume');
+      const fullName = document.getElementById('full-name');
+      const headline = document.getElementById('headline');
+      const summary = document.getElementById('summary');
+      const skills = document.getElementById('skills');
+      const contactItems = document.getElementById('contact-items');
+      const experience = document.getElementById('experience');
+      const projects = document.getElementById('projects');
+      const education = document.getElementById('education');
+      const certifications = document.getElementById('certifications');
+      const printButton = document.getElementById('print-button');
+      const contactButton = document.getElementById('contact-button');
+
+      const query = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+      const shareId = (query.get('id') || hash.get('id') || '').trim();
+      const resumePayload = (query.get('r') || hash.get('r') || '').trim();
+
+      printButton.addEventListener('click', () => window.print());
+
+      function setEmpty(message) {
+        emptyMessage.textContent = message;
+        emptySection.classList.add('active');
+        resumeSection.classList.remove('active');
+      }
+
+      function setResumeVisible() {
+        emptySection.classList.remove('active');
+        resumeSection.classList.add('active');
+      }
+
+      function text(value) {
+        return typeof value === 'string' ? value.trim() : '';
+      }
+
+      function appendChip(container, label, href = '') {
+        const value = text(label);
+        if (!value) return;
+        if (href) {
+          const anchor = document.createElement('a');
+          anchor.className = 'chip';
+          anchor.href = href;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          anchor.textContent = value;
+          container.appendChild(anchor);
+          return;
+        }
+        const span = document.createElement('span');
+        span.className = 'chip';
+        span.textContent = value;
+        container.appendChild(span);
+      }
+
+      function formatDate(raw) {
+        const value = text(raw);
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+      }
+
+      function decodeResumePayload(payload) {
+        if (!payload) return null;
+        try {
+          const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+          const json = atob(padded);
+          return JSON.parse(json);
+        } catch (error) {
+          console.error(error);
+          return null;
+        }
+      }
+
+      function appendEntry(container, titleValue, metaValue, copyValue, extras = []) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'entry';
+
+        const titleNode = document.createElement('div');
+        titleNode.className = 'entry-title';
+        titleNode.textContent = text(titleValue) || 'Untitled';
+        wrapper.appendChild(titleNode);
+
+        const metaText = text(metaValue);
+        if (metaText) {
+          const metaNode = document.createElement('div');
+          metaNode.className = 'entry-meta';
+          metaNode.textContent = metaText;
+          wrapper.appendChild(metaNode);
+        }
+
+        const copyText = text(copyValue);
+        if (copyText) {
+          const copyNode = document.createElement('div');
+          copyNode.className = 'entry-copy';
+          copyNode.textContent = copyText;
+          wrapper.appendChild(copyNode);
+        }
+
+        if (extras.length > 0) {
+          const list = document.createElement('ul');
+          list.className = 'list';
+          extras.filter(Boolean).forEach((item) => {
+            const li = document.createElement('li');
+            li.textContent = item;
+            list.appendChild(li);
+          });
+          wrapper.appendChild(list);
+        }
+
+        container.appendChild(wrapper);
+      }
+
+      function populateResume(resume) {
+        const personal = resume.personalInfo || {};
+        const name = text(personal.fullName) || text(resume.title) || 'Shared Resume';
+        const jobTitle = text(personal.jobTitle);
+        const location = text(personal.address);
+        const head = [jobTitle, location].filter(Boolean).join(' • ');
+
+        document.title = `${name} | Shared Resume`;
+        fullName.textContent = name;
+        headline.textContent = head;
+        summary.textContent = text(resume.objective) || 'No professional summary provided.';
+
+        skills.innerHTML = '';
+        (resume.skills || []).forEach((skill) => appendChip(skills, skill?.name));
+        if (!skills.children.length) {
+          appendChip(skills, 'No skills listed');
+        }
+
+        contactItems.innerHTML = '';
+        const email = text(personal.email);
+        const phone = text(personal.phone);
+        const linkedIn = text(personal.linkedIn);
+        const github = text(personal.github);
+        const website = text(personal.website);
+        if (email) appendChip(contactItems, email, `mailto:${email}`);
+        if (phone) appendChip(contactItems, phone, `tel:${phone}`);
+        if (linkedIn) appendChip(contactItems, 'LinkedIn', linkedIn);
+        if (github) appendChip(contactItems, 'GitHub', github);
+        if (website) appendChip(contactItems, 'Website', website);
+        if (!contactItems.children.length) {
+          appendChip(contactItems, 'Contact details not shared');
+        }
+
+        contactButton.disabled = !email;
+        contactButton.onclick = () => {
+          if (email) {
+            window.location.href = `mailto:${email}`;
+          }
+        };
+
+        experience.innerHTML = '';
+        (resume.experience || []).forEach((item) => {
+          const meta = [text(item.position), text(item.company)].filter(Boolean).join(' • ');
+          const dateRange = [formatDate(item.startDate), item.isCurrentlyWorking ? 'Present' : formatDate(item.endDate)]
+            .filter(Boolean)
+            .join(' - ');
+          appendEntry(
+            experience,
+            meta || 'Experience',
+            [dateRange, text(item.location)].filter(Boolean).join(' • '),
+            text(item.description),
+            Array.isArray(item.achievements) ? item.achievements.map((value) => text(value)).filter(Boolean) : [],
+          );
+        });
+        if (!experience.children.length) {
+          appendEntry(experience, 'No work experience provided', '', '');
+        }
+
+        projects.innerHTML = '';
+        (resume.projects || []).forEach((item) => {
+          const technologies = Array.isArray(item.technologies) ? item.technologies.map((value) => text(value)).filter(Boolean) : [];
+          appendEntry(projects, item.title, item.url, item.description, technologies);
+        });
+        if (!projects.children.length) {
+          appendEntry(projects, 'No projects provided', '', '');
+        }
+
+        education.innerHTML = '';
+        (resume.education || []).forEach((item) => {
+          const meta = [text(item.degree), text(item.institution)].filter(Boolean).join(' • ');
+          const dateRange = [formatDate(item.startDate), item.isCurrentlyStudying ? 'Present' : formatDate(item.endDate)]
+            .filter(Boolean)
+            .join(' - ');
+          appendEntry(education, meta || 'Education', [dateRange, text(item.location)].filter(Boolean).join(' • '), item.description || item.grade || '');
+        });
+        if (!education.children.length) {
+          appendEntry(education, 'No education provided', '', '');
+        }
+
+        certifications.innerHTML = '';
+        (resume.certifications || []).forEach((item) => {
+          const meta = [text(item.issuer), formatDate(item.issueDate)].filter(Boolean).join(' • ');
+          appendEntry(certifications, item.name, meta, item.credentialUrl || item.credentialId || '');
+        });
+        if (!certifications.children.length) {
+          appendEntry(certifications, 'No certifications provided', '', '');
+        }
+      }
+
+      async function loadShare() {
+        const payloadResume = decodeResumePayload(resumePayload);
+        if (payloadResume) {
+          populateResume(payloadResume);
+          setResumeVisible();
+          return;
+        }
+
+        if (!shareId) {
+          setEmpty('This shared resume link is missing its identifier.');
+          return;
+        }
+
+        try {
+          const snapshot = await getDoc(doc(db, 'public_resume_shares', shareId));
+          if (!snapshot.exists()) {
+            setEmpty('This shared resume link is invalid or no longer available.');
+            return;
+          }
+
+          const data = snapshot.data();
+          if (!data || data.active !== true || !data.resume) {
+            const storedPayload = typeof data?.resumePayload === 'string' ? decodeResumePayload(data.resumePayload) : null;
+            if (storedPayload) {
+              populateResume(storedPayload);
+              setResumeVisible();
+              return;
+            }
+
+            setEmpty('This shared resume link has been disabled.');
+            return;
+          }
+
+          populateResume(data.resume);
+          setResumeVisible();
+        } catch (error) {
+          console.error(error);
+          setEmpty('Unable to load this shared resume right now. Please try again later.');
+        }
+      }
+
+      loadShare();
+    </script>
+  </body>
+</html>

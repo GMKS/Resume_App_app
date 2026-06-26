@@ -6,7 +6,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
-import '../../../core/services/resume_quality_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/utils/resume_translations.dart';
@@ -14,7 +13,6 @@ import '../../../core/utils/validation_feedback.dart';
 import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/app_empty_state_card.dart';
 import '../../../shared/widgets/app_loading_state.dart';
-import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/editor_intro_card.dart';
 import 'resume_editor_screen.dart';
@@ -459,66 +457,6 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
     });
   }
 
-  ResumeModel _buildDraftResume(ResumeModel resume) {
-    final hasDraftInput = _positionController.text.trim().isNotEmpty ||
-        _companyController.text.trim().isNotEmpty ||
-        _descriptionController.text.trim().isNotEmpty ||
-        _locationController.text.trim().isNotEmpty ||
-        _achievementControllers
-            .any((controller) => controller.text.trim().isNotEmpty) ||
-        _startDate != null ||
-        _endDate != null;
-
-    if (!hasDraftInput) {
-      return resume;
-    }
-
-    final draftExperience = Experience(
-      id: widget.existing?.id ?? 'draft-experience',
-      company: _companyController.text.trim(),
-      position: _positionController.text.trim(),
-      location: _locationController.text.trim(),
-      description: _descriptionController.text.trim(),
-      startDate: _startDate ?? DateTime.now(),
-      endDate: _isCurrently ? null : _endDate,
-      isCurrentlyWorking: _isCurrently,
-      achievements: _achievementControllers
-          .map((controller) => controller.text.trim())
-          .where((value) => value.isNotEmpty)
-          .toList(),
-    );
-
-    final updatedExperience = widget.existing != null
-        ? resume.experience
-            .map((item) =>
-                item.id == draftExperience.id ? draftExperience : item)
-            .toList()
-        : [...resume.experience, draftExperience];
-
-    return resume.copyWith(experience: updatedExperience);
-  }
-
-  String? _liveValidationMessage() {
-    if (_positionController.text.trim().isEmpty) {
-      return 'Add a role title so the preview can establish seniority at a glance.';
-    }
-    if (_companyController.text.trim().isEmpty) {
-      return 'Add the employer name to keep your experience timeline credible.';
-    }
-    if (_startDate == null) {
-      return 'Select a start date to anchor the timeline and avoid preview ambiguity.';
-    }
-    if (_endDate == null && !_isCurrently) {
-      return 'Add an end date or mark this role as current so exported timelines stay consistent.';
-    }
-    if (_descriptionController.text.trim().isEmpty &&
-        !_achievementControllers
-            .any((controller) => controller.text.trim().isNotEmpty)) {
-      return 'Add responsibilities or results so this role contributes meaningful proof, not just a title.';
-    }
-    return null;
-  }
-
   void _selectDate(bool isStart) async {
     final date = await showDatePicker(
       context: context,
@@ -559,6 +497,9 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
     }
     if (_endDate == null && !_isCurrently) {
       missingFields.add('End Date or Currently Working');
+    }
+    if (_descriptionController.text.trim().isEmpty) {
+      missingFields.add('Description');
     }
 
     if (missingFields.isNotEmpty) {
@@ -755,15 +696,6 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
 
   @override
   Widget build(BuildContext context) {
-    final resume = ref.watch(currentResumeProvider(widget.resumeId));
-    final qualityReport = resume == null
-        ? null
-        : ResumeQualityService.analyzeResume(_buildDraftResume(resume));
-    final liveValidationMessage = _liveValidationMessage();
-    final achievementCount = _achievementControllers
-        .where((controller) => controller.text.trim().isNotEmpty)
-        .length;
-
     return Container(
       height: MediaQuery.of(context).size.height * 0.9,
       decoration: const BoxDecoration(
@@ -805,74 +737,6 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  EditorIntroCard(
-                    title: widget.existing != null
-                        ? 'Refine this role'
-                        : 'Add a stronger role story',
-                    subtitle:
-                        'Focus on the scope, dates, and impact you want to preserve in preview, export, and ATS parsing.',
-                    icon: Iconsax.briefcase,
-                    accentColor: AppColors.success,
-                    stats: [
-                      EditorIntroStat(
-                        label: _isCurrently ? 'current role' : 'dated role',
-                        icon: Iconsax.clock,
-                      ),
-                      EditorIntroStat(
-                        label: achievementCount > 0
-                            ? '$achievementCount impact bullets'
-                            : 'add impact bullets',
-                        icon: Iconsax.chart_success,
-                      ),
-                    ],
-                  ),
-                  if (qualityReport != null) ...[
-                    const SizedBox(height: 16),
-                    ResumeQualityPanel(
-                      report: qualityReport,
-                      title: 'Draft Experience Guidance',
-                      subtitle:
-                          'This uses your in-progress role details before save so you can catch weak spots early.',
-                      accentColor: AppColors.success,
-                      maxSuggestions: 2,
-                    ),
-                  ],
-                  if (liveValidationMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.warning.withValues(alpha: 0.18),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Iconsax.info_circle,
-                            color: AppColors.warning,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              liveValidationMessage,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    height: 1.4,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 16),
                   CustomTextField(
                     controller: _positionController,
@@ -942,6 +806,12 @@ class _ExperienceFormState extends ConsumerState<_ExperienceForm> {
                     hint: 'Describe your role and responsibilities...',
                     maxLines: 4,
                     onChanged: (_) => setState(() {}),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Description is required';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 8),
                   Row(

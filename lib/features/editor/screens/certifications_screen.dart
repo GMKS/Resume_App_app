@@ -7,7 +7,6 @@ import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/services/free_plan_service.dart';
-import '../../../core/services/resume_quality_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/resume_model.dart';
 import '../../../core/utils/validation_feedback.dart';
@@ -15,7 +14,6 @@ import '../../../shared/widgets/adaptive_tooltip.dart';
 import '../../../shared/widgets/app_empty_state_card.dart';
 import '../../../shared/widgets/app_loading_state.dart';
 import '../../../shared/widgets/feature_gate.dart';
-import '../../../shared/widgets/resume_quality_panel.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/editor_intro_card.dart';
 import 'resume_editor_screen.dart';
@@ -374,57 +372,6 @@ class _CertFormState extends ConsumerState<_CertForm> {
     setState(() => _expiryDate = date);
   }
 
-  ResumeModel _buildDraftResume(ResumeModel resume) {
-    final hasDraftInput = _nameController.text.trim().isNotEmpty ||
-        _issuerController.text.trim().isNotEmpty ||
-        _credIdController.text.trim().isNotEmpty ||
-        _urlController.text.trim().isNotEmpty ||
-        _issueDate != null ||
-        _expiryDate != null;
-
-    if (!hasDraftInput) {
-      return resume;
-    }
-
-    final draftCertification = Certification(
-      id: widget.existing?.id ?? 'draft-certification',
-      name: _nameController.text.trim(),
-      issuer: _issuerController.text.trim(),
-      credentialId: _credIdController.text.trim(),
-      credentialUrl: _urlController.text.trim(),
-      issueDate: _issueDate,
-      expiryDate: _expiryDate,
-    );
-
-    final updatedCertifications = widget.existing != null
-        ? resume.certifications
-            .map((item) =>
-                item.id == draftCertification.id ? draftCertification : item)
-            .toList()
-        : [...resume.certifications, draftCertification];
-
-    return resume.copyWith(certifications: updatedCertifications);
-  }
-
-  String? _liveGuidanceMessage() {
-    if (_nameController.text.trim().isEmpty) {
-      return 'Add the certification name so this proof point is recognizable in preview output.';
-    }
-    if (_issuerController.text.trim().isEmpty) {
-      return 'Add the issuing organization to make the credential trustworthy.';
-    }
-    if (_issueDate != null &&
-        _expiryDate != null &&
-        _expiryDate!.isBefore(_issueDate!)) {
-      return 'Expiry date must stay after the issue date so exported certification timelines remain consistent.';
-    }
-    if (_urlController.text.trim().isEmpty &&
-        _credIdController.text.trim().isEmpty) {
-      return 'Add a credential URL or ID when possible so recruiters can verify this certification quickly.';
-    }
-    return null;
-  }
-
   void _save() {
     final missingFields = <String>[];
     if (_nameController.text.trim().isEmpty) {
@@ -487,11 +434,6 @@ class _CertFormState extends ConsumerState<_CertForm> {
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = mediaQuery.viewInsets.bottom;
     final safeBottom = mediaQuery.viewPadding.bottom;
-    final resume = ref.watch(currentResumeProvider(widget.resumeId));
-    final qualityReport = resume == null
-        ? null
-        : ResumeQualityService.analyzeResume(_buildDraftResume(resume));
-    final liveGuidanceMessage = _liveGuidanceMessage();
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.9,
@@ -541,74 +483,6 @@ class _CertFormState extends ConsumerState<_CertForm> {
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                 children: [
-                  EditorIntroCard(
-                    title: widget.existing != null
-                        ? 'Refine certification proof'
-                        : 'Add a verified credential',
-                    subtitle:
-                        'Use issuer, date, and verification details to make this credential durable across templates and exports.',
-                    icon: Iconsax.medal_star,
-                    accentColor: const Color(0xFF14B8A6),
-                    stats: [
-                      EditorIntroStat(
-                        label: _issueDate != null ? 'dated' : 'date optional',
-                        icon: Iconsax.calendar,
-                      ),
-                      EditorIntroStat(
-                        label: _urlController.text.trim().isNotEmpty
-                            ? 'link included'
-                            : 'add link or id',
-                        icon: Iconsax.link,
-                      ),
-                    ],
-                  ),
-                  if (qualityReport != null) ...[
-                    const SizedBox(height: 16),
-                    ResumeQualityPanel(
-                      report: qualityReport,
-                      title: 'Draft Certification Guidance',
-                      subtitle:
-                          'This score updates from your in-progress certification details before save.',
-                      accentColor: const Color(0xFF14B8A6),
-                      maxSuggestions: 2,
-                    ),
-                  ],
-                  if (liveGuidanceMessage != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.warning.withValues(alpha: 0.16),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Iconsax.info_circle,
-                            color: AppColors.warning,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              liveGuidanceMessage,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    height: 1.4,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 16),
                   CustomTextField(
                       controller: _nameController,

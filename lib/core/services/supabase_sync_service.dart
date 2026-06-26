@@ -8,21 +8,32 @@ import '../models/resume_model.dart';
 import 'free_plan_service.dart';
 import 'resume_json.dart';
 
-/// Syncs resumes to/from Firebase Firestore using anonymous authentication.
-///
-/// **How cross-device sync works:**
-/// By default, each device generates a random UUID stored in SharedPreferences.
-/// That UUID is the Firestore document key, so two devices never share data unless
-/// they have the same key.
-///
-/// To share data between mobile and Chrome (or any two devices), the user sets a
-/// **Sync Code** — a short string they choose. Once set, that code becomes the
-/// Firestore path key on that device, replacing the random UUID. Setting the SAME
-/// code on two devices makes them read/write the same cloud data.
+class CloudIdentityStatus {
+  const CloudIdentityStatus({
+    required this.uid,
+    required this.displayLabel,
+    required this.isAnonymous,
+    required this.deviceId,
+    required this.legacySharedSyncDetected,
+  });
+
+  final String uid;
+  final String displayLabel;
+  final bool isAnonymous;
+  final String deviceId;
+  final bool legacySharedSyncDetected;
+
+  bool get hasSharedCloudAccess => uid.isNotEmpty && !isAnonymous;
+}
+
+/// Syncs user data to Firestore using the authenticated Firebase user identity.
 class SupabaseSyncService {
   static final _auth = FirebaseAuth.instance;
   static final _db = FirebaseFirestore.instance;
-  static const _collection = 'resumes';
+  static const _usersCollection = 'users';
+  static const _resumeCollection = 'resumes';
+  static const _settingsCollection = 'settings';
+  static const _backupsCollection = 'backups';
   static const _prefKey = 'sync_device_id';
   static const _syncCodeKey = 'sync_account_code';
 
@@ -39,36 +50,25 @@ class SupabaseSyncService {
     }
   }
 
-  // ── Sync Code (user-set, cross-device) ────────────────────────────────────
-
-  /// Returns the current sync code, or null if the user hasn't set one yet.
   static Future<String?> getSyncCode() async {
-    if (!FreePlanService.canUseCloudSync) {
-      return null;
-    }
-    final prefs = await SharedPreferences.getInstance();
-    final code = prefs.getString(_syncCodeKey);
-    return (code != null && code.trim().isNotEmpty) ? code.trim() : null;
+    return null;
   }
 
-  /// Sets a user-chosen sync code. Both devices must use the same code to share
-  /// data. Pass null to clear the code and revert to the device-only UUID.
   static Future<void> setSyncCode(String? code) async {
-    if (!FreePlanService.canUseCloudSync) {
-      return;
-    }
-    final prefs = await SharedPreferences.getInstance();
-    if (code == null || code.trim().isEmpty) {
-      await prefs.remove(_syncCodeKey);
-    } else {
-      await prefs.setString(_syncCodeKey, code.trim().toLowerCase());
-    }
+    await clearLegacySharedSyncCode();
   }
 
-  // ── Device ID fallback ────────────────────────────────────────────────────
+  static Future<bool> hasLegacySharedSyncCode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString(_syncCodeKey)?.trim() ?? '';
+    return code.isNotEmpty;
+  }
 
-  /// Returns the persistent device UUID (created once per device/browser).
-  /// Used only when no sync code is set.
+  static Future<void> clearLegacySharedSyncCode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_syncCodeKey);
+  }
+
   static Future<String> getDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
     String? id = prefs.getString(_prefKey);
@@ -79,56 +79,121 @@ class SupabaseSyncService {
     return id;
   }
 
-  /// Returns the active Firestore document key:
-  /// - The user-set sync code if one exists, OR
-  /// - The per-device UUID otherwise.
-  static Future<String> _activeKey() async {
-    final code = await getSyncCode();
-    if (code != null) return 'code_$code';
-    return getDeviceId();
+  static Future<CloudIdentityStatus> getCloudIdentityStatus() async {
+    await ensureSignedIn();
+    final user = _auth.currentUser!;
+    final legacySharedSyncDetected = await hasLegacySharedSyncCode();
+    final deviceId = await getDeviceId();
+
+    final displayLabel = () {
+      final email = user.email?.trim() ?? '';
+      if (email.isNotEmpty) {
+        return email;
+      }
+
+      final phone = user.phoneNumber?.trim() ?? '';
+      if (phone.isNotEmpty) {
+        return phone;
+      }
+
+      final name = user.displayName?.trim() ?? '';
+      if (name.isNotEmpty) {
+        return name;
+      }
+
+      if (user.isAnonymous) {
+        return 'Guest workspace';
+      }
+
+      return user.uid;
+    }();
+
+    return CloudIdentityStatus(
+      uid: user.uid,
+      displayLabel: displayLabel,
+      isAnonymous: user.isAnonymous,
+      deviceId: deviceId,
+      legacySharedSyncDetected: legacySharedSyncDetected,
+    );
   }
 
-  // ── Auth ───────────────────────────────────────────────────────────────────
-
-  /// Ensures a Firebase session exists (anonymous sign-in on first use).
-  /// Throws if Firebase was not initialized (bad config).
   static Future<void> ensureSignedIn() async {
-    // Guard: ensure Firebase app is initialized before using Auth.
     if (Firebase.apps.isEmpty) {
-      throw Exception('Firebase is not initialized. Check your firebase_options.dart config.');
+      throw Exception(
+          'Firebase is not initialized. Check your firebase_options.dart config.');
     }
     if (_auth.currentUser == null) {
       await _auth.signInAnonymously();
     }
   }
 
-  /// Helper to get the Firestore items subcollection for the active key
-  /// (sync code if set, otherwise per-device UUID).
-  static Future<CollectionReference<Map<String, dynamic>>> _itemsRef() async {
-    final key = await _activeKey();
-    return _db
-        .collection(_collection)
-        .doc(key)
-        .collection('items');
+  static Future<String> _cloudUserId() async {
+    await ensureSignedIn();
+    final uid = _auth.currentUser?.uid.trim() ?? '';
+    if (uid.isEmpty) {
+      throw Exception(
+          'Cloud sync is unavailable because no authenticated workspace is active.');
+    }
+    return uid;
   }
 
-  static Future<DocumentReference<Map<String, dynamic>>> _collectionDocRef(
-    String collection,
+  static DocumentReference<Map<String, dynamic>> _userDoc(String uid) {
+    return _db.collection(_usersCollection).doc(uid);
+  }
+
+  static Future<CollectionReference<Map<String, dynamic>>> _resumesRef() async {
+    final uid = await _cloudUserId();
+    return _userDoc(uid).collection(_resumeCollection);
+  }
+
+  static Future<DocumentReference<Map<String, dynamic>>> _settingsDoc(
+    String name,
   ) async {
-    final key = await _activeKey();
-    return _db.collection(collection).doc(key);
+    final uid = await _cloudUserId();
+    return _userDoc(uid).collection(_settingsCollection).doc(name);
   }
 
-  // ── Load ───────────────────────────────────────────────────────────────────
+  static Future<DocumentReference<Map<String, dynamic>>> _backupDoc(
+    String name,
+  ) async {
+    final uid = await _cloudUserId();
+    return _userDoc(uid).collection(_backupsCollection).doc(name);
+  }
 
-  /// Fetches all resumes for this device from Firestore.
+  static Future<void> _touchWorkspace({
+    bool markBackup = false,
+    bool markRestore = false,
+  }) async {
+    final status = await getCloudIdentityStatus();
+    await _userDoc(status.uid).set(
+      <String, dynamic>{
+        'uid': status.uid,
+        'isAnonymous': status.isAnonymous,
+        'lastSeenAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    await (await _settingsDoc('sync_state')).set(
+      <String, dynamic>{
+        'workspaceLabel': status.displayLabel,
+        'isAnonymous': status.isAnonymous,
+        if (markBackup) 'lastBackupAt': FieldValue.serverTimestamp(),
+        if (markRestore) 'lastRestoreAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
   static Future<List<ResumeModel>> loadAll() async {
     if (!FreePlanService.canUseCloudSync) {
       return [];
     }
     try {
       await ensureSignedIn();
-      final ref = await _itemsRef();
+      final ref = await _resumesRef();
       final snapshot = await ref.get();
       return snapshot.docs
           .map((doc) => ResumeJson.fromMap(doc.data()))
@@ -138,72 +203,57 @@ class SupabaseSyncService {
     }
   }
 
-  // ── Save ───────────────────────────────────────────────────────────────────
-
-  /// Saves a single resume to Firestore.
   static Future<void> save(ResumeModel resume) async {
     if (!FreePlanService.canUseCloudSync) {
       return;
     }
     try {
       await ensureSignedIn();
-      final ref = await _itemsRef();
+      final ref = await _resumesRef();
       await ref.doc(resume.id).set(ResumeJson.toMap(resume));
-    } catch (_) {
-      // Silently fail — local save already succeeded.
-    }
+      await _touchWorkspace(markBackup: true);
+    } catch (_) {}
   }
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
-
-  /// Deletes a resume from Firestore.
   static Future<void> delete(String resumeId) async {
     if (!FreePlanService.canUseCloudSync) {
       return;
     }
     try {
       await ensureSignedIn();
-      final ref = await _itemsRef();
+      final ref = await _resumesRef();
       await ref.doc(resumeId).delete();
     } catch (_) {}
   }
 
-  // ── Manual Backup (with error reporting) ──────────────────────────────────
-
-  /// Backs up all provided resumes to Firestore using a batch write.
-  /// Returns null on success, or an error message string on failure.
   static Future<String?> manualBackupAll(List<ResumeModel> resumes) async {
     if (!FreePlanService.canUseCloudSync) {
       return FreePlanService.premiumCloudSyncMessage;
     }
     try {
       await ensureSignedIn();
-      final ref = await _itemsRef();
+      final ref = await _resumesRef();
       final batch = _db.batch();
       for (final resume in resumes) {
         batch.set(ref.doc(resume.id), ResumeJson.toMap(resume));
       }
       await batch.commit();
-      return null; // success
+      await _touchWorkspace(markBackup: true);
+      return null;
     } catch (e) {
       return e.toString();
     }
   }
 
-  // ── Manual Restore (with error reporting) ─────────────────────────────────
-
-  /// Loads all resumes from Firestore for this device.
-  /// Returns an empty list if nothing is found, or throws on a real error.
   static Future<List<ResumeModel>> manualRestoreAll() async {
     if (!FreePlanService.canUseCloudSync) {
       throw Exception(FreePlanService.premiumCloudSyncMessage);
     }
     await ensureSignedIn();
-    final ref = await _itemsRef();
+    final ref = await _resumesRef();
     final snapshot = await ref.get();
-    return snapshot.docs
-        .map((doc) => ResumeJson.fromMap(doc.data()))
-        .toList();
+    await _touchWorkspace(markRestore: true);
+    return snapshot.docs.map((doc) => ResumeJson.fromMap(doc.data())).toList();
   }
 
   static Future<String?> manualBackupJsonList({
@@ -216,11 +266,13 @@ class SupabaseSyncService {
     }
     try {
       await ensureSignedIn();
-      final doc = await _collectionDocRef(collection);
+      final doc = await _backupDoc(collection);
       await doc.set(<String, dynamic>{
         field: items,
+        'ownerUid': _auth.currentUser?.uid ?? '',
         'updated_at': FieldValue.serverTimestamp(),
       });
+      await _touchWorkspace(markBackup: true);
       return null;
     } catch (e) {
       return e.toString();
@@ -235,9 +287,10 @@ class SupabaseSyncService {
       throw Exception(FreePlanService.premiumCloudSyncMessage);
     }
     await ensureSignedIn();
-    final doc = await _collectionDocRef(collection);
+    final doc = await _backupDoc(collection);
     final snapshot = await doc.get();
     final data = snapshot.data();
+    await _touchWorkspace(markRestore: true);
     final rawItems = data?[field];
     if (rawItems is! List) {
       return const <Map<String, dynamic>>[];
@@ -253,21 +306,31 @@ class SupabaseSyncService {
         .toList(growable: false);
   }
 
-  /// Returns the active key (sync code if set, otherwise device UUID).
-  static Future<String> get currentUserId async => _activeKey();
+  static Future<String> get currentUserId async {
+    final currentUser = _auth.currentUser;
+    final uid = currentUser?.uid.trim() ?? '';
+    if (uid.isNotEmpty) {
+      return uid;
+    }
+    return getDeviceId();
+  }
 
   static Future<void> deleteAllCloudData() async {
     try {
       await ensureSignedIn();
+      final uid = await _cloudUserId();
+      final userDoc = _userDoc(uid);
 
-      final key = await _activeKey();
-      final resumesDoc = _db.collection(_collection).doc(key);
-      final resumeItems = await resumesDoc.collection('items').get();
+      final resumeItems = await userDoc.collection(_resumeCollection).get();
       await _deleteDocumentsInBatches(resumeItems.docs);
-      await resumesDoc.delete();
 
-      final jobTrackerDoc = _db.collection('job_tracker').doc(key);
-      await jobTrackerDoc.delete();
+      final backupDocs = await userDoc.collection(_backupsCollection).get();
+      await _deleteDocumentsInBatches(backupDocs.docs);
+
+      final settingsDocs = await userDoc.collection(_settingsCollection).get();
+      await _deleteDocumentsInBatches(settingsDocs.docs);
+
+      await userDoc.delete();
     } catch (_) {}
   }
 }

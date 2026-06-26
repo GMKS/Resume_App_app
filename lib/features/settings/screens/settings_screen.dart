@@ -7,8 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_info.dart';
-import '../../../core/services/app_config_service.dart';
 import '../../../core/services/app_version_service.dart';
+import '../../../core/services/data_deletion_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/free_plan_service.dart';
 import '../../../core/services/storage_service.dart';
@@ -142,25 +142,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showAiApiKeySheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => const _AiApiKeySheet(),
-    );
-  }
-
-  void _handleAiServiceTap() {
-    if (AppConfigService.read('GROQ_API_KEY').isNotEmpty) {
-      context.push('/ai-assistant');
-      return;
-    }
-
-    _showAiApiKeySheet();
-  }
-
   void _showBackupSyncSheet() {
     if (!FreePlanService.canUseCloudSync) {
       showUpgradePromptSheet(
@@ -208,9 +189,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
-              StorageService.deleteAllResumes();
+            onPressed: () async {
               Navigator.pop(context);
+              await DataDeletionService.deleteUserData(deleteCloudData: false);
+              if (!mounted) {
+                return;
+              }
+              ref.read(resumesProvider.notifier).loadResumes();
               setState(() => _resumeCount = 0);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -222,6 +207,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: const Text('Delete All'),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _openPlayStoreListing() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final marketUri = Uri.tryParse(
+      'market://details?id=${AppInfo.playStorePackageId}',
+    );
+    final webUri = Uri.tryParse(AppInfo.playStoreUrl);
+
+    if (marketUri != null && await canLaunchUrl(marketUri)) {
+      await launchUrl(marketUri, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    if (webUri != null && await canLaunchUrl(webUri)) {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Could not open store'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _shareApp() {
+    final playStoreUri = Uri.tryParse(AppInfo.playStoreUrl);
+    if (playStoreUri == null ||
+        !playStoreUri.hasScheme ||
+        playStoreUri.host.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not share app link'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    SharePlus.instance.share(
+      ShareParams(
+        text:
+            'Check out this awesome Resume Builder app!\n${playStoreUri.toString()}',
+        subject: 'Resume Builder App',
       ),
     );
   }
@@ -267,10 +300,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildSocialButton(
-                    Iconsax.global, 'Website', 'https://example.com'),
+                  Iconsax.global, 'Website', AppInfo.websiteUrl),
                 const SizedBox(width: 16),
                 _buildSocialButton(
-                    Iconsax.instagram, 'Instagram', 'https://instagram.com'),
+                  Iconsax.instagram,
+                  'Instagram',
+                  'https://www.instagram.com/'),
                 const SizedBox(width: 16),
                 _buildSocialButton(Iconsax.message, 'Support',
                     'mailto:${AppInfo.supportEmail}'),
@@ -604,14 +639,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 24),
             _buildSectionHeader('AI FEATURES'),
             _buildSettingTile(
-              icon: Iconsax.cpu,
-              title: 'AI Service',
-              subtitle: AppConfigService.read('GROQ_API_KEY').isNotEmpty
-                  ? 'Managed by the app. No personal API key needed'
-                  : 'Managed by the app. AI is unavailable right now',
-              onTap: _handleAiServiceTap,
-            ),
-            _buildSettingTile(
               icon: Iconsax.magic_star,
               iconColor: const Color(0xFF8B5CF6),
               title: 'AI Assistant',
@@ -625,7 +652,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Iconsax.document_text,
               title: 'My Resumes',
               subtitle: '$_resumeCount resumes saved',
-              onTap: () => context.pop(),
+              onTap: () => context.push('/my-resumes'),
             ),
             _buildSettingTile(
               icon: Iconsax.cloud,
@@ -659,22 +686,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Iconsax.star_1,
               title: 'Rate App',
               subtitle: 'Love the app? Give us 5 stars!',
-              onTap: () async {
-                // Opens Play Store page for the app
-                const storeUrl =
-                    'https://play.google.com/store/apps/details?id=com.resumebuilder.app';
-                final uri = Uri.parse(storeUrl);
-                final messenger = ScaffoldMessenger.of(context);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                } else {
-                  messenger.showSnackBar(
-                    const SnackBar(
-                        content: Text('Could not open store'),
-                        behavior: SnackBarBehavior.floating),
-                  );
-                }
-              },
+              onTap: _openPlayStoreListing,
             ),
             _buildSettingTile(
               icon: Iconsax.message_question,
@@ -726,12 +738,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Iconsax.share,
               title: 'Share App',
               subtitle: 'Tell your friends about us',
-              onTap: () {
-                Share.share(
-                  'Check out this awesome Resume Builder app!\nhttps://play.google.com/store/apps/details?id=com.resumebuilder.app',
-                  subject: 'Resume Builder App',
-                );
-              },
+              onTap: _shareApp,
             ),
 
             const SizedBox(height: 24),
@@ -843,12 +850,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
 
   String? _statusMessage;
   bool _inProgress = false;
-
-  // ── Sync Code state ───────────────────────────────────────────────────────
-  final _codeController = TextEditingController();
-  String? _currentCode; // what's saved in prefs
-  String? _deviceId; // per-device fallback UUID
-  bool _editingCode = false;
+  CloudIdentityStatus? _identity;
 
   @override
   void initState() {
@@ -857,25 +859,24 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
   }
 
   Future<void> _loadSyncInfo() async {
-    final code = await SupabaseSyncService.getSyncCode();
-    final deviceId = await SupabaseSyncService.getDeviceId();
+    final identity = await SupabaseSyncService.getCloudIdentityStatus();
+    if (identity.legacySharedSyncDetected) {
+      await SupabaseSyncService.clearLegacySharedSyncCode();
+    }
     if (mounted) {
       setState(() {
-        _currentCode = code;
-        _deviceId = deviceId;
-        if (code != null) _codeController.text = code;
+        _identity = identity;
+        if (identity.legacySharedSyncDetected) {
+          _statusMessage =
+              'ℹ️ Legacy sync codes were disabled for security. Cloud sync now uses your authenticated workspace only. Back up again from this device to migrate safely.';
+        }
       });
     }
   }
 
   @override
-  void dispose() {
-    _codeController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final identity = _identity;
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
           24, 20, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
@@ -938,7 +939,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  '1. Set the exact same Sync Code on every device you want to connect.',
+                  '1. Sign in on each device with the same account to access the same private cloud workspace.',
                   style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -952,7 +953,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                       height: 1.5),
                 ),
                 Text(
-                  '3. On the other device, tap Restore from Cloud to pull that data down.',
+                  '3. On another device logged into the same account, tap Restore from Cloud to pull that data down.',
                   style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -967,7 +968,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Different Sync Codes create different cloud spaces, so your devices must use the same code to share data.',
+                  'Cloud data is isolated by authenticated user. Another account can never read this workspace, even if it knows an old sync code or document ID.',
                   style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -987,7 +988,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
           ),
           const SizedBox(height: 16),
 
-          // ── Sync Code panel ───────────────────────────────────────────────
+          // ── Cloud workspace panel ────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -999,184 +1000,86 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title row
                 Row(
                   children: [
                     const Icon(Iconsax.link,
                         size: 18, color: AppColors.primary),
                     const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text('Sync Code',
-                          style: TextStyle(
+                    Expanded(
+                      child: Text(
+                          identity?.hasSharedCloudAccess == true
+                              ? 'Cloud Workspace'
+                              : 'Private Workspace',
+                          style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
-                    if (!_editingCode)
-                      TextButton(
-                        onPressed: () => setState(() => _editingCode = true),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                        child: Text(
-                            _currentCode == null ? 'Set Code' : 'Change',
-                            style: const TextStyle(
-                                fontSize: 13, color: AppColors.primary)),
-                      ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                // Explanation
-                const Text(
-                  'To sync between mobile and Chrome (or any two devices), set the SAME sync code on both. '
-                  'Any device using the same code shares the same cloud data.',
-                  style: TextStyle(
+                Text(
+                  identity?.hasSharedCloudAccess == true
+                      ? 'This workspace is linked to your authenticated account. Devices signed into the same account can back up and restore the same private data.'
+                      : 'This device is currently using an anonymous private workspace. Sign in with the same account on each device to enable secure multi-device sync.',
+                  style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                       height: 1.5),
                 ),
                 const SizedBox(height: 12),
-
-                // Current status chip
-                if (!_editingCode) ...[
-                  if (_currentCode != null) ...[
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color:
-                                    AppColors.success.withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Iconsax.tick_circle,
-                                  size: 14, color: AppColors.success),
-                              const SizedBox(width: 6),
-                              Text('Code: $_currentCode',
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.success)),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        GestureDetector(
-                          onTap: () async {
-                            await SupabaseSyncService.setSyncCode(null);
-                            if (!mounted) return;
-                            _codeController.clear();
-                            setState(() => _currentCode = null);
-                          },
-                          child: const Text('Clear',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.error,
-                                  decoration: TextDecoration.underline)),
-                        ),
-                      ],
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: (identity?.hasSharedCloudAccess == true
+                            ? AppColors.success
+                            : AppColors.warning)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: (identity?.hasSharedCloudAccess == true
+                              ? AppColors.success
+                              : AppColors.warning)
+                          .withValues(alpha: 0.4),
                     ),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: AppColors.warning.withValues(alpha: 0.4)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Iconsax.warning_2,
-                              size: 14, color: AppColors.warning),
-                          SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'Device-only mode — syncs to this device only',
-                              style: TextStyle(
-                                  fontSize: 12, color: AppColors.warning),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_deviceId != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Device ID: ${_deviceId!.substring(0, 8)}…',
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ],
-                ],
-
-                // Code editing field
-                if (_editingCode) ...[
-                  Row(
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _codeController,
-                          autofocus: true,
-                          textInputAction: TextInputAction.done,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. john-resume-2025',
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                          ),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: () async {
-                          final code = _codeController.text.trim();
-                          if (code.isEmpty) {
-                            setState(() => _editingCode = false);
-                            return;
-                          }
-                          await SupabaseSyncService.setSyncCode(code);
-                          if (mounted) {
-                            setState(() {
-                              _currentCode = code.toLowerCase();
-                              _editingCode = false;
-                              _statusMessage =
-                                  '✅ Sync code set! Set the same code on your other device, then Backup/Restore.';
-                            });
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                        ),
-                        child: const Text('Save'),
+                      Icon(
+                        identity?.hasSharedCloudAccess == true
+                            ? Iconsax.tick_circle
+                            : Iconsax.warning_2,
+                        size: 14,
+                        color: identity?.hasSharedCloudAccess == true
+                            ? AppColors.success
+                            : AppColors.warning,
                       ),
                       const SizedBox(width: 6),
-                      TextButton(
-                        onPressed: () => setState(() => _editingCode = false),
-                        child: const Text('Cancel',
-                            style: TextStyle(color: AppColors.textSecondary)),
+                      Flexible(
+                        child: Text(
+                          identity?.hasSharedCloudAccess == true
+                              ? 'Linked to ${identity?.displayLabel ?? 'your account'}'
+                              : 'Guest workspace only on this device',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: identity?.hasSharedCloudAccess == true
+                                ? AppColors.success
+                                : AppColors.warning,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Use letters, numbers and hyphens. Enter the exact same code on every device you want to sync.',
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        height: 1.5),
+                ),
+                if (identity != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    identity.hasSharedCloudAccess
+                        ? 'Cloud user ID: ${identity.uid.substring(0, 8)}…'
+                        : 'Device ID: ${identity.deviceId.substring(0, 8)}…',
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.textSecondary),
                   ),
                 ],
               ],
@@ -1252,7 +1155,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
     final confirmed = await _confirmSyncAction(
       title: 'Backup to Cloud?',
       message:
-          'This uploads the latest resumes and job tracker updates from this device. Use the same Sync Code on your other device, then tap Restore there.',
+          'This uploads the latest resumes and job tracker updates to your authenticated cloud workspace. On another device, sign in with the same account and tap Restore there.',
       confirmLabel: 'Backup Now',
     );
     if (confirmed) {
@@ -1264,7 +1167,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
     final confirmed = await _confirmSyncAction(
       title: 'Restore from Cloud?',
       message:
-          'This pulls the latest cloud backup for this Sync Code and updates this device. Newer cloud items will be merged into your local data.',
+          'This pulls the latest backup from your authenticated cloud workspace and updates this device. Newer cloud items will be merged into your local data.',
       confirmLabel: 'Restore Now',
     );
     if (confirmed) {
@@ -1330,7 +1233,9 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
           );
 
     if (!mounted) return;
-    final label = _currentCode != null ? 'code "$_currentCode"' : 'this device';
+    final label = _identity?.hasSharedCloudAccess == true
+        ? 'your account workspace'
+        : 'this private guest workspace';
     final backedUp = <String>[
       if (resumeError == null && resumes.isNotEmpty)
         '${resumes.length} resume(s)',
@@ -1344,7 +1249,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
     setState(() {
       _inProgress = false;
       _statusMessage = failures.isEmpty
-          ? '✅ Backup complete. Saved ${backedUp.join(' and ')} to $label. Open the same Sync Code on your other device, then tap Restore from Cloud there.'
+          ? '✅ Backup complete. Saved ${backedUp.join(' and ')} to $label. Sign in with the same account on your other device, then tap Restore from Cloud there.'
           : backedUp.isEmpty
               ? '❌ Backup could not finish. Please try again.\n${failures.join('\n')}'
               : '✅ Backup saved ${backedUp.join(' and ')} to $label, but some items still need attention.\n${failures.join('\n')}';
@@ -1409,9 +1314,9 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
       }
 
       widget.onRestored?.call();
-      final hint = _currentCode == null
-          ? ' TIP: Set a Sync Code to access data from other devices.'
-          : '';
+      final hint = _identity?.hasSharedCloudAccess == true
+          ? ''
+          : ' Sign in with the same account on both devices to enable secure cross-device sync.';
       final summaries = <String>[
         if (cloudResumes.isNotEmpty)
           created == 0 && updated == 0
@@ -1426,7 +1331,7 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
       setState(() {
         _inProgress = false;
         _statusMessage = summaries.isEmpty
-            ? 'ℹ️ No cloud backup was found for this Sync Code/device.$hint'
+            ? 'ℹ️ No cloud backup was found for this workspace.$hint'
             : '✅ Restore complete. ${summaries.join(' • ')}. If another device has newer changes, run Backup there first and Restore here again.';
       });
     } catch (e) {
@@ -1434,172 +1339,8 @@ class _BackupSyncSheetState extends State<_BackupSyncSheet> {
       setState(() {
         _inProgress = false;
         _statusMessage =
-            '❌ Restore could not finish. Check your internet connection and Sync Code, then try again.\n$e';
+            '❌ Restore could not finish. Check your internet connection and account session, then try again.\n$e';
       });
     }
-  }
-}
-
-// ─── AI API Key bottom-sheet widget ─────────────────────────────────────────
-class _AiApiKeySheet extends StatefulWidget {
-  const _AiApiKeySheet();
-
-  @override
-  State<_AiApiKeySheet> createState() => _AiApiKeySheetState();
-}
-
-class _AiApiKeySheetState extends State<_AiApiKeySheet> {
-  @override
-  Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final bottomInset = mediaQuery.viewInsets.bottom;
-    final safeBottom = mediaQuery.viewPadding.bottom;
-    final isConfigured = AppConfigService.read('GROQ_API_KEY').isNotEmpty;
-
-    return SafeArea(
-      top: false,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 20,
-          bottom: bottomInset > 0 ? bottomInset + 20 : safeBottom + 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Iconsax.cpu, color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'AI Service',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          isConfigured
-                              ? 'Configured by the app'
-                              : 'Currently unavailable',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  AdaptiveTooltip(
-                    message: 'Close API key sheet',
-                    button: true,
-                    child: IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: (isConfigured ? AppColors.success : AppColors.info)
-                      .withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: (isConfigured ? AppColors.success : AppColors.info)
-                        .withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Icon(
-                        isConfigured
-                            ? Iconsax.tick_circle
-                            : Iconsax.information,
-                        color:
-                            isConfigured ? AppColors.success : AppColors.info,
-                        size: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        isConfigured
-                            ? 'AI requests are handled by the app configuration. Users do not need to create, paste, or manage a personal API key.'
-                            : 'AI access is managed by the app configuration. Personal Groq keys are no longer required, and AI features will show a friendly error until the service is configured.',
-                        style: TextStyle(
-                          color:
-                              isConfigured ? AppColors.success : AppColors.info,
-                          fontSize: 12,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    if (isConfigured) {
-                      context.push('/ai-assistant');
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    isConfigured ? 'Open AI Assistant' : 'Close',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

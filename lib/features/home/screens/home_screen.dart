@@ -38,11 +38,6 @@ class ResumesNotifier extends StateNotifier<List<ResumeModel>> {
 
   /// Restores resumes from Supabase into local Hive storage then refreshes.
   Future<void> restoreFromCloud() async {
-    final syncCode = await SupabaseSyncService.getSyncCode();
-    if (syncCode == null || syncCode.isEmpty) {
-      return;
-    }
-
     final cloudResumes = await SupabaseSyncService.loadAll();
     for (final resume in cloudResumes) {
       final local = StorageService.getResume(resume.id);
@@ -117,6 +112,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
+  void _openResumeList(ResumeListFilter filter) {
+    ref.read(resumeListFilterProvider.notifier).state = filter;
+    ref.read(currentTabProvider.notifier).state = 1;
+  }
 
   @override
   void initState() {
@@ -313,6 +313,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                   title: '${resumes.length}',
                                   subtitle: 'Total Resumes',
                                   color: AppColors.primary,
+                                  onTap: () => _openResumeList(
+                                    ResumeListFilter.all,
+                                  ),
+                                  semanticLabel:
+                                      'Total resumes, ${resumes.length}',
+                                  semanticHint: 'Opens the full resume list',
                                 ),
                               ),
                               SizedBox(
@@ -323,6 +329,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                       '${resumes.where((r) => r.completionPercentage == 100).length}',
                                   subtitle: 'Completed',
                                   color: AppColors.success,
+                                  onTap: () => _openResumeList(
+                                    ResumeListFilter.completed,
+                                  ),
+                                  semanticLabel:
+                                      'Completed resumes, ${resumes.where((r) => r.completionPercentage == 100).length}',
+                                  semanticHint:
+                                      'Opens resumes completed at one hundred percent',
                                 ),
                               ),
                               SizedBox(
@@ -333,6 +346,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                       '${resumes.where((r) => r.completionPercentage < 100).length}',
                                   subtitle: 'In Progress',
                                   color: AppColors.warning,
+                                  onTap: () => _openResumeList(
+                                    ResumeListFilter.inProgress,
+                                  ),
+                                  semanticLabel:
+                                      'In progress resumes, ${resumes.where((r) => r.completionPercentage < 100).length}',
+                                  semanticHint:
+                                      'Opens resumes still in progress',
                                 ),
                               ),
                             ],
@@ -342,67 +362,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           .animate()
                           .fadeIn(delay: 200.ms, duration: 500.ms)
                           .slideY(begin: 0.2, end: 0),
-
-                      const SizedBox(height: 24),
-
-                      // My Resumes Summary Card — tap to go to Resumes tab
-                      GestureDetector(
-                        onTap: () =>
-                            ref.read(currentTabProvider.notifier).state = 1,
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color:
-                                    AppColors.primary.withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color:
-                                      AppColors.primary.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Iconsax.document_text_1,
-                                    color: AppColors.primary),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'My Resumes',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                              fontWeight: FontWeight.bold),
-                                    ),
-                                    Text(
-                                      resumes.isEmpty
-                                          ? 'No resumes yet — create one!'
-                                          : '${resumes.length} resume${resumes.length == 1 ? '' : 's'} saved',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                              color: AppColors.textSecondary),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Iconsax.arrow_right_3,
-                                  color: AppColors.primary),
-                            ],
-                          ),
-                        ),
-                      ).animate().fadeIn(delay: 300.ms, duration: 500.ms),
                     ],
                   ),
                 ),

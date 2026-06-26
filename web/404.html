@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script>
+    (function() {
+      var segments = window.location.pathname.split('/').filter(Boolean);
+      var basePath = segments.length > 0 ? '/' + segments[0] + '/' : '/';
+      var targetPath = window.location.pathname + window.location.search + window.location.hash;
+      var targetUrl = basePath + '?p=' + encodeURIComponent(targetPath);
+      window.location.replace(targetUrl);
+    }());
+  </script>
+</head>
+<body></body>
+</html>

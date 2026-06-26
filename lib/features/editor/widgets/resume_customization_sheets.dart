@@ -470,7 +470,7 @@ void showFontPicker({
                       ),
                       child: Center(
                           child: Text('Aa',
-                            style: _resumeFontTextStyle(entry.key,
+                              style: _resumeFontTextStyle(entry.key,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   color: selected
