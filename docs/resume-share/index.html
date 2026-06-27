@@ -272,6 +272,12 @@
       const shareId = (query.get('id') || hash.get('id') || '').trim();
       const resumePayload = (query.get('r') || hash.get('r') || '').trim();
 
+      console.info('resume-share:start', {
+        href: window.location.href,
+        shareId,
+        hasPayload: Boolean(resumePayload),
+      });
+
       printButton.addEventListener('click', () => window.print());
 
       function setEmpty(message) {
@@ -460,27 +466,41 @@
       async function loadShare() {
         const payloadResume = decodeResumePayload(resumePayload);
         if (payloadResume) {
+          console.info('resume-share:payload-query-hit', { shareId });
           populateResume(payloadResume);
           setResumeVisible();
           return;
         }
 
         if (!shareId) {
+          console.warn('resume-share:missing-share-id');
           setEmpty('This shared resume link is missing its identifier.');
           return;
         }
 
         try {
           const snapshot = await getDoc(doc(db, 'public_resume_shares', shareId));
+          console.info('resume-share:snapshot', {
+            shareId,
+            exists: snapshot.exists(),
+          });
           if (!snapshot.exists()) {
             setEmpty('This shared resume link is invalid or no longer available.');
             return;
           }
 
           const data = snapshot.data();
+          console.info('resume-share:data', {
+            shareId,
+            active: data?.active === true,
+            hasResume: Boolean(data?.resume),
+            hasPayload: typeof data?.resumePayload === 'string' && data.resumePayload.length > 0,
+            publicUrl: typeof data?.publicUrl === 'string' ? data.publicUrl : '',
+          });
           if (!data || data.active !== true || !data.resume) {
             const storedPayload = typeof data?.resumePayload === 'string' ? decodeResumePayload(data.resumePayload) : null;
             if (storedPayload) {
+              console.info('resume-share:payload-doc-hit', { shareId });
               populateResume(storedPayload);
               setResumeVisible();
               return;
@@ -493,7 +513,10 @@
           populateResume(data.resume);
           setResumeVisible();
         } catch (error) {
-          console.error(error);
+          console.error('resume-share:load-failed', {
+            shareId,
+            error,
+          });
           setEmpty('Unable to load this shared resume right now. Please try again later.');
         }
       }

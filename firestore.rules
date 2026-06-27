@@ -40,12 +40,15 @@ service cloud.firestore {
     }
 
     match /public_resume_shares/{shareId} {
-      allow read: if resource.data.active == true;
+      allow get: if resource == null || resource.data.active == true;
+      allow list: if false;
       allow create: if signedIn()
-        && request.resource.data.ownerUid == request.auth.uid;
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.active == true;
       allow update: if signedIn()
         && resource.data.ownerUid == request.auth.uid
-        && request.resource.data.ownerUid == request.auth.uid;
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.active == true;
       allow delete: if signedIn()
         && resource.data.ownerUid == request.auth.uid;
     }
