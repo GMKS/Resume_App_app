@@ -216,7 +216,8 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
         debugPrint('Copy Enabled');
         debugPrint('Share Enabled');
       }
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Portfolio share publish failed: $error');
       if (!mounted) {
         return;
       }
@@ -226,6 +227,7 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
         _shareResumeVersion = resumeVersion;
         _isGeneratingShareLink = false;
       });
+      _showSnackBar(error.toString(), isError: true);
     }
   }
 
@@ -664,7 +666,7 @@ class _PortfolioTabScreenState extends ConsumerState<PortfolioTabScreen> {
                                 const SizedBox(height: 4),
                                 SelectableText(
                                   hasPortfolioUrl
-                                    ? shareUrl
+                                      ? shareUrl
                                       : emptyPortfolioMessage,
                                   onTap: hasPortfolioUrl
                                       ? _openPortfolioLink

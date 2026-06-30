@@ -30,7 +30,11 @@ class PreviewScreen extends ConsumerStatefulWidget {
   final String resumeId;
   final ResumeModel? initialResume;
 
-  const PreviewScreen({super.key, required this.resumeId, this.initialResume});
+  const PreviewScreen({
+    super.key,
+    required this.resumeId,
+    this.initialResume,
+  });
 
   @override
   ConsumerState<PreviewScreen> createState() => _PreviewScreenState();
@@ -136,9 +140,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   }
 
   ResumeModel? _currentResume() {
-    return _resume ??
-        widget.initialResume ??
-        StorageService.getResume(widget.resumeId);
+    return _resume ?? StorageService.getResume(widget.resumeId);
   }
 
   @override
@@ -155,8 +157,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
   }
 
   void _loadResume() {
-    final resume =
-        widget.initialResume ?? StorageService.getResume(widget.resumeId);
+    final resume = widget.initialResume ?? StorageService.getResume(widget.resumeId);
     _logLifecycle('loadResume:start', resume: resume);
     if (!mounted) {
       return;
@@ -799,9 +800,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         color: _isReadingMode ? Colors.black : Colors.transparent,
-        padding: EdgeInsets.only(
-          top: _isReadingMode ? MediaQuery.paddingOf(context).top + 18 : 18,
-        ),
+        padding: EdgeInsets.only(top: _isReadingMode ? 0 : 18),
         child: Stack(
           children: [
             if (_previewBytes == null)

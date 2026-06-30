@@ -38,6 +38,17 @@ subprojects {
     }
 }
 
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "com.razorpay" && requested.name == "checkout") {
+                useVersion("1.6.41")
+                because("Avoid dynamic Razorpay metadata lookups during release builds")
+            }
+        }
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

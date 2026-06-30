@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:resume_builder/core/services/ai_resume_service.dart';
@@ -7,7 +6,8 @@ import 'package:resume_builder/core/services/app_config_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('Flutter client can generate AI bullet points through live backend', () async {
+  test('Flutter client can generate AI bullet points through live backend',
+      () async {
     await AppConfigService.initialize();
 
     final health = await AiResumeService.validateAvailability(

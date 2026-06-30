@@ -30,6 +30,30 @@ class TwilioService {
 
   bool get supportsWebOtp => !kIsWeb || _hasDebugOtp || _hasBackendOtp;
 
+  void _logOtpContext(String stage, {Object? error, StackTrace? stackTrace}) {
+    final packageName = AppConfigService.read('PACKAGE_NAME');
+    final packageSha1 = AppConfigService.read('PACKAGE_SHA1');
+    final packageSha256 = AppConfigService.read('PACKAGE_SHA256');
+    final firebaseCerts = AppConfigService.read(
+      'FIREBASE_ANDROID_CERTIFICATE_HASHES',
+    );
+
+    debugPrint(
+      '[OTP][$stage] package=$packageName '
+      'sha1=${packageSha1.isEmpty ? 'n/a' : packageSha1} '
+      'sha256=${packageSha256.isEmpty ? 'n/a' : packageSha256} '
+      'firebaseCerts=${firebaseCerts.isEmpty ? 'n/a' : firebaseCerts}',
+    );
+
+    if (error != null) {
+      debugPrint('[OTP][$stage] error=$error');
+    }
+
+    if (stackTrace != null) {
+      debugPrint('[OTP][$stage] stack=$stackTrace');
+    }
+  }
+
   /// Sends a verification code using Firebase Phone Auth on mobile first,
   /// then falls back to the configured backend when available.
   Future<Map<String, dynamic>> sendOTP(String phoneNumber) async {
@@ -174,6 +198,7 @@ class TwilioService {
     var completed = false;
 
     try {
+      _logOtpContext('firebase-send-start');
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
         forceResendingToken:
@@ -210,6 +235,7 @@ class TwilioService {
           }
 
           completed = true;
+          _logOtpContext('firebase-verification-failed', error: error);
           completer.complete(<String, dynamic>{
             'success': false,
             'message': _parseFirebaseAuthError(error),
@@ -250,6 +276,7 @@ class TwilioService {
         },
       );
     } on FirebaseAuthException catch (error) {
+      _logOtpContext('firebase-send-exception', error: error);
       return {
         'success': false,
         'message': _parseFirebaseAuthError(error),
@@ -257,6 +284,11 @@ class TwilioService {
         'provider': 'firebase',
       };
     } catch (error, stackTrace) {
+      _logOtpContext(
+        'firebase-send-unknown-exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
       developer.log(
         'Failed to start Firebase phone verification',
         name: 'TwilioService',
@@ -285,6 +317,7 @@ class TwilioService {
     }
 
     try {
+      _logOtpContext('firebase-verify-start');
       final credential = PhoneAuthProvider.credential(
         verificationId: verificationId,
         smsCode: otpCode,
@@ -298,6 +331,7 @@ class TwilioService {
         'status': 'approved',
       };
     } on FirebaseAuthException catch (error) {
+      _logOtpContext('firebase-verify-failed', error: error);
       return {
         'success': false,
         'message': _parseFirebaseAuthError(error),
@@ -305,6 +339,11 @@ class TwilioService {
         'provider': 'firebase',
       };
     } catch (error, stackTrace) {
+      _logOtpContext(
+        'firebase-verify-unknown-exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
       developer.log(
         'Failed to verify Firebase OTP',
         name: 'TwilioService',
@@ -322,6 +361,7 @@ class TwilioService {
 
   Future<Map<String, dynamic>> _sendOtpViaBackend(String phoneNumber) async {
     try {
+      _logOtpContext('backend-send-start');
       final response = await http
           .post(
             Uri.parse(_otpSendUrl),
@@ -347,6 +387,11 @@ class TwilioService {
 
       return result;
     } catch (error, stackTrace) {
+      _logOtpContext(
+        'backend-send-exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
       developer.log(
         'Failed to reach OTP send service',
         name: 'TwilioService',
@@ -368,6 +413,7 @@ class TwilioService {
     String otpCode,
   ) async {
     try {
+      _logOtpContext('backend-verify-start');
       final response = await http
           .post(
             Uri.parse(_otpVerifyUrl),
@@ -393,6 +439,11 @@ class TwilioService {
 
       return result;
     } catch (error, stackTrace) {
+      _logOtpContext(
+        'backend-verify-exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
       developer.log(
         'Failed to reach OTP verify service',
         name: 'TwilioService',

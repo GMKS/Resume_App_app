@@ -18,10 +18,12 @@ class PublicResumeShareScreen extends ConsumerStatefulWidget {
   final String? resumePayload;
 
   @override
-  ConsumerState<PublicResumeShareScreen> createState() => _PublicResumeShareScreenState();
+  ConsumerState<PublicResumeShareScreen> createState() =>
+      _PublicResumeShareScreenState();
 }
 
-class _PublicResumeShareScreenState extends ConsumerState<PublicResumeShareScreen> {
+class _PublicResumeShareScreenState
+    extends ConsumerState<PublicResumeShareScreen> {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _collection = 'public_resume_shares';
 
@@ -45,30 +47,55 @@ class _PublicResumeShareScreenState extends ConsumerState<PublicResumeShareScree
   }
 
   Future<Map<String, dynamic>?> _loadSharedResume() async {
+    debugPrint(
+      'PublicResumeShareScreen.load start shareId=${widget.shareId} '
+      'hasPayload=${(widget.resumePayload?.trim().isNotEmpty ?? false)}',
+    );
+
     final payloadResume = _decodeResumePayload(widget.resumePayload);
     if (payloadResume != null) {
+      debugPrint('PublicResumeShareScreen.load using query payload');
       return payloadResume;
     }
 
-    final snapshot = await _db.collection(_collection).doc(widget.shareId).get();
-    final data = snapshot.data();
-    if (data == null || data['active'] != true) {
+    if (widget.shareId.trim().isEmpty) {
+      debugPrint('PublicResumeShareScreen.load missing shareId');
       return null;
     }
 
-    final resumeData = data['resume'];
-    if (resumeData is! Map) {
-      final storedPayload = data['resumePayload'];
-      if (storedPayload is String) {
-        final decoded = _decodeResumePayload(storedPayload);
-        if (decoded != null) {
-          return decoded;
-        }
+    try {
+      final snapshot =
+          await _db.collection(_collection).doc(widget.shareId).get();
+      final data = snapshot.data();
+      debugPrint(
+        'PublicResumeShareScreen.load snapshot '
+        'exists=${snapshot.exists} active=${data?['active']} '
+        'hasResume=${data?['resume'] is Map}',
+      );
+      if (data == null || data['active'] != true) {
+        return null;
       }
-      return null;
-    }
 
-    return resumeData.map((key, value) => MapEntry(key.toString(), value));
+      final resumeData = data['resume'];
+      if (resumeData is! Map) {
+        final storedPayload = data['resumePayload'];
+        if (storedPayload is String) {
+          final decoded = _decodeResumePayload(storedPayload);
+          if (decoded != null) {
+            debugPrint(
+                'PublicResumeShareScreen.load using stored payload fallback');
+            return decoded;
+          }
+        }
+        return null;
+      }
+
+      return resumeData.map((key, value) => MapEntry(key.toString(), value));
+    } catch (error) {
+      debugPrint(
+          'PublicResumeShareScreen.load failed shareId=${widget.shareId} error=$error');
+      rethrow;
+    }
   }
 
   @override
@@ -79,6 +106,12 @@ class _PublicResumeShareScreenState extends ConsumerState<PublicResumeShareScree
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const Scaffold(
+            body: Center(child: Text('Shared portfolio is unavailable.')),
           );
         }
 

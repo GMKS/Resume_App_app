@@ -7,7 +7,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_platform_interface/in_app_purchase_platform_interface.dart'
-    show InAppPurchasePlatform;
+  show InAppPurchasePlatform, InAppPurchasePlatformAddition, PurchaseStatus;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/subscription_model.dart';
@@ -109,33 +109,39 @@ class PlayBillingService {
     }
 
     try {
-      final response = await platform.billingClientManager.runWithClient(
-        (client) => client.queryPurchases(ProductType.subs),
-      );
+      final platformAddition =
+          InAppPurchasePlatformAddition.instance
+              as InAppPurchaseAndroidPlatformAddition;
+      final response = await platformAddition.queryPastPurchases();
 
       debugPrint(
         'PlayBillingService.startupSync: source=$source '
-        'response=${response.responseCode.name} '
-        'purchaseCount=${response.purchasesList.length}',
+        'error=${response.error?.code ?? 'none'} '
+        'purchaseCount=${response.pastPurchases.length}',
       );
 
-      if (response.responseCode != BillingResponse.ok) {
+      if (response.error != null) {
         return false;
       }
 
-      final activePurchases = response.purchasesList
+      final activePurchases = response.pastPurchases
+          .whereType<GooglePlayPurchaseDetails>()
           .where(
             (purchase) =>
-                purchase.purchaseState == PurchaseStateWrapper.purchased &&
-                purchase.purchaseToken.trim().isNotEmpty,
+                purchase.status == PurchaseStatus.purchased &&
+                purchase.billingClientPurchase.purchaseToken.trim().isNotEmpty,
           )
           .toList(growable: false)
         ..sort(
-            (left, right) => right.purchaseTime.compareTo(left.purchaseTime));
+          (left, right) => right.billingClientPurchase.purchaseTime.compareTo(
+            left.billingClientPurchase.purchaseTime,
+          ),
+        );
 
       final prefs = await SharedPreferences.getInstance();
       for (final purchase in activePurchases) {
-        final matchingPlan = purchase.products
+        final billingPurchase = purchase.billingClientPurchase;
+        final matchingPlan = billingPurchase.products
             .map(planForProductId)
             .whereType<SubscriptionPlan>()
             .firstOrNull;
@@ -144,12 +150,12 @@ class PlayBillingService {
         }
 
         final purchaseDate =
-            DateTime.fromMillisecondsSinceEpoch(purchase.purchaseTime);
+            DateTime.fromMillisecondsSinceEpoch(billingPurchase.purchaseTime);
         final renewalDate = _projectGooglePlayRenewalDate(
           purchaseDate: purchaseDate,
           plan: matchingPlan,
         );
-        final cancelAtPeriodEnd = !purchase.isAutoRenewing;
+        final cancelAtPeriodEnd = !billingPurchase.isAutoRenewing;
 
         await prefs.setString('subscription_plan', matchingPlan.name);
         await prefs.setString(
@@ -162,14 +168,15 @@ class PlayBillingService {
           purchaseDate.millisecondsSinceEpoch.toString(),
         );
         await prefs.setString(
-            'subscription_purchase_token', purchase.purchaseToken);
-        await prefs.setString('subscription_store_order_id', purchase.orderId);
-        await prefs.setString('subscription_payment_id', purchase.orderId);
-        await prefs.setString('subscription_order_id', purchase.orderId);
-        await prefs.setString('subscription_signature', purchase.signature);
+          'subscription_purchase_token', billingPurchase.purchaseToken);
+        await prefs.setString(
+          'subscription_store_order_id', billingPurchase.orderId);
+        await prefs.setString('subscription_payment_id', billingPurchase.orderId);
+        await prefs.setString('subscription_order_id', billingPurchase.orderId);
+        await prefs.setString('subscription_signature', billingPurchase.signature);
         await prefs.setString('subscription_verification_status', 'active');
         await prefs.setBool(
-            'subscription_auto_renewing', purchase.isAutoRenewing);
+          'subscription_auto_renewing', billingPurchase.isAutoRenewing);
         await prefs.setBool(
             'subscription_cancel_at_period_end', cancelAtPeriodEnd);
         await prefs.setString(
@@ -183,11 +190,11 @@ class PlayBillingService {
 
         debugPrint(
           'PlayBillingService.startupSync: source=$source '
-          'plan=${matchingPlan.name} orderId=${purchase.orderId} '
-          'tokenPresent=${purchase.purchaseToken.isNotEmpty} '
-          'acknowledged=${purchase.isAcknowledged} '
-          'autoRenewing=${purchase.isAutoRenewing} '
-          'purchaseTime=${purchase.purchaseTime} '
+          'plan=${matchingPlan.name} orderId=${billingPurchase.orderId} '
+          'tokenPresent=${billingPurchase.purchaseToken.isNotEmpty} '
+          'acknowledged=${billingPurchase.isAcknowledged} '
+          'autoRenewing=${billingPurchase.isAutoRenewing} '
+          'purchaseTime=${billingPurchase.purchaseTime} '
           'renewalDate=${renewalDate.toIso8601String()}',
         );
         return true;
@@ -539,42 +546,22 @@ class PlayBillingService {
     if (defaultTargetPlatform == TargetPlatform.android &&
         platform is InAppPurchaseAndroidPlatform) {
       final queryIds = _productIds.toList(growable: false)..sort();
-      // ignore: invalid_use_of_visible_for_testing_member
-      final wrapper = await platform.billingClientManager.runWithClient(
-        (client) => client.queryProductDetails(
-          productList: queryIds
-              .map(
-                (productId) => ProductWrapper(
-                  productId: productId,
-                  productType: ProductType.subs,
-                ),
-              )
-              .toList(growable: false),
-        ),
-      );
-      final productDetails = wrapper.productDetailsList
-          .expand(GooglePlayProductDetails.fromProductDetails)
+      final response = await platform.queryProductDetails(queryIds.toSet());
+      final productDetails = response.productDetails
+          .whereType<GooglePlayProductDetails>()
           .toList(growable: false);
       final returnedIds = productDetails.map((product) => product.id).toSet();
       final notFoundIds = queryIds
           .where((productId) => !returnedIds.contains(productId))
           .toList(growable: false);
-      final error = wrapper.billingResult.responseCode == BillingResponse.ok
-          ? null
-          : IAPError(
-              source: 'google_play',
-              code: wrapper.billingResult.responseCode.name,
-              message: wrapper.billingResult.debugMessage ?? '',
-            );
 
       return _ProductQueryResult(
         response: ProductDetailsResponse(
           productDetails: productDetails,
           notFoundIDs: notFoundIds,
-          error: error,
+          error: response.error,
         ),
-        queryType: 'BillingClient.queryProductDetailsAsync(ProductType.subs)',
-        androidBillingResult: wrapper.billingResult,
+        queryType: 'InAppPurchaseAndroidPlatform.queryProductDetails',
       );
     }
 

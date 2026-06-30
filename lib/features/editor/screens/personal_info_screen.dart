@@ -293,6 +293,10 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
       final resume = ref.read(currentResumeProvider(widget.resumeId));
       if (resume != null) {
         final normalizedPhone = _normalizedPhoneDigits(_phoneController.text);
+        final rawWebsite = _websiteController.text.trim();
+        final normalizedWebsite = rawWebsite.isEmpty
+            ? ''
+            : PortfolioProfileService.normalizeExternalUrl(rawWebsite);
         // Encode newly picked photo as base64, or keep existing stored value
         final String? imageBase64 = _pendingImageBytes != null
             ? base64Encode(_pendingImageBytes!)
@@ -305,16 +309,16 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
             email: _emailController.text.trim(),
             phone: normalizedPhone.isEmpty
                 ? ''
-              : PhoneNumberUtils.formatInternational(
-                _countryCode.trim(),
-                normalizedPhone,
-                includeSpace: true,
-                ),
+                : PhoneNumberUtils.formatInternational(
+                    _countryCode.trim(),
+                    normalizedPhone,
+                    includeSpace: true,
+                  ),
             address: _addressController.text.trim(),
             jobTitle: _jobTitleController.text.trim(),
             linkedIn: _linkedInController.text.trim(),
             github: _githubController.text.trim(),
-            website: _websiteController.text.trim(),
+            website: normalizedWebsite,
             profileImage: imageBase64,
             dateOfBirth: resume.personalInfo.dateOfBirth,
           ),
@@ -831,7 +835,8 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
                       if (trimmed.isEmpty) {
                         return null;
                       }
-                      if (!PortfolioProfileService.isValidPortfolioUrl(trimmed)) {
+                      if (!PortfolioProfileService.isValidPortfolioUrl(
+                          trimmed)) {
                         return 'Enter a valid public website URL';
                       }
                       return null;

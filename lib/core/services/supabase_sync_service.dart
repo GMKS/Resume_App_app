@@ -315,6 +315,17 @@ class SupabaseSyncService {
     return getDeviceId();
   }
 
+  static Future<String> get authenticatedUserId async {
+    await ensureSignedIn();
+    final uid = _auth.currentUser?.uid.trim() ?? '';
+    if (uid.isEmpty) {
+      throw Exception(
+        'Public resume sharing requires an authenticated Firebase workspace.',
+      );
+    }
+    return uid;
+  }
+
   static Future<void> deleteAllCloudData() async {
     try {
       await ensureSignedIn();

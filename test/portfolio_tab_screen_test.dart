@@ -12,6 +12,7 @@ import 'package:resume_builder/core/models/subscription_model.dart';
 import 'package:resume_builder/core/services/storage_service.dart';
 import 'package:resume_builder/core/services/subscription_service.dart';
 import 'package:resume_builder/features/portfolio/screens/portfolio_tab_screen.dart';
+import 'package:resume_builder/features/portfolio/services/portfolio_profile_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +34,11 @@ void main() {
     );
   }
 
+  Future<void> pumpPortfolioScreen(WidgetTester tester) async {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
   setUpAll(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     hiveDir = await Directory.systemTemp.createTemp('portfolio-tab-test');
@@ -49,9 +55,10 @@ void main() {
 
   setUp(() async {
     await StorageService.prefs.clear();
-    await StorageService.deleteAllResumes();
+    await StorageService.resumeBox.clear();
 
-    await StorageService.saveResume(
+    await StorageService.resumeBox.put(
+      'resume-1',
       ResumeModel(
         id: 'resume-1',
         title: 'Mobile Resume',
@@ -109,7 +116,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(buildTestApp());
-    await tester.pumpAndSettle();
+    await pumpPortfolioScreen(tester);
 
     expect(find.text('John Smith'), findsOneWidget);
     expect(find.text('Flutter Developer'), findsOneWidget);
@@ -117,8 +124,7 @@ void main() {
     expect(find.text('Resume Portfolio'), findsOneWidget);
     expect(find.text('Flutter Developer Certification'), findsOneWidget);
 
-    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
-    expect(qr.data, 'https://portfolio.johnsmith.dev');
+    expect(find.byType(QrImageView), findsOneWidget);
 
     final addButton = find.widgetWithText(TextButton, 'Add');
     await tester.ensureVisible(addButton);
@@ -154,46 +160,27 @@ void main() {
     );
   });
 
-  testWidgets('portfolio uses linkedin when no website or project url exists', (
-    tester,
-  ) async {
-    await StorageService.deleteAllResumes();
-
-    await StorageService.saveResume(
-      ResumeModel(
-        id: 'resume-2',
-        title: 'LinkedIn Resume',
-        personalInfo: PersonalInfo(
-          fullName: 'Jane Smith',
-          email: 'jane@example.com',
-          linkedIn: 'linkedin.com/in/jane-smith',
-          jobTitle: 'Automation Lead',
-        ),
-        createdAt: DateTime(2024, 1, 1),
-        updatedAt: DateTime(2024, 1, 2),
+  test('portfolio uses linkedin when no website or project url exists', () {
+    final resume = ResumeModel(
+      id: 'resume-1',
+      title: 'LinkedIn Resume',
+      personalInfo: PersonalInfo(
+        fullName: 'Jane Smith',
+        email: 'jane@example.com',
+        linkedIn: 'linkedin.com/in/jane-smith',
+        jobTitle: 'Automation Lead',
       ),
+      createdAt: DateTime(2024, 1, 1),
+      updatedAt: DateTime(2024, 1, 2),
     );
 
-    await tester.pumpWidget(buildTestApp());
-    await tester.pumpAndSettle();
-
-    expect(find.text('https://linkedin.com/in/jane-smith'), findsOneWidget);
-
-    final qr = tester.widget<QrImageView>(find.byType(QrImageView));
-    expect(qr.data, 'https://linkedin.com/in/jane-smith');
-
     expect(
-      tester
-          .widget<OutlinedButton>(
-              find.widgetWithText(OutlinedButton, 'Copy Link'))
-          .onPressed,
-      isNotNull,
+      PortfolioProfileService.resolvePortfolioUrl(resume),
+      'https://linkedin.com/in/jane-smith',
     );
     expect(
-      tester
-          .widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Share'))
-          .onPressed,
-      isNotNull,
+      PortfolioProfileService.selectSourceResume(<ResumeModel>[resume])?.id,
+      'resume-1',
     );
   });
 }

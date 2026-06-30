@@ -1,7 +1,6 @@
 param(
     [switch]$AnalyzeSize,
-    [switch]$Arm64Only,
-    [string]$VersionName
+    [switch]$Arm64Only
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,8 +46,6 @@ if (-not $pubspecVersionMatch) {
 
 $pubspecBuildNumber = [int64]$pubspecVersionMatch.Matches[0].Groups[2].Value
 $pubspecVersionName = $pubspecVersionMatch.Matches[0].Groups[1].Value
-$releaseVersionName = if ([string]::IsNullOrWhiteSpace($VersionName)) { $pubspecVersionName } else { $VersionName.Trim() }
-$pubspecVersionChanged = $releaseVersionName -ne $pubspecVersionName
 $lastBuildNumberPath = Join-Path $PSScriptRoot '.last_android_build_number'
 $lastRecordedBuildNumber = 0
 
@@ -64,23 +61,14 @@ $nextBuildNumber = [Math]::Max(
     [Math]::Max($pubspecBuildNumber + 1, $lastRecordedBuildNumber + 1)
 )
 
-if ($nextBuildNumber -le $pubspecBuildNumber -or $nextBuildNumber -le $lastRecordedBuildNumber) {
-    throw "Computed build number $nextBuildNumber must be greater than the previous version codes (pubspec=$pubspecBuildNumber, lastBuild=$lastRecordedBuildNumber)."
-}
-
-if ($nextBuildNumber -eq $pubspecBuildNumber) {
-    throw "Refusing to build with duplicate versionCode $nextBuildNumber. Increase the build number before packaging a new AAB."
-}
-
 # Keep Android versionCode in a safe range (Play's max is 2,100,000,000).
 if ($nextBuildNumber -gt 2100000000) {
     throw "Computed build number $nextBuildNumber exceeds Android/Play maximum (2,100,000,000)."
 }
 
-function Update-PubspecVersion {
+function Update-PubspecBuildNumber {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$VersionName,
         [Parameter(Mandatory = $true)][int64]$BuildNumber
     )
 
@@ -107,7 +95,7 @@ function Update-PubspecVersion {
     $updated = [System.Text.RegularExpressions.Regex]::Replace(
         $text,
         '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)\s*$',
-        { param($m) "version: $VersionName+$BuildNumber" }
+        { param($m) "version: $($m.Groups[1].Value)+$BuildNumber" }
     )
 
     if ($updated -ne $text) {
@@ -117,16 +105,11 @@ function Update-PubspecVersion {
             $outBytes = $bom + $outBytes
         }
         [System.IO.File]::WriteAllBytes($Path, $outBytes)
-        Write-Host "Synced pubspec.yaml version -> $VersionName+$BuildNumber"
+        Write-Host "Synced pubspec.yaml build number -> $BuildNumber"
     }
 }
 
 Write-Host "Using Android versionCode=$nextBuildNumber"
-if ($pubspecVersionChanged) {
-    Write-Host "Updating versionName from $pubspecVersionName to $releaseVersionName"
-}
-
-Update-PubspecVersion -Path (Join-Path $PSScriptRoot 'pubspec.yaml') -VersionName $releaseVersionName -BuildNumber $nextBuildNumber
 
 $targetPlatform = if ($Arm64Only) {
     'android-arm64'
@@ -145,112 +128,30 @@ $buildArgs = @(
     '--split-debug-info=build/symbols'
 )
 
-function Get-ConfigValue {
-    param(
-        [Parameter(Mandatory = $true)][string]$Key
-    )
-
-    $envValue = [Environment]::GetEnvironmentVariable($Key)
-    if (-not [string]::IsNullOrWhiteSpace($envValue)) {
-        return $envValue.Trim()
-    }
-
-    $localPropertiesPath = Join-Path $PSScriptRoot 'android\local.properties'
-    if (Test-Path $localPropertiesPath) {
-        $match = Select-String -Path $localPropertiesPath -Pattern ("^" + [Regex]::Escape($Key) + "=(.*)$") | Select-Object -First 1
-        if ($match) {
-            $value = $match.Matches[0].Groups[1].Value.Trim()
-            if (-not [string]::IsNullOrWhiteSpace($value)) {
-                return $value
-            }
-        }
-    }
-
-    $dotEnvPath = Join-Path $PSScriptRoot '.env'
-    if (Test-Path $dotEnvPath) {
-        $match = Select-String -Path $dotEnvPath -Pattern ("^" + [Regex]::Escape($Key) + "=(.*)$") | Select-Object -First 1
-        if ($match) {
-            $value = $match.Matches[0].Groups[1].Value.Trim()
-            if (-not [string]::IsNullOrWhiteSpace($value)) {
-                return $value
-            }
-        }
-    }
-
-    return ''
-}
-
-$otpBaseUrl = Get-ConfigValue -Key 'OTP_BASE_URL'
-$otpSendUrl = Get-ConfigValue -Key 'OTP_SEND_URL'
-$otpVerifyUrl = Get-ConfigValue -Key 'OTP_VERIFY_URL'
-$aiBaseUrl = Get-ConfigValue -Key 'AI_BASE_URL'
-$aiEnvironment = Get-ConfigValue -Key 'AI_ENV'
-$razorpayKeyId = Get-ConfigValue -Key 'RAZORPAY_KEY_ID'
-
-if (-not [string]::IsNullOrWhiteSpace($razorpayKeyId) -and
-    [string]::IsNullOrWhiteSpace($otpBaseUrl) -and
-    [string]::IsNullOrWhiteSpace($otpSendUrl) -and
-    [string]::IsNullOrWhiteSpace($otpVerifyUrl)) {
-    throw 'Razorpay checkout requires OTP_BASE_URL or OTP_SEND_URL / OTP_VERIFY_URL to be configured in environment variables, android/local.properties, or .env before building a release.'
-}
-
-if ([string]::IsNullOrWhiteSpace($aiBaseUrl)) {
-    throw 'Production AI features require AI_BASE_URL to be configured in environment variables, android/local.properties, or .env before building a release.'
-}
-
-if ($aiBaseUrl -notmatch '^https?://') {
-    throw "AI_BASE_URL must be an absolute http/https URL. Current value: $aiBaseUrl"
-}
-
-if ([string]::IsNullOrWhiteSpace($aiEnvironment)) {
-    Write-Warning 'AI_ENV is not configured. Defaulting runtime diagnostics to production.'
-}
-
 if ($AnalyzeSize) {
     $buildArgs += '--analyze-size'
 }
 
-Write-Host 'Release checklist:'
-Write-Host "- versionCode: $nextBuildNumber (previous pubspec=$pubspecBuildNumber, lastBuild=$lastRecordedBuildNumber)"
-Write-Host "- versionName: $releaseVersionName"
-Write-Host '- Google Play Billing: enabled in production builds and product IDs loaded from release config'
-Write-Host "- AI backend: $aiBaseUrl"
-if (-not [string]::IsNullOrWhiteSpace($aiEnvironment)) {
-    Write-Host "- AI environment: $aiEnvironment"
-}
-Write-Host '- Dummy/test payments: disabled for signed release builds'
-Write-Host '- Build output: release app bundle for Play Console upload'
-
-function Ensure-FlutterDependencies {
-    $packageConfigPath = Join-Path $PSScriptRoot '.dart_tool\package_config.json'
-    $pubspecLockPath = Join-Path $PSScriptRoot 'pubspec.lock'
-
-    $needsGet = -not (Test-Path $packageConfigPath)
-    if (-not $needsGet -and (Test-Path $pubspecLockPath)) {
-        $packageConfigTime = (Get-Item $packageConfigPath).LastWriteTimeUtc
-        $pubspecTime = (Get-Item 'pubspec.yaml').LastWriteTimeUtc
-        $lockTime = (Get-Item $pubspecLockPath).LastWriteTimeUtc
-        if ($pubspecTime -gt $packageConfigTime -or $lockTime -gt $packageConfigTime) {
-            $needsGet = $true
-        }
-    }
-
-    if ($needsGet) {
-        Write-Host 'Refreshing Flutter dependencies...'
-        flutter pub get
-    } else {
-        Write-Host 'Skipping flutter pub get; dependency cache is current.'
+if (Test-Path (Join-Path $PSScriptRoot 'android\gradlew.bat')) {
+    Write-Host 'Stopping existing Gradle daemons (if any)...'
+    Push-Location (Join-Path $PSScriptRoot 'android')
+    try {
+        & .\gradlew.bat --stop | Out-Null
+    } finally {
+        Pop-Location
     }
 }
 
-Ensure-FlutterDependencies
-& flutter @buildArgs --build-name $releaseVersionName
+flutter clean
+flutter pub get
+& flutter @buildArgs
 
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
 Set-Content -Path $lastBuildNumberPath -Value $nextBuildNumber
+Update-PubspecBuildNumber -Path (Join-Path $PSScriptRoot 'pubspec.yaml') -BuildNumber $nextBuildNumber
 
 $aabPath = Join-Path $PSScriptRoot 'build\app\outputs\bundle\release\app-release.aab'
 

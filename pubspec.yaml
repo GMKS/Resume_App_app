@@ -3,7 +3,7 @@ description: A modern, professional resume builder app with beautiful templates 
 
 publish_to: "none"
 
-version: 1.0.2+1782485882
+version: 1.0.2+1782654349
 environment:
   sdk: ">=3.0.0 <4.0.0"
 
